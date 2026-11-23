@@ -14,6 +14,7 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { Reflector } from 'three/addons/objects/Reflector.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { dressCar } from './details.js';
 
 // ---------------------------------------------------------------- the car
 // Material names come from the model. The paint is recoloured only on meshes under `paintNode`, because the
@@ -21,16 +22,13 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 const CAR = {
   url: new URL('../assets/models/lancer-evolution.glb', import.meta.url).href,
   length: 4.49,                        // Evo IX: 4,490 mm
-  paintNode: 'car body',
+  paintNode: 'car_body',             // GLTFLoader renames the node 'car body' to 'car_body'
   paint: ['wire_176026026'],
-  glass: ['wire_255255255'],
-  tailLights: ['wire_255000000'],
-  rims: ['wire_154154154'],
-  tyres: ['wire_040040040'],
+  tailLights: ['wire_255000000'],   // used to find the front; the other parts are handled in details.js
   // CC BY 4.0 requires this credit wherever the model is shown
   credit: '<a href="https://sketchfab.com/3d-models/mitsubishi-lancer-evolution-b8087424eb45478a80a32428396f58a9">Mitsubishi Lancer Evolution</a> 3D model by <a href="https://sketchfab.com/3dcarsforyou">3DCars4U</a>, licensed under <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>.',
 };
-const PAINT = { color: 0xc4c8cd, metalness: 0.9, roughness: 0.32 };   // liquid silver, under clear coat
+const PAINT = { color: 0xb9bdc3 };   // liquid silver (the full paint material is in details.js)
 
 const CEIL = 3.35;
 const SPOT_Y = 3.25;
@@ -77,7 +75,7 @@ function environment() {
   const pool = new THREE.Mesh(new THREE.CircleGeometry(2.6, 48), basic(0.32, 0.31, 0.3));
   pool.rotation.x = -Math.PI / 2; pool.position.y = lift + 0.01; env.add(pool);
   for (const s of [-1, 1]) {
-    const bay = new THREE.Mesh(new THREE.PlaneGeometry(40, 1.6), basic(0.05, 0.05, 0.055, THREE.DoubleSide));
+    const bay = new THREE.Mesh(new THREE.PlaneGeometry(40, 1.6), basic(0.12, 0.12, 0.13, THREE.DoubleSide));
     bay.position.set(0, 0.9 + lift, s * 14.5); env.add(bay);
   }
   const pmrem = new THREE.PMREMGenerator(renderer);
@@ -326,32 +324,15 @@ function prepareCar(model) {
   car.updateMatrixWorld(true);
   car.position.y = -new THREE.Box3().setFromObject(car).min.y;
 
-  // physically based materials: clear-coated metallic paint, reflective tinted glass, satin rims, rubber
-  const paint = new THREE.MeshPhysicalMaterial({
-    color: PAINT.color, metalness: PAINT.metalness, roughness: PAINT.roughness,
-    clearcoat: 1, clearcoatRoughness: 0.03, envMap: ENV, envMapIntensity: 1.2,
-  });
-  const glass = new THREE.MeshPhysicalMaterial({
-    color: 0x0a0c0e, metalness: 0, roughness: 0.02, transparent: true, opacity: 0.78,
-    clearcoat: 1, clearcoatRoughness: 0, envMap: ENV, envMapIntensity: 1.6, depthWrite: false,
-  });
-  const underBody = o => { for (let p = o; p; p = p.parent) if (p.name === CAR.paintNode) return true; return false; };
-  model.traverse(o => {
-    if (!o.isMesh) return;
-    o.castShadow = true;
-    o.receiveShadow = true;
-    const list = names(o.material).map(m => {
-      if (CAR.paint.includes(m.name) && underBody(o)) return paint;
-      if (CAR.glass.includes(m.name)) { o.castShadow = false; return glass; }
-      if (CAR.rims.includes(m.name)) { m.color.setScalar(0.035); m.metalness = 0.9; m.roughness = 0.28; }   // gloss black wheels, like the build
-      if (CAR.tyres.includes(m.name)) { m.roughness = 0.88; m.metalness = 0; }
-      if (CAR.tailLights.includes(m.name)) { m.emissive = new THREE.Color(0.9, 0.03, 0.02); m.emissiveIntensity = 0.6; }
-      m.envMap = ENV;
-      m.envMapIntensity = 1;
-      return m;
-    });
-    o.material = Array.isArray(o.material) ? list : list[0];
-  });
+  car.updateMatrixWorld(true);
+
+  // realistic materials and details (src/showroom/details.js)
+  let metresPerUnit = 0.025;
+  model.traverse(o => { if (o.isMesh && o.parent && o.parent.name === CAR.paintNode) metresPerUnit = o.matrixWorld.getMaxScaleOnAxis(); });
+  scene.add(dressCar(model, {
+    env: ENV, paintColor: PAINT.color, unitsPerMetre: 1 / metresPerUnit,
+    frontX: new THREE.Box3().setFromObject(car).max.x,
+  }));
 
   // soft contact shadow so the tyres sit on the floor
   const shadowTex = canvasTexture(256, (g, n) => {
@@ -369,9 +350,11 @@ const api = { ready: false, credit: CAR.credit, setActive, camera, controls, spo
 const draco = new DRACOLoader().setDecoderPath(new URL('../vendor/three/addons/libs/draco/gltf/', import.meta.url).href);
 new GLTFLoader().setDRACOLoader(draco).load(CAR.url, gltf => {
   scene.add(prepareCar(gltf.scene));
-  composer.render();   // compile shaders now, not on the first visible frame
-  api.ready = true;
-  onReady(api);
+  // compile every shader in the background (KHR_parallel_shader_compile), so the page and the film don't stall
+  renderer.compileAsync(scene, camera).catch(() => {}).then(() => {
+    api.ready = true;
+    onReady(api);
+  });
 }, undefined, err => {
   console.error('[showroom]', err);
   onError(err);

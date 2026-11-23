@@ -44,7 +44,7 @@ npm run dev          # rebuild on every change in src/; refresh dist/index.html 
 | `src/app.js` | Hero film controller, WebGL setup, render loop, adaptive resolution, 3D intro (preview only), scroll cameras, routing, configurator UI, parts catalogue, contact form |
 | `src/scene.frag` | The whole 3D scene |
 | `assets/site/` | Hero media that ships with the site |
-| `src/showroom/` | `showroom.js`: the photoreal three.js scene (car, garage, spotlight, reflective floor, post-processing) as `startShowroom()`. `index.html`: a full-screen preview with drag-to-orbit (`dist/showroom/`) |
+| `src/showroom/` | `showroom.js`: the photoreal three.js scene (car, garage, spotlight, reflective floor, post-processing) as `startShowroom()`. `details.js`: the car's realistic materials and details. `index.html`: a full-screen preview with drag-to-orbit (`dist/showroom/`) |
 | `vendor/three/` | three.js r170 and the add-ons the showroom imports (glTF and Draco loaders, post-processing, Reflector, OrbitControls) |
 | `assets/site/models/` | The 3D car and its credits |
 | `assets/generated/` | Higgsfield stills, the segment prompts (`prompts/`), `film-plan.json`, and how the shipped files were made |
@@ -76,10 +76,23 @@ npm run dev          # rebuild on every change in src/; refresh dist/index.html 
 
 ## Showroom (`src/showroom/showroom.js`)
 
-- **Car config `CAR`:** the model URL, real length (4.49 m) and its material names.
-  - The paint (`wire_176026026`) is replaced with a clear-coated metallic `MeshPhysicalMaterial`, but only under the `car body` node, because the wheels share that material.
-  - Also restyled: glass, gloss black rims, tyres and glowing tail-light lenses.
+- **Car config `CAR`:** the model URL, real length (4.49 m) and the tail-light material.
   - The model is scaled to its real length, centred and set on the floor. It is turned so its front faces +x, away from the tail lights.
+- **Details (`details.js`, `dressCar()`):** the model has no textures, so realism is added at runtime and the file stays untouched.
+  - **Telling parts apart:** the model shares materials between parts, so `dressCar()` goes by the node each part hangs under. Those nodes are `car_body` (GLTFLoader turns spaces in node names into underscores), `w1`–`w4` and `b1`–`b4`.
+  - **Paint:** `MeshPhysicalMaterial` with a rough metallic base (0.36) under a mirror clear coat.
+    - Metallic flake tilts the base normal per 1.5 mm cell, and fades out by `fwidth` once a flake is under a pixel, so it doesn't alias into noise.
+    - The clear coat gets a faint 1.5 cm orange-peel ripple.
+    - Both are in model units, converted using the body mesh's world scale.
+  - **Wheels:**
+    - tyres: sidewall lettering from a canvas strip on the outer face only (`uOutward` per tyre), a rim-protector ring, tread grooves and sipes, all in the tyre's local cylinder (axis = local y)
+    - gloss black clear-coated rims (`wire_007007007`)
+    - machined cast-iron discs with a dark hat (`wire_154154154`)
+    - red calipers (everything under `b1`–`b4`)
+    - a chrome centre cap
+  - **Body:** satin black trim, tinted windows, and glossy deep-red tail-light lenses with a faint glow.
+  - **Headlights:** the lens triangles are split out of the window glass by position (within 0.62 m of the nose, 0.45–0.8 m high, more than 0.3 m off centre) into a clear-glass mesh. Behind each lens sit two emissive projectors with halo rings, plus a `SpotLight` beam onto the floor ahead.
+  - **Number plates:** both get planar UVs computed in world space and an "RZER" canvas plate.
 - **Lighting:**
   - One `SpotLight` overhead (110 cd, 0.78 rad) with PCF soft shadows, a dim hemisphere fill, and an additive cone mesh for the visible beam.
   - A PMREM map of a small HDR car park (spotlight lens and halo, dimmed tube rows, lit floor pool) gives the car its reflections.
@@ -89,6 +102,7 @@ npm run dev          # rebuild on every change in src/; refresh dist/index.html 
   - The `Reflector` mesh itself draws nothing (`colorWrite: false`); it only renders the mirror texture.
   - The set: hazard-striped pillars, dimmed tube rows, bay lines, fog.
 - **Post:** `EffectComposer` → `UnrealBloomPass` → `OutputPass` (ACES) → a vignette and grain pass.
+- **Shader compile:** `renderer.compileAsync()` compiles every shader before `showroom:ready`. It runs in the background where `KHR_parallel_shader_compile` exists, so the page and the film don't stall.
 - **Cost:** the model is about 500,000 triangles and 19 MB uncompressed. The `Reflector` renders the scene twice. Compressing the GLB with Draco (the gltf.report script in `assets/generated/README.md` style) would cut the download several times over.
 
 ## Shader (`src/scene.frag`)
