@@ -2,8 +2,8 @@
 
 Website for **Rzer (RZER Performance)**, a Singapore car tuning and performance workshop (Instagram: `@rzerperformance.sg`). Built by a web designer for this client. Theme: **gloss black**. One page with three parts:
 
-1. **Hero:** a realistic 15.6 s film that follows reference video 1 beat for beat, including its camera moves:
-   - black liquid flows in at floor level over a chrome emblem and gathers into a dome and a drop
+1. **Hero:** a realistic 12.5 s film that follows reference video 1 beat for beat from its 3 s mark, including its camera moves (the client cut the opening, where the liquid flows in):
+   - a glossy black dome on the spotlit floor shrinks to a drop
    - the drop bursts into radiating rods and a rectangle, and the frame and chassis rise from it
    - the body pours over as the camera comes down to a head-on view
    - the headlights snap on, the paint cures to silver, and the camera orbits to the front three-quarter
@@ -27,7 +27,7 @@ npm run dev          # rebuild on every change in src/; refresh dist/index.html 
 ## Stack and constraints
 
 - **The 3D view has no libraries and no 3D assets.** Raw WebGL2 with one fragment shader that raymarches signed distance fields (SDFs). The car, garage, liquid and lattice are all modelled in GLSL. This was chosen because the original build environment had no CDN access, and because SDFs let the liquid morph straight into the car. Moving to Three.js later would be a new renderer, not a port.
-- **The hero is media, not 3D:** `assets/site/hero-intro.mp4` (plus a `.webm` fallback), `hero-poster.jpg` and `hero-final.jpg`, about 9 MB in total. `build.mjs` copies them to `dist/assets/`.
+- **The hero is media, not 3D:** `assets/site/hero-intro.mp4` (plus a `.webm` fallback), `hero-poster.jpg` and `hero-final.jpg`, about 7.5 MB in total. `build.mjs` copies them to `dist/assets/`.
 - The page is **one HTML file**. `build.mjs` inlines `style.css`, `scene.frag` (into a `<script type="x-shader/x-fragment">`) and `app.js` into `src/index.html` at the `/*__CSS__*/`, `/*__FRAG__*/`, `/*__JS__*/` placeholders.
 - It was first published as a claude.ai artifact. That host's limits shaped some choices: inline scripts only, no fetch, no form posting, and hash routes must be a plain `#name`. It is now meant for normal hosting (for example GitHub Pages from `dist/`).
 

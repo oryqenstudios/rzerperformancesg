@@ -1,24 +1,24 @@
 # Generated hero media
 
-The hero opens on a realistic 15.6 s film made with Higgsfield (`api.higgsfield.ai`). It follows reference video 1 beat for beat, including its camera moves, and ends on the final still. This folder keeps the stills, the prompts and the plan for rebuilding the film. The files the site ships are in `assets/site/` (`build.mjs` copies them to `dist/assets/`).
+The hero opens on a realistic 12.5 s film made with Higgsfield (`api.higgsfield.ai`). It follows reference video 1 beat for beat, including its camera moves, and ends on the final still. This folder keeps the stills, the prompts and the plan for rebuilding the film. The files the site ships are in `assets/site/` (`build.mjs` copies them to `dist/assets/`).
 
 ## What ships
 
 | File in `assets/site/` | Made from |
 |---|---|
 | `hero-final.jpg` | `hero-final.png` at JPEG quality 88. It is `hero-v2a-1.png` with the garbled number-plate lettering painted out to a blank black plate. |
-| `hero-intro.mp4` / `.webm` | The five segments in `film-plan.json`, joined by `tools/assemble-film.py`. 1920×1080, 24 fps. H.264 CRF 24 (capped at 2.8 Mbit/s) with faststart is about 5 MB; VP9 CRF 35 is about 3.7 MB. No audio. |
+| `hero-intro.mp4` / `.webm` | The five segments in `film-plan.json`, joined by `tools/assemble-film.py`. 1920×1080, 24 fps. H.264 CRF 24 (capped at 2.8 Mbit/s) with faststart is about 4 MB; VP9 CRF 35 is about 3.1 MB. No audio. |
 | `hero-poster.jpg` | The film's first frame, shown until it starts. |
 
 ## The film, phase by phase
 
 | Playback | Reference video | Segment (model) | What happens | Camera |
 |---|---|---|---|---|
-| 0–3.4 s | 0–3.3 s | `seg-a-hailuo` (Hailuo 2.3) | Black liquid flows in from the left over a chrome ring emblem on the floor, gathers into a glossy dome, shrinks to a drop | Floor level, rising and pushing in |
-| 3.4–5.6 s | 3.3–5.2 s | `seg-b1-hailuo` (Hailuo 2.3) | The drop bursts into dozens of thin rods radiating across the floor; a pool squares off into a beaded rectangle | Looking down, rising |
-| 5.6–7.6 s | 5.2–6.4 s | `seg-b2-kling` (Kling 2.5 Turbo Pro) | The frame, wheels, engine, intercooler and seats rise out of the rectangle | High over the front |
-| 7.6–11.2 s | 6.4–10.4 s | `seg-c-kling` (Kling) | Black liquid pours up over the chassis and forms the body | Cranes down to a low, head-on front view |
-| 11.2–15.6 s | 10.4–15 s | `seg-d-kling` (Kling) | Headlights snap on, the paint cures from black to silver | Orbits from head-on to the front three-quarter, ending on the final still |
+| 0–0.4 s | 3.0–3.3 s | `seg-a-hailuo` (Hailuo 2.3), last 0.7 s only | The glossy dome shrinks to a drop. The client cut the first 3 s, where black liquid flows in over a chrome ring emblem; `"from": 5.184` in the plan does the cut, so removing it brings that opening back | Looking down at the drop |
+| 0.4–2.6 s | 3.3–5.2 s | `seg-b1-hailuo` (Hailuo 2.3) | The drop bursts into dozens of thin rods radiating across the floor; a pool squares off into a beaded rectangle | Looking down, rising |
+| 2.6–4.6 s | 5.2–6.4 s | `seg-b2-kling` (Kling 2.5 Turbo Pro) | The frame, wheels, engine, intercooler and seats rise out of the rectangle | High over the front |
+| 4.6–8.2 s | 6.4–10.4 s | `seg-c-kling` (Kling) | Black liquid pours up over the chassis and forms the body | Cranes down to a low, head-on front view |
+| 8.2–12.5 s | 10.4–15 s | `seg-d-kling` (Kling) | Headlights snap on, the paint cures from black to silver | Orbits from head-on to the front three-quarter, ending on the final still |
 
 The segment clips themselves are not committed (`assets/generated/shots/` is ignored, about 35 MB). Higgsfield keeps them for 7 days after generation.
 
