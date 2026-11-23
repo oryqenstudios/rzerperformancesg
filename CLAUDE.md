@@ -2,7 +2,13 @@
 
 Website for **Rzer (RZER Performance)**, a Singapore car tuning and performance workshop (Instagram: `@rzerperformance.sg`). Built by a web designer for this client. Theme: **gloss black**. One page with three parts:
 
-1. **Hero:** a realistic 10 s film in the style of reference video 1. A black droplet sits in a spotlight in an underground car park, bursts into radiating rods, grows a chassis, engine and wheels, pours a black liquid body over them, and cures into the client's silver Evo IX build. It crossfades into the final still, and the **RZER Performance logo** draws in over it. The film was generated with Higgsfield; see `assets/generated/README.md`.
+1. **Hero:** a realistic 15.6 s film that follows reference video 1 beat for beat, including its camera moves:
+   - black liquid flows in at floor level over a chrome emblem and gathers into a dome and a drop
+   - the drop bursts into radiating rods and a rectangle, and the frame and chassis rise from it
+   - the body pours over as the camera comes down to a head-on view
+   - the headlights snap on, the paint cures to silver, and the camera orbits to the front three-quarter
+
+   It crossfades into the final still, and the **RZER Performance logo** draws in over it. The film was generated with Higgsfield in five chained segments; see `assets/generated/README.md`.
 2. **Scroll sections** in the style of reference video 2: a real-time 3D Evo IX-style car under a showroom spotlight. The camera moves around it per section (side profile, rear three-quarter, x-ray with tracked hotspots, wheel close-up, headlights-on front view, contact).
 3. **Configurator** (`#build`): orbit the car and swap parts live (paint, wheels, calipers, aero, stance, exhaust, lights/tint, carbon) with a job card, build code, hold-to-compare-stock and copy-build.
 
@@ -21,7 +27,7 @@ npm run dev          # rebuild on every change in src/; refresh dist/index.html 
 ## Stack and constraints
 
 - **The 3D view has no libraries and no 3D assets.** Raw WebGL2 with one fragment shader that raymarches signed distance fields (SDFs). The car, garage, liquid and lattice are all modelled in GLSL. This was chosen because the original build environment had no CDN access, and because SDFs let the liquid morph straight into the car. Moving to Three.js later would be a new renderer, not a port.
-- **The hero is media, not 3D:** `assets/site/hero-intro.mp4` (plus a `.webm` fallback), `hero-poster.jpg` and `hero-final.jpg`, about 2.8 MB in total. `build.mjs` copies them to `dist/assets/`.
+- **The hero is media, not 3D:** `assets/site/hero-intro.mp4` (plus a `.webm` fallback), `hero-poster.jpg` and `hero-final.jpg`, about 9 MB in total. `build.mjs` copies them to `dist/assets/`.
 - The page is **one HTML file**. `build.mjs` inlines `style.css`, `scene.frag` (into a `<script type="x-shader/x-fragment">`) and `app.js` into `src/index.html` at the `/*__CSS__*/`, `/*__FRAG__*/`, `/*__JS__*/` placeholders.
 - It was first published as a claude.ai artifact. That host's limits shaped some choices: inline scripts only, no fetch, no form posting, and hash routes must be a plain `#name`. It is now meant for normal hosting (for example GitHub Pages from `dist/`).
 
@@ -34,7 +40,9 @@ npm run dev          # rebuild on every change in src/; refresh dist/index.html 
 | `src/app.js` | Hero film controller, WebGL setup, render loop, adaptive resolution, 3D intro (preview only), scroll cameras, routing, configurator UI, parts catalogue, contact form |
 | `src/scene.frag` | The whole 3D scene |
 | `assets/site/` | Hero media that ships with the site |
-| `assets/generated/` | Raw Higgsfield generations, the prompts and settings, and how the shipped files were made |
+| `assets/generated/` | Higgsfield stills, the segment prompts (`prompts/`), `film-plan.json`, and how the shipped files were made |
+| `tools/higgsfield-i2v.sh` | Generate one film segment (image-to-video) and pull its last frame |
+| `tools/assemble-film.py` | Reverse, retime and join the segments per `film-plan.json`; encode the web files |
 | `tools/shot.mjs` | Render the shader alone with any uniforms → `tools/shots/*.png` |
 | `tools/page.mjs` | Drive the built page through states (intro time, scroll, `#build`, clicks) → screenshots + page errors |
 
@@ -42,7 +50,7 @@ npm run dev          # rebuild on every change in src/; refresh dist/index.html 
 
 - The film plays muted and inline once. On `ended` it adds `.is-final`, which fades in `hero-final.jpg`, then `finishIntro()` swaps `is-intro` for `intro-done` and adds `.revealed` to the logo.
 - **Skip** cuts straight to the final frame. Esc, the wheel or a swipe set `playbackRate = 4`. `prefers-reduced-motion` and in-page hash links go straight to the still.
-- **Fallbacks:** if autoplay is refused, the last `<source>` errors, or nothing has played after 7 s, it shows the still. The film's last frame and the still differ by about 1.5% per pixel, so the crossfade is invisible.
+- **Fallbacks:** if autoplay is refused, the last `<source>` errors, or nothing has played after 7 s, it shows the still. The film's last frame and the still differ by about 1.2% per pixel, so the crossfade is invisible.
 - While the film covers the stage (home page, `scrollY < 2`), the 3D view draws only every 30th frame.
 - **Portrait screens** (`max-aspect-ratio: 9/10`): the media takes the top 72svh and the copy sits on black below. The hero's own black background hides the 3D stage, and `.hero::after` fades it into the next section.
 - **Logo:** inline SVG, white, no background, redrawn from the client's logo. `.logo-line` (the car roofline swoosh) draws in with `stroke-dashoffset` on a `pathLength="1"` path. `.logo-words` (bold slanted RZER and outlined PERFORMANCE, Archivo at 125% width, skewed −12°) wipes in with `clip-path`. Replace it with the client's vector file when they send one.
