@@ -1,0 +1,7 @@
+[
+ {"file": "assets/generated/shots/seg-a-hailuo.mp4",  "target": 3.4},
+ {"file": "assets/generated/shots/seg-b1-hailuo.mp4", "target": 2.2, "from": 1.6},
+ {"file": "assets/generated/shots/seg-b2-kling.mp4",  "target": 2.0, "to": 4.0},
+ {"file": "assets/generated/shots/seg-c-kling.mp4",   "target": 3.6},
+ {"file": "assets/generated/shots/seg-d-kling.mp4",   "target": 4.4}
+]
