@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en-SG">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RZER Showroom</title>
+<meta name="description" content="Photoreal real-time preview of the Rzer build under a showroom spotlight in an underground car park.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&amp;display=swap" rel="stylesheet">
+<style>
+:root { --black: #000; --chrome: #e8ebee; --steel: #a3a9b1; --graphite: #5d636b; --font: "Archivo", "Helvetica Neue", Helvetica, Arial, sans-serif; --gutter: clamp(20px, 6vw, 96px); color-scheme: dark; }
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: var(--black); color: var(--chrome); font-family: var(--font); overflow: hidden; }
+#view { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; touch-action: none; }
+.copy { position: fixed; left: var(--gutter); bottom: clamp(56px, 10vh, 120px); width: clamp(260px, 31vw, 520px); pointer-events: none; }
+.logo-svg { display: block; width: 100%; height: auto; overflow: visible; }
+.logo-line { fill: none; stroke: #fff; stroke-width: 3.2; stroke-linecap: round; stroke-linejoin: round; filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.35)); }
+.logo-rzer { fill: #fff; font-family: var(--font); font-weight: 900; font-stretch: 125%; font-size: 84px; transform: skewX(-12deg); transform-origin: 30px 212px; }
+.logo-perf { fill: none; stroke: #fff; stroke-width: 1.4; font-family: var(--font); font-weight: 800; font-stretch: 125%; font-size: 44px; transform: skewX(-12deg); transform-origin: 280px 212px; }
+.status { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); font-size: 0.875rem; color: var(--steel); transition: opacity 0.4s ease; }
+.status.gone { opacity: 0; }
+.credit { position: fixed; right: 14px; bottom: 10px; font-size: 0.6875rem; color: var(--graphite); max-width: 60ch; text-align: right; }
+.credit a { color: inherit; }
+@media (max-aspect-ratio: 9/10) { .copy { bottom: 64px; } }
+</style>
+<script type="importmap">
+{ "imports": { "three": "../vendor/three/three.module.min.js", "three/addons/": "../vendor/three/addons/" } }
+</script>
+</head>
+<body>
+<canvas id="view" aria-label="Real-time 3D view of the car under a spotlight in an underground car park"></canvas>
+<p class="status" id="status">Loading the showroom</p>
+<div class="copy" aria-hidden="true">
+  <svg class="logo-svg" viewBox="0 0 640 230" focusable="false">
+    <path class="logo-line" d="M34 158 C96 151 150 143 196 131 C226 123 248 116 262 108 C286 94 312 76 342 64 C360 57 380 54 404 54 C438 54 462 57 482 66 C500 74 516 86 532 96 C548 105 566 110 588 112 L598 101 L603 115 C611 118 617 123 620 131"/>
+    <text class="logo-rzer" x="30" y="212" textLength="236" lengthAdjust="spacingAndGlyphs">RZER</text>
+    <text class="logo-perf" x="280" y="212" textLength="336" lengthAdjust="spacingAndGlyphs">PERFORMANCE</text>
+  </svg>
+</div>
+<p class="credit" id="credit"></p>
+<script type="module">
+import { startShowroom, credit } from './showroom.js';
+document.getElementById('credit').innerHTML = credit;
+const status = document.getElementById('status');
+window.SHOWROOM = startShowroom({
+  canvas: document.getElementById('view'),
+  interactive: true,
+  onReady: () => status.classList.add('gone'),
+  onError: () => { status.textContent = 'The car model could not be loaded.'; },
+});
+</script>
+</body>
+</html>

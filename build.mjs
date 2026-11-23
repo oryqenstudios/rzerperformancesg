@@ -22,6 +22,9 @@ function build() {
   // hero film, poster and final still ship next to the page
   const assetsIn = path.join(root, 'assets', 'site'), assetsOut = path.join(root, 'dist', 'assets');
   if (fs.existsSync(assetsIn)) fs.cpSync(assetsIn, assetsOut, { recursive: true });
+  // the photoreal three.js showroom (dist/showroom/) and the vendored three.js it imports
+  fs.cpSync(path.join(srcDir, 'showroom'), path.join(root, 'dist', 'showroom'), { recursive: true });
+  fs.cpSync(path.join(root, 'vendor'), path.join(root, 'dist', 'vendor'), { recursive: true });
   console.log(`[build] dist/index.html ${(html.length / 1024).toFixed(1)} KB`);
 }
 

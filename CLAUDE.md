@@ -8,7 +8,7 @@ Website for **Rzer (RZER Performance)**, a Singapore car tuning and performance 
    - the body pours over as the camera comes down to a head-on view
    - the headlights snap on, the paint cures to silver, and the camera orbits to the front three-quarter
 
-   It crossfades into the final still, and the **RZER Performance logo** draws in over it. The film was generated with Higgsfield in five chained segments; see `assets/generated/README.md`.
+   As it ends, the **RZER Performance logo** draws in, and the film hands over to a **photoreal real-time three.js Evo IX** under the showroom spotlight (`src/showroom/`). The AI still is the fallback until the 3D car loads. The film was generated with Higgsfield in five chained segments; see `assets/generated/README.md`.
 2. **Scroll sections** in the style of reference video 2: a real-time 3D Evo IX-style car under a showroom spotlight. The camera moves around it per section (side profile, rear three-quarter, x-ray with tracked hotspots, wheel close-up, headlights-on front view, contact).
 3. **Configurator** (`#build`): orbit the car and swap parts live (paint, wheels, calipers, aero, stance, exhaust, lights/tint, carbon) with a job card, build code, hold-to-compare-stock and copy-build.
 
@@ -27,7 +27,11 @@ npm run dev          # rebuild on every change in src/; refresh dist/index.html 
 ## Stack and constraints
 
 - **The 3D view has no libraries and no 3D assets.** Raw WebGL2 with one fragment shader that raymarches signed distance fields (SDFs). The car, garage, liquid and lattice are all modelled in GLSL. This was chosen because the original build environment had no CDN access, and because SDFs let the liquid morph straight into the car. Moving to Three.js later would be a new renderer, not a port.
-- **The hero is media, not 3D:** `assets/site/hero-intro.mp4` (plus a `.webm` fallback), `hero-poster.jpg` and `hero-final.jpg`, about 7.5 MB in total. `build.mjs` copies them to `dist/assets/`.
+- **The hero is a film, then three.js.** The film files are `assets/site/hero-intro.mp4` (plus a `.webm` fallback), `hero-poster.jpg` and `hero-final.jpg`, about 7.5 MB in total. After the film comes the photoreal car:
+  - `src/showroom/showroom.js` is an ES module that uses **three.js r170, vendored in `vendor/three/`** (MIT; no CDN). The page reaches it through an import map.
+  - The car is `assets/site/models/lancer-evolution.glb` (CC BY 4.0 by 3DCars4U; see `assets/site/models/CREDITS.md`).
+  - `build.mjs` copies `assets/site/` to `dist/assets/`, `src/showroom/` to `dist/showroom/` and `vendor/` to `dist/vendor/`.
+- **Serve over HTTP.** Module scripts don't load from `file://`, so the 3D car needs a web server (for example `python3 -m http.server -d dist` or GitHub Pages). Opened from disk, the hero falls back to the AI still.
 - The page is **one HTML file**. `build.mjs` inlines `style.css`, `scene.frag` (into a `<script type="x-shader/x-fragment">`) and `app.js` into `src/index.html` at the `/*__CSS__*/`, `/*__FRAG__*/`, `/*__JS__*/` placeholders.
 - It was first published as a claude.ai artifact. That host's limits shaped some choices: inline scripts only, no fetch, no form posting, and hash routes must be a plain `#name`. It is now meant for normal hosting (for example GitHub Pages from `dist/`).
 
@@ -40,6 +44,9 @@ npm run dev          # rebuild on every change in src/; refresh dist/index.html 
 | `src/app.js` | Hero film controller, WebGL setup, render loop, adaptive resolution, 3D intro (preview only), scroll cameras, routing, configurator UI, parts catalogue, contact form |
 | `src/scene.frag` | The whole 3D scene |
 | `assets/site/` | Hero media that ships with the site |
+| `src/showroom/` | `showroom.js`: the photoreal three.js scene (car, garage, spotlight, reflective floor, post-processing) as `startShowroom()`. `index.html`: a full-screen preview with drag-to-orbit (`dist/showroom/`) |
+| `vendor/three/` | three.js r170 and the add-ons the showroom imports (glTF and Draco loaders, post-processing, Reflector, OrbitControls) |
+| `assets/site/models/` | The 3D car and its credits |
 | `assets/generated/` | Higgsfield stills, the segment prompts (`prompts/`), `film-plan.json`, and how the shipped files were made |
 | `tools/higgsfield-i2v.sh` | Generate one film segment (image-to-video) and pull its last frame |
 | `tools/assemble-film.py` | Reverse, retime and join the segments per `film-plan.json`; encode the web files |
@@ -51,7 +58,12 @@ npm run dev          # rebuild on every change in src/; refresh dist/index.html 
 - The film plays muted and inline once. `LOGO_LEAD` (2.2 s) before it ends, `revealLogo()` adds `.revealed` to the logo, so the logo comes in over the final orbit. On `ended`, `finishIntro()` adds `.is-final` (fading in `hero-final.jpg`) and swaps `is-intro` for `intro-done`, which brings in the tagline and buttons.
 - **Skip** cuts straight to the final frame. Esc, the wheel or a swipe set `playbackRate = 4`. `prefers-reduced-motion` and in-page hash links go straight to the still.
 - **Fallbacks:** if autoplay is refused, the last `<source>` errors, or nothing has played after 7 s, it shows the still. The film's last frame and the still differ by about 1.2% per pixel, so the crossfade is invisible.
-- While the film covers the stage (home page, `scrollY < 2`), the 3D view draws only every 30th frame.
+- While the film covers the stage (home page, `scrollY < 2`), the old shader view draws only every 30th frame.
+- **Photoreal hero car:**
+  - The module script at the end of `index.html` starts `startShowroom()` on `#hero-3d` while the film plays.
+  - When it's ready, it fires `showroom:ready`; `app.js` then adds `.has-3d`, which crossfades the canvas over the still.
+  - `updateHeroCar()` in `app.js` renders it only from 1.5 s before the film ends, and only while the hero is on screen. It uses `setActive()`.
+  - The camera sways slowly around the front three-quarter from the car's left, with a lens shift that puts the car right of the logo. Portrait screens use a wider lens.
 - **Portrait screens** (`max-aspect-ratio: 9/10`): the media takes the top 72svh and the copy sits on black below. The hero's own black background hides the 3D stage, and `.hero::after` fades it into the next section.
 - **Logo:** inline SVG, white, no background, redrawn from the client's logo. The words are bold slanted RZER and outlined PERFORMANCE, in Archivo at 125% width, skewed −12°. The reveal (CSS keyframes on `.revealed`, about 2.2 s) runs:
   1. `.logo-line`, the car roofline swoosh, draws in as a light trace with `stroke-dashoffset` on a `pathLength="1"` path.
@@ -61,6 +73,23 @@ npm run dev          # rebuild on every change in src/; refresh dist/index.html 
   5. `.logo-words` pulses a glow as it lands.
 
   Reduced motion turns the animations off. Replace it with the client's vector file when they send one.
+
+## Showroom (`src/showroom/showroom.js`)
+
+- **Car config `CAR`:** the model URL, real length (4.49 m) and its material names.
+  - The paint (`wire_176026026`) is replaced with a clear-coated metallic `MeshPhysicalMaterial`, but only under the `car body` node, because the wheels share that material.
+  - Also restyled: glass, gloss black rims, tyres and glowing tail-light lenses.
+  - The model is scaled to its real length, centred and set on the floor. It is turned so its front faces +x, away from the tail lights.
+- **Lighting:**
+  - One `SpotLight` overhead (110 cd, 0.78 rad) with PCF soft shadows, a dim hemisphere fill, and an additive cone mesh for the visible beam.
+  - A PMREM map of a small HDR car park (spotlight lens and halo, dimmed tube rows, lit floor pool) gives the car its reflections.
+  - That map is set **per car material**, never as `scene.environment`. In r170, `scene.environment` ignores each material's `envMapIntensity` and lit the whole car park evenly.
+- **Floor:**
+  - A canvas-made concrete texture under a `MeshStandardMaterial`, patched in `onBeforeCompile` to add the `Reflector`'s planar reflection with a 13-tap blur and fresnel.
+  - The `Reflector` mesh itself draws nothing (`colorWrite: false`); it only renders the mirror texture.
+  - The set: hazard-striped pillars, dimmed tube rows, bay lines, fog.
+- **Post:** `EffectComposer` → `UnrealBloomPass` → `OutputPass` (ACES) → a vignette and grain pass.
+- **Cost:** the model is about 500,000 triangles and 19 MB uncompressed. The `Reflector` renders the scene twice. Compressing the GLB with Draco (the gltf.report script in `assets/generated/README.md` style) would cut the download several times over.
 
 ## Shader (`src/scene.frag`)
 
@@ -184,7 +213,11 @@ Gloss and metallic paint only read through these reflections, so **any change to
 - **All copy is a placeholder.** It was written from the brief "car tuning and performance" because the client's Instagram couldn't be read. Confirm the services, process and tagline.
 - **No address, phone or opening hours.** Bookings point to an Instagram DM.
 - **The hero film and still are AI-generated** (Higgsfield). They show an Evo with an older Evo V/VI-style front and a Mitsubishi grille badge. The number plate was blanked by hand. A real photo of the client's car as a reference image would make it an accurate Evo IX.
-- **The 3D car is an Evo IX-style model built from primitives**, not a licensed model. There are no prices anywhere.
+- **3D cars:**
+  - The hero's 3D car is the CC BY 4.0 Evo IX by 3DCars4U. Its credit must stay in the footer.
+  - The scroll sections and configurator still use the older primitive-built Evo IX-style car in the shader.
+  - Do not use the vecarz Evo IX (CC BY-NC) without a commercial licence.
+  - There are no prices anywhere.
 - **The logo SVG is a redraw** of a small image of the client's logo. Swap in their vector file when available.
 
 ## Testing workflow
@@ -198,7 +231,11 @@ Headless Chromium falls back to SwiftShader (software) without a GPU: about 1–
 
 ## Ideas not yet built
 
-- Real car platforms the client works on (likely Three.js with licensed GLB models whose part meshes are named), keeping the same catalogue and job card. That would also let the scroll sections match the realistic hero.
+- Move the scroll sections and the configurator onto the three.js showroom with the same Evo model, so they match the hero:
+  - scroll cameras like `HOME_CAMS`
+  - paint, rim, caliper and tint swaps through its materials
+  - aero parts would need extra meshes
+- Draco-compress `lancer-evolution.glb`.
 - A 9:16 version of the hero film and still for phones.
 - Video 2 beats: opening doors, an exploded engine, a numbers section with real dyno figures from the client.
 - Share a build by link. `buildCode()` is already a reversible mixed-radix base36 code; decoding isn't written yet.
