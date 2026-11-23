@@ -295,7 +295,13 @@ let lastInteract = 0;
 
 // ------------------------------------------------------------------ hero intro: realistic film -> final still -> logo
 const heroMedia = $('#hero-media'), heroVideo = $('#hero-video'), introBar = $('#intro-bar');
-let heroDone = false;
+const LOGO_LEAD = 2.2;   // the logo starts drawing in this many seconds before the film ends
+let heroDone = false, logoShown = false;
+function revealLogo() {
+  if (logoShown) return;
+  logoShown = true;
+  $('#logo').classList.add('revealed');
+}
 function finishIntro() {
   if (heroDone) return;
   heroDone = true;
@@ -303,7 +309,7 @@ function finishIntro() {
   try { heroVideo.pause(); } catch (e) { /* never started */ }
   introBar.style.width = '100%';
   body.classList.remove('is-intro'); body.classList.add('intro-done');
-  $('#logo').classList.add('revealed');
+  revealLogo();
 }
 // Esc, wheel or a swipe speed the film up; the skip button cuts straight to the final frame
 function fastForward() {
@@ -315,7 +321,10 @@ addEventListener('keydown', e => { if (e.key === 'Escape') fastForward(); });
 addEventListener('wheel', () => { if (!heroDone && mode === 'home') fastForward(); }, { passive: true });
 addEventListener('touchmove', () => { if (!heroDone && mode === 'home') fastForward(); }, { passive: true });
 heroVideo.addEventListener('timeupdate', () => {
-  if (heroVideo.duration) introBar.style.width = (heroVideo.currentTime / heroVideo.duration * 100).toFixed(1) + '%';
+  if (!heroVideo.duration) return;
+  introBar.style.width = (heroVideo.currentTime / heroVideo.duration * 100).toFixed(1) + '%';
+  // the logo comes in with the film's final shot, not after it
+  if (heroVideo.currentTime >= heroVideo.duration - LOGO_LEAD) revealLogo();
 });
 heroVideo.addEventListener('ended', finishIntro);
 heroVideo.addEventListener('error', finishIntro);

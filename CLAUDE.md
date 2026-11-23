@@ -48,12 +48,19 @@ npm run dev          # rebuild on every change in src/; refresh dist/index.html 
 
 ## Hero (`#hero-media` in `src/index.html`, controller in `src/app.js`)
 
-- The film plays muted and inline once. On `ended` it adds `.is-final`, which fades in `hero-final.jpg`, then `finishIntro()` swaps `is-intro` for `intro-done` and adds `.revealed` to the logo.
+- The film plays muted and inline once. `LOGO_LEAD` (2.2 s) before it ends, `revealLogo()` adds `.revealed` to the logo, so the logo comes in over the final orbit. On `ended`, `finishIntro()` adds `.is-final` (fading in `hero-final.jpg`) and swaps `is-intro` for `intro-done`, which brings in the tagline and buttons.
 - **Skip** cuts straight to the final frame. Esc, the wheel or a swipe set `playbackRate = 4`. `prefers-reduced-motion` and in-page hash links go straight to the still.
 - **Fallbacks:** if autoplay is refused, the last `<source>` errors, or nothing has played after 7 s, it shows the still. The film's last frame and the still differ by about 1.2% per pixel, so the crossfade is invisible.
 - While the film covers the stage (home page, `scrollY < 2`), the 3D view draws only every 30th frame.
 - **Portrait screens** (`max-aspect-ratio: 9/10`): the media takes the top 72svh and the copy sits on black below. The hero's own black background hides the 3D stage, and `.hero::after` fades it into the next section.
-- **Logo:** inline SVG, white, no background, redrawn from the client's logo. `.logo-line` (the car roofline swoosh) draws in with `stroke-dashoffset` on a `pathLength="1"` path. `.logo-words` (bold slanted RZER and outlined PERFORMANCE, Archivo at 125% width, skewed −12°) wipes in with `clip-path`. Replace it with the client's vector file when they send one.
+- **Logo:** inline SVG, white, no background, redrawn from the client's logo. The words are bold slanted RZER and outlined PERFORMANCE, in Archivo at 125% width, skewed −12°. The reveal (CSS keyframes on `.revealed`, about 2.2 s) runs:
+  1. `.logo-line`, the car roofline swoosh, draws in as a light trace with `stroke-dashoffset` on a `pathLength="1"` path.
+  2. `.logo-spark`, a short glowing dash on the same path, rides its tip.
+  3. `.logo-rzer` slides in out of a blur.
+  4. `.logo-perf` draws its outline with `stroke-dasharray`.
+  5. `.logo-words` pulses a glow as it lands.
+
+  Reduced motion turns the animations off. Replace it with the client's vector file when they send one.
 
 ## Shader (`src/scene.frag`)
 

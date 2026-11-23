@@ -137,15 +137,27 @@ main { position: relative; z-index: 1; }
   position: absolute; left: var(--gutter); bottom: clamp(64px, 11vh, 128px);
   display: grid; gap: 22px; max-width: min(92vw, 980px);
 }
-/* RZER Performance logo: the roofline draws in like a light trace, then the words wipe in */
+/* RZER Performance logo. Reveal (on .revealed, which starts in the film's last seconds):
+   the roofline draws in as a light trace with a spark at its head, RZER slides out of a blur,
+   PERFORMANCE draws its outline, and the words glow as they land. */
 .logo { margin: 0; width: clamp(260px, 31vw, 520px); line-height: 0; }
 .logo-svg { display: block; width: 100%; height: auto; overflow: visible; }
-.logo-line { fill: none; stroke: #fff; stroke-width: 3.2; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 1; stroke-dashoffset: 0; filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.35)); transition: stroke-dashoffset 1.6s cubic-bezier(0.6, 0, 0.2, 1) 0.35s; }
-.logo-words { clip-path: inset(0 0 0 0); transition: clip-path 1.2s cubic-bezier(0.7, 0, 0.2, 1) 1.2s; }
+.logo-line { fill: none; stroke: #fff; stroke-width: 3.2; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 1; stroke-dashoffset: 0; filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.35)); }
+.logo-spark { fill: none; stroke: #fff; stroke-width: 7; stroke-linecap: round; stroke-dasharray: 0.03 1.2; stroke-dashoffset: 0.03; opacity: 0; filter: drop-shadow(0 0 5px #fff) drop-shadow(0 0 16px rgba(255, 255, 255, 0.85)); }
 .logo-rzer { fill: #fff; font-family: var(--font); font-weight: 900; font-stretch: 125%; font-size: 84px; transform: skewX(-12deg); transform-origin: 30px 212px; }
-.logo-perf { fill: none; stroke: #fff; stroke-width: 1.4; font-family: var(--font); font-weight: 800; font-stretch: 125%; font-size: 44px; letter-spacing: 0.02em; transform: skewX(-12deg); transform-origin: 280px 212px; }
+.logo-perf { fill: none; stroke: #fff; stroke-width: 1.4; stroke-dasharray: 160; stroke-dashoffset: 0; font-family: var(--font); font-weight: 800; font-stretch: 125%; font-size: 44px; letter-spacing: 0.02em; transform: skewX(-12deg); transform-origin: 280px 212px; }
 .is-intro .logo:not(.revealed) .logo-line { stroke-dashoffset: 1; }
-.is-intro .logo:not(.revealed) .logo-words { clip-path: inset(0 100% 0 0); }
+.is-intro .logo:not(.revealed) .logo-rzer, .is-intro .logo:not(.revealed) .logo-perf { opacity: 0; }
+.logo.revealed .logo-line { animation: logo-draw 1.5s cubic-bezier(0.65, 0, 0.25, 1) both; }
+.logo.revealed .logo-spark { animation: logo-spark 1.5s cubic-bezier(0.65, 0, 0.25, 1) both; }
+.logo.revealed .logo-rzer { animation: logo-rzer 1s cubic-bezier(0.2, 0.7, 0.2, 1) 0.55s both; }
+.logo.revealed .logo-perf { animation: logo-perf 1.3s cubic-bezier(0.3, 0.6, 0.2, 1) 0.85s both; }
+.logo.revealed .logo-words { animation: logo-glow 2.2s ease-out 0.6s both; }
+@keyframes logo-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+@keyframes logo-spark { 0% { stroke-dashoffset: 0.03; opacity: 1; } 88% { opacity: 1; } 100% { stroke-dashoffset: -1; opacity: 0; } }
+@keyframes logo-rzer { from { opacity: 0; transform: translateX(-34px) skewX(-12deg); filter: blur(10px); } to { opacity: 1; transform: translateX(0) skewX(-12deg); filter: blur(0); } }
+@keyframes logo-perf { from { opacity: 0; stroke-dashoffset: 160; transform: translateX(20px) skewX(-12deg); } 25% { opacity: 1; } to { opacity: 1; stroke-dashoffset: 0; transform: translateX(0) skewX(-12deg); } }
+@keyframes logo-glow { 0% { filter: drop-shadow(0 0 0 rgba(255, 255, 255, 0)); } 55% { filter: drop-shadow(0 0 16px rgba(255, 255, 255, 0.8)); } 100% { filter: drop-shadow(0 0 3px rgba(255, 255, 255, 0.25)); } }
 .hero-line, .hero-actions { transition: opacity 0.8s ease 0.3s; }
 .is-intro .hero-line, .is-intro .hero-actions { opacity: 0; pointer-events: none; }
 .hero-line { font-size: clamp(1rem, 1.4vw, 1.25rem); color: var(--chrome); max-width: 24em; }
@@ -386,7 +398,8 @@ body:not(.in-builder) .loading { display: none; }
 
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
-  .logo-line, .logo-words, .hero-line, .hero-actions { transition: none; }
+  .hero-line, .hero-actions { transition: none; }
+  .logo.revealed .logo-line, .logo.revealed .logo-spark, .logo.revealed .logo-rzer, .logo.revealed .logo-perf, .logo.revealed .logo-words { animation: none; }
   .btn { transition: none; }
 }
 
@@ -422,6 +435,7 @@ body:not(.in-builder) .loading { display: none; }
         <span class="sr-only">RZER Performance</span>
         <svg class="logo-svg" viewBox="0 0 640 230" aria-hidden="true" focusable="false">
           <path class="logo-line" pathLength="1" d="M34 158 C96 151 150 143 196 131 C226 123 248 116 262 108 C286 94 312 76 342 64 C360 57 380 54 404 54 C438 54 462 57 482 66 C500 74 516 86 532 96 C548 105 566 110 588 112 L598 101 L603 115 C611 118 617 123 620 131"/>
+          <path class="logo-spark" pathLength="1" d="M34 158 C96 151 150 143 196 131 C226 123 248 116 262 108 C286 94 312 76 342 64 C360 57 380 54 404 54 C438 54 462 57 482 66 C500 74 516 86 532 96 C548 105 566 110 588 112 L598 101 L603 115 C611 118 617 123 620 131"/>
           <g class="logo-words">
             <text class="logo-rzer" x="30" y="212" textLength="236" lengthAdjust="spacingAndGlyphs">RZER</text>
             <text class="logo-perf" x="280" y="212" textLength="336" lengthAdjust="spacingAndGlyphs">PERFORMANCE</text>
@@ -1863,7 +1877,13 @@ let lastInteract = 0;
 
 // ------------------------------------------------------------------ hero intro: realistic film -> final still -> logo
 const heroMedia = $('#hero-media'), heroVideo = $('#hero-video'), introBar = $('#intro-bar');
-let heroDone = false;
+const LOGO_LEAD = 2.2;   // the logo starts drawing in this many seconds before the film ends
+let heroDone = false, logoShown = false;
+function revealLogo() {
+  if (logoShown) return;
+  logoShown = true;
+  $('#logo').classList.add('revealed');
+}
 function finishIntro() {
   if (heroDone) return;
   heroDone = true;
@@ -1871,7 +1891,7 @@ function finishIntro() {
   try { heroVideo.pause(); } catch (e) { /* never started */ }
   introBar.style.width = '100%';
   body.classList.remove('is-intro'); body.classList.add('intro-done');
-  $('#logo').classList.add('revealed');
+  revealLogo();
 }
 // Esc, wheel or a swipe speed the film up; the skip button cuts straight to the final frame
 function fastForward() {
@@ -1883,7 +1903,10 @@ addEventListener('keydown', e => { if (e.key === 'Escape') fastForward(); });
 addEventListener('wheel', () => { if (!heroDone && mode === 'home') fastForward(); }, { passive: true });
 addEventListener('touchmove', () => { if (!heroDone && mode === 'home') fastForward(); }, { passive: true });
 heroVideo.addEventListener('timeupdate', () => {
-  if (heroVideo.duration) introBar.style.width = (heroVideo.currentTime / heroVideo.duration * 100).toFixed(1) + '%';
+  if (!heroVideo.duration) return;
+  introBar.style.width = (heroVideo.currentTime / heroVideo.duration * 100).toFixed(1) + '%';
+  // the logo comes in with the film's final shot, not after it
+  if (heroVideo.currentTime >= heroVideo.duration - LOGO_LEAD) revealLogo();
 });
 heroVideo.addEventListener('ended', finishIntro);
 heroVideo.addEventListener('error', finishIntro);
