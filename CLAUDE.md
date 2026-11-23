@@ -26,7 +26,7 @@ npm run dev          # rebuild on every change in src/; refresh dist/index.html 
 
 ## Stack and constraints
 
-- **The 3D view has no libraries and no 3D assets.** Raw WebGL2 with one fragment shader that raymarches signed distance fields (SDFs). The car, garage, liquid and lattice are all modelled in GLSL. This was chosen because the original build environment had no CDN access, and because SDFs let the liquid morph straight into the car. Moving to Three.js later would be a new renderer, not a port.
+- **The 3D view has no libraries and no 3D assets.** Raw WebGL2 with one fragment shader that raymarches signed distance fields (SDFs). The car and garage are modelled in GLSL. This was chosen because the original build environment had no CDN access, and because SDFs let an earlier 3D liquid intro morph straight into the car (since replaced by the hero film and removed from the shader). Moving to Three.js later would be a new renderer, not a port.
 - **The hero is a film, then three.js.** The film files are `assets/site/hero-intro.mp4` (plus a `.webm` fallback), `hero-poster.jpg` and `hero-final.jpg`, about 7.5 MB in total. After the film comes the photoreal car:
   - `src/showroom/showroom.js` is an ES module that uses **three.js r170, vendored in `vendor/three/`** (MIT; no CDN). The page reaches it through an import map.
   - The car is `assets/site/models/lancer-evolution.glb` (CC BY 4.0 by 3DCars4U; see `assets/site/models/CREDITS.md`).
@@ -41,7 +41,7 @@ npm run dev          # rebuild on every change in src/; refresh dist/index.html 
 |---|---|
 | `src/index.html` | Markup: nav, hero (film, still, logo SVG), sections (`data-cam` keys), footer, rev-counter gauge, x-ray hotspots, configurator shell |
 | `src/style.css` | Design tokens and every layout rule (desktop, ≤900px mobile, portrait hero, reduced motion) |
-| `src/app.js` | Hero film controller, WebGL setup, render loop, adaptive resolution, 3D intro (preview only), scroll cameras, routing, configurator UI, parts catalogue, contact form |
+| `src/app.js` | Hero film controller, WebGL setup, render loop, adaptive resolution, scroll cameras, routing, configurator UI, parts catalogue, contact form |
 | `src/scene.frag` | The whole 3D scene |
 | `assets/site/` | Hero media that ships with the site |
 | `src/showroom/` | `showroom.js`: the photoreal three.js scene (car, garage, spotlight, reflective floor, post-processing) as `startShowroom()`. `details.js`: the car's realistic materials and details. `index.html`: a full-screen preview with drag-to-orbit (`dist/showroom/`) |
@@ -60,7 +60,7 @@ npm run dev          # rebuild on every change in src/; refresh dist/index.html 
 - **Fallbacks:** if autoplay is refused, the last `<source>` errors, or nothing has played after 7 s, it shows the still. The film's last frame and the still differ by about 1.2% per pixel, so the crossfade is invisible.
 - While the film covers the stage (home page, `scrollY < 2`), the old shader view draws only every 30th frame.
 - **Photoreal hero car:**
-  - The module script at the end of `index.html` starts `startShowroom()` on `#hero-3d` while the film plays.
+  - The module script at the end of `index.html` starts `startShowroom()` on `#hero-3d` while the film plays. If the page opens straight on `#build`, it waits until the visitor leaves the configurator, so its 19 MB download and shader compiles don't delay the configurator's view.
   - When it's ready, it fires `showroom:ready`; `app.js` then adds `.has-3d`, which crossfades the canvas over the still.
   - `updateHeroCar()` in `app.js` renders it only from 1.5 s before the film ends, and only while the hero is on screen. It uses `setActive()`.
   - The camera sways slowly around the front three-quarter from the car's left, with a lens shift that puts the car right of the logo. Portrait screens use a wider lens.
@@ -111,7 +111,7 @@ npm run dev          # rebuild on every change in src/; refresh dist/index.html 
 
 **Body space:** `pb = p + vec3(0, uRide, 0)`. Lowering moves the body down while the wheels stay on the floor and tuck into the arches.
 
-**Modes** (`gMode`): 0 intro, 1 car, 2 x-ray shell (body + bolt-ons), 3 x-ray inner (wheels, chassis, engine, seats).
+**Modes** (`gMode`): 1 car, 2 x-ray shell (body + bolt-ons), 3 x-ray inner (wheels, chassis, engine, seats).
 
 **Body** `bodySDF`: an Evo IX-style four-door saloon. It is a smooth intersection of three extruded 2D views:
 - side profile polygon `PROF[20]` (x,y): blunt nose, bonnet, raked windscreen, flat roof, rear screen, boot
@@ -125,7 +125,7 @@ It then cuts wheel arches (only for |z|>0.46), the big lower intake in the front
 - `mirrorSDF`
 - `exhaustSDF`: dual, quad or centre layouts via `exhaustSlot`
 - `wheelSDF`: tyre, barrel, lip, 4 spoke styles via polar repetition, rotor, caliper
-- `chassisSDF(p, t)` and `engineSDF(p, t)`: the perimeter frame, strut towers, suspension and greenhouse pillars; a transverse turbo four with a front-mount intercooler, the AWD driveline and the seats. `t` is the intro clock, so each group grows in over its own window. The x-ray passes 99.
+- `chassisSDF(p, t)` and `engineSDF(p, t)`: the perimeter frame, strut towers, suspension and greenhouse pillars; a transverse turbo four with a front-mount intercooler, the AWD driveline and the seats. `t` once timed each group growing in for the old 3D intro; the x-ray passes 99.
 
 **Materials:** `scene()` returns a `M_*` id. Zones on the body are decided in `shadeObj` from body-space position and normal, not in the SDF:
 - glass: windscreen, side glass framed by the drip rail, A and C pillars and the black B-pillar; rear screen
@@ -153,21 +153,11 @@ Gloss and metallic paint only read through these reflections, so **any change to
 
 **Floor:**
 - fbm concrete and lane markings
-- in car modes, an analytic contact shadow (the car footprint plus 4 wheel patches)
+- an analytic contact shadow (the car footprint plus 4 wheel patches)
 - headlight pool and spotlight pool
 - an optional glossy reflection pass (`uReflect`), stronger in showroom mode
 
 **Pillars:** 14 analytic boxes with hazard stripes.
-
-**3D intro clock** `uT` (seconds; ≥ `BUILT` = 10.8 means the car is complete). The site no longer plays it (the hero is a film), but `RZ.setIntro(t)` previews it. It follows the reference beats:
-- **0–2.2 s:** the pool slides in and swallows a chrome RZER roundel, then gathers into a mound.
-- **2.2–3.6 s:** drop, flattened lens, crown.
-- **3.6–5.3 s:** burst into ten curling legs that straighten, 56 thin rods, web chords and the rectangle outline.
-- **5.3–8.5 s:** the frame rises out of the outline. Then come the towers, suspension, engine and intercooler, wheels, seats and pillars.
-- **8.6–10.0 s:** the body pours up as `M_LIQUID`.
-- **10.0–10.7 s:** a bright line sweeps front to back and cures the liquid into paint.
-- **10.9 s:** headlights.
-- **11.2–12.4 s:** showroom spot.
 
 **X-ray:** two passes. The inner one is solid; the shell is translucent, using fresnel alpha plus a faint grid.
 
@@ -177,9 +167,10 @@ Gloss and metallic paint only read through these reflections, so **any change to
 
 - **One call site each** for `march`, `calcN`, `calcAO`, `shadeObj` and `background`. Chrome on Windows compiles WebGL through ANGLE → HLSL, which inlines every call, so each extra call site of these copies the whole scene again and compile time balloons. `main()` uses a 2-pass loop (primary, then x-ray shell or floor reflection) for exactly this reason. Add new passes to that loop rather than calling `march` again.
 - Loops start at `uZero` (a uniform that is always 0) so drivers can't unroll them.
-- `carScene` and `bodySDF` return a bounding-box distance when far away (> 0.12 and > 0.10). **Don't feed those bounded distances into AO**: it causes rectangular floor shadows. That's why the floor uses the analytic footprint shadow in car modes.
+- `carScene` and `bodySDF` return a bounding-box distance when far away (> 0.12 and > 0.10). **Don't feed those bounded distances into AO**: it causes rectangular floor shadows. That's why the floor uses the analytic footprint shadow.
 - `app.js` adapts the render scale (`quality`: start 0.6 on desktop, 0.45 on mobile, range 0.34–0.9 of `min(devicePixelRatio, 1.5)`). It turns the floor reflection off below 0.5. Cost scales with the screen area the car covers.
-- The shader compiles asynchronously via `KHR_parallel_shader_compile`.
+- The shader compiles asynchronously via `KHR_parallel_shader_compile`. If it isn't ready after 10 s, the configurator's loading note says the first visit can take up to a minute on some graphics cards.
+- **Keep `scene()` small.** The configurator once stuck on "Loading the 3D scene" on Windows because the unused 3D intro inside `scene()` was copied into every call site. Removing it took the software-renderer compile from 29 s to 16 s (the original upload took 18 s). `node tools/page.mjs` prints the compile time.
 
 ## App (`src/app.js`)
 
@@ -196,7 +187,6 @@ Gloss and metallic paint only read through these reflections, so **any change to
   - `HOME_CAMS` per section (`data-cam`). The camera is interpolated in orbit space (target, r, θ, φ) from scroll position so it never passes through the car. The hero camera looks at the front three-quarter from the car's left, like the film's final frame.
   - `shift` is a lens shift in NDC that places the car beside the copy.
   - `BUILD_VIEWS` holds one camera per configurator category.
-  - `INTRO_KEYS` is a Catmull-Rom path through the 3D intro.
   - On portrait screens the camera distance is scaled up by `fit`.
 - **Routing:** `#build` opens the configurator. Any other hash is the home page (in-page anchors).
 - **Hotspots:** DOM labels projected from 3D points (`data-pos`) on the turbo, front coilover, front brake and exhaust. They're visible only in the x-ray section.
@@ -205,7 +195,6 @@ Gloss and metallic paint only read through these reflections, so **any change to
 - **Test hooks:** `window.RZ` exposes:
   - `state()`, which includes `heroDone` and `heroTime`
   - `skipHero()`
-  - `setIntro(t, hold)`, which previews the 3D intro
   - `setConfig(obj)`
   - `quality`
   - `settle(bool)`: `settle(true)` snaps the camera so screenshots don't wait for easing.

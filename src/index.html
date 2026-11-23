@@ -211,12 +211,20 @@
 <script type="module">
 // The photoreal three.js Evo IX for the end of the hero film (src/showroom/showroom.js).
 // It loads while the film plays; app.js shows it after the film and only renders it while the hero is visible.
+// Opened straight on #build, it waits until the visitor leaves the configurator, so its download and shader
+// compiles don't hold up the configurator's own 3D view.
 import { startShowroom, credit } from './showroom/showroom.js';
 document.getElementById('model-credit').innerHTML = credit;
-window.RZ_SHOWROOM = startShowroom({
-  canvas: document.getElementById('hero-3d'),
-  onReady: api => document.dispatchEvent(new CustomEvent('showroom:ready', { detail: api })),
-});
+const start = () => {
+  window.RZ_SHOWROOM = startShowroom({
+    canvas: document.getElementById('hero-3d'),
+    onReady: api => document.dispatchEvent(new CustomEvent('showroom:ready', { detail: api })),
+  });
+};
+if (location.hash === '#build') {
+  const later = () => { if (location.hash !== '#build') { removeEventListener('hashchange', later); start(); } };
+  addEventListener('hashchange', later);
+} else start();
 </script>
 </body>
 </html>

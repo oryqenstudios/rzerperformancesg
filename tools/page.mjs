@@ -14,8 +14,8 @@
 //   log:      expression whose value is printed
 //
 // Examples
-//   node tools/page.mjs 1440 900 '{"list":[{"js":"RZ.setIntro(9); RZ.settle(true)","frames":5,"shot":"hero"}]}'
-//   node tools/page.mjs 1440 900 '{"list":[{"js":"RZ.setIntro(99); RZ.settle(true)"},{"scrollTo":"engineering","shot":"xray"}]}'
+//   node tools/page.mjs 1440 900 '{"list":[{"js":"RZ.skipHero(); RZ.settle(true)","frames":5,"shot":"hero"}]}'
+//   node tools/page.mjs 1440 900 '{"list":[{"js":"RZ.skipHero(); RZ.settle(true)"},{"scrollTo":"engineering","shot":"xray"}]}'
 //   node tools/page.mjs 1440 900 '{"hash":"#build","list":[{"js":"RZ.settle(true)","frames":4,"shot":"build"},{"click":"#tab-aero","shot":"aero"}]}'
 //   node tools/page.mjs 390 844 '{"hash":"#build","list":[{"js":"RZ.settle(true)","frames":4,"shot":"mobile-build"}]}'
 import { chromium } from 'playwright';
@@ -37,8 +37,10 @@ p.on('pageerror', e => errors.push('pageerror: ' + e.message));
 p.on('console', m => { if (m.type() === 'error' && !/fonts\.(googleapis|gstatic)|Failed to load resource/.test(m.text())) errors.push('console: ' + m.text()); });
 
 const url = pathToFileURL(path.join(here, '..', 'dist', 'index.html')).href + (steps.hash || '');
+const t0 = Date.now();
 await p.goto(url);
 await p.waitForFunction(() => window.RZ && (RZ.state().ready || RZ.state().glFailed), null, { timeout: 120000 });
+console.log('shader ready in', ((Date.now() - t0) / 1000).toFixed(1), 's');
 if (steps.scale) await p.evaluate(q => { RZ.quality.scale = q; RZ.quality.min = q; RZ.quality.max = q; }, steps.scale);
 const frames = async n => { for (let i = 0; i < n; i++) await p.evaluate(() => new Promise(r => requestAnimationFrame(() => r()))); };
 

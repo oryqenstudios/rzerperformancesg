@@ -9,7 +9,6 @@ uniform int   uZero;
 uniform vec3  uCamPos, uCamFwd, uCamRight, uCamUp;
 uniform float uTanHalf;
 uniform vec2  uShift;
-uniform float uT;          // intro clock (s). >= BUILT : car complete
 uniform float uXray;
 uniform float uLights;
 uniform float uBay;
@@ -32,7 +31,6 @@ const float FX    = 1.31;    // front axle
 const float RX    = -1.315;  // rear axle
 const float TRK   = 0.755;   // wheel centre |z| (half the track)
 const float CEIL  = 3.35;
-const float BUILT = 10.8;    // intro clock (s) at which the car is complete
 const vec3  SPOT  = vec3(0.0, 3.30, 0.0);   // showroom spotlight above the car, pointing down
 const vec3  SPOTC = vec3(1.0, 0.97, 0.92);
 const vec2  RECT  = vec2(2.15, 0.86);       // floor rectangle the rods run out to (half extents)
@@ -42,7 +40,7 @@ const float M_BODY = 1., M_TIRE = 2., M_RIM = 3., M_ROTOR = 4., M_CALIPER = 5., 
             M_EXH = 7., M_PAINTONLY = 8., M_CHASSIS = 9., M_ALU = 10., M_LIQUID = 11., M_SEAT = 12.,
             M_TURBO = 13., M_TRIM = 14., M_CHROME = 15., M_COOLER = 16.;
 
-int gMode; // 0 intro, 1 car, 2 shell (xray), 3 inner (xray)
+int gMode; // 1 car, 2 shell (xray), 3 inner (xray)
 
 // ---------------------------------------------------------------- utils
 mat2 rot(float a){ float c = cos(a), s = sin(a); return mat2(c, s, -s, c); }
@@ -253,7 +251,7 @@ vec2 wheelSDF(vec3 p){
 }
 
 // ---------------------------------------------------------------- chassis / engine / interior
-// t is the intro clock: each group grows in over its window. The x-ray passes 99.
+// t once timed each group growing in for the 3D intro (now replaced by the hero film); the x-ray passes 99.
 float chassisSDF(vec3 p, float t){
   vec3 q = vec3(p.x, p.y, abs(p.z));
   // perimeter frame, rising out of the rectangle the rods drew on the floor
@@ -340,107 +338,6 @@ vec2 engineSDF(vec3 p, float t){
   return res;
 }
 
-// ---------------------------------------------------------------- intro
-float rectR(float a){ return min(RECT.x / max(abs(cos(a)), 1e-3), RECT.y / max(abs(sin(a)), 1e-3)); }
-
-// chrome RZER roundel lying on the floor: a ring around a Z
-float emblemSDF(vec3 p){
-  float bb = length(p) - 0.36;
-  if(bb > 0.08) return bb;
-  vec2 u = vec2(-p.z, -p.x) / 0.30;   // reads upright from the opening camera
-  float ring = abs(length(u) - 0.90) - 0.075;
-  float z = min(min(sdSeg(u, vec2(-0.44, 0.42), vec2(0.44, 0.42)), sdSeg(u, vec2(0.44, 0.42), vec2(-0.44, -0.42))), sdSeg(u, vec2(-0.44, -0.42), vec2(0.44, -0.42))) - 0.085;
-  vec2 w = vec2(min(ring, z) * 0.30, abs(p.y - 0.013) - 0.009);
-  return min(max(w.x, w.y), 0.) + length(max(w, 0.)) - 0.004;
-}
-
-vec2 introLiquid(vec3 p, float t){
-  vec2 res = vec2(1e9, M_LIQUID);
-  if(t < 3.62){
-    // the pool slides in from the left, swallows the emblem and gathers into a mound
-    float d = sdEll(p - vec3(0.02, 0., 0.05), vec3(0.64, 0.46, 0.66));
-    float m1 = smoothstep(1.65, 2.2, t);
-    if(m1 < 1.){
-      float k = smoothstep(-0.2, 1.6, t);
-      vec3 head = vec3(0.04, 0., mix(2.9, 0.12, k));
-      float L = mix(2.3, 0., smoothstep(1.2, 2.05, t));
-      float pd = 1e9;
-      for(int i = 0; i < 6; i++){
-        float fi = float(i) / 5.;
-        vec3 c = head + vec3(sin(fi * 4.2 + t * 1.6) * 0.16 * fi, 0., fi * L);
-        pd = smin(pd, sdEll(p - c, vec3(mix(0.50, 0.34, fi), mix(0.30, 0.07, fi), 0.30 + L * 0.10)), 0.30);
-      }
-      float fk = smoothstep(0.7, 1.4, t) * (1. - smoothstep(1.55, 2.0, t));
-      if(fk > 0.){ // fingers that run ahead and out to the sides as it spreads
-        vec3 fq = p - head; fq.x = abs(fq.x);
-        pd = smin(pd, sdEll(fq - vec3(0.25 + 0.45 * fk, 0., -0.15 - 0.25 * fk), vec3(0.01 + 0.34 * fk, 0.05, 0.16)), 0.18);
-      }
-      pd += 0.016 * sin(p.x * 8. + t * 3.) * sin(p.z * 6. - t * 2.4);
-      d = mix(pd, d, m1);
-    }
-    // a sitting drop, a flattened lens, then a crown just before it bursts
-    if(t > 2.2) d = mix(d, sdEll(p - vec3(0., 0.15, 0.), vec3(0.40, 0.33, 0.40)), smoothstep(2.2, 2.65, t));
-    if(t > 2.75) d = mix(d, sdEll(p, vec3(0.34, 0.13, 0.34)), smoothstep(2.75, 3.25, t));
-    if(t > 3.3){
-      float crown = smin(sdEll(p, vec3(0.22, 0.085, 0.22)), sdCap(p, vec3(0.), vec3(0., 0.15, 0.), 0.028), 0.06);
-      d = mix(d, crown, smoothstep(3.3, 3.58, t));
-    }
-    res.x = d;
-    return res;
-  }
-  // burst -> curling legs -> thin rods + web -> rectangle
-  float g  = smoothstep(3.58, 3.9, t);     // burst
-  float s  = smoothstep(4.2, 4.95, t);     // legs straighten and run out to the rectangle
-  float sr = smoothstep(4.35, 5.05, t);    // thin rods fan out between them
-  float rg = smoothstep(4.75, 5.3, t);     // web and outline
-  float fade = smoothstep(7.2, 8.6, t);    // the floor web dissolves as the body pours
-  float rr = length(p.xz);
-  float ang = atan(p.z, p.x);
-  float d = sdEll(p, vec3(0.22, 0.085, 0.22) * mix(1., 0.32, g));
-  {
-    float sec = 2. * PI / 10.;
-    float a = ang - 0.32 * rr * (1. - s);
-    float id = floor((a + sec * 0.5) / sec);
-    float ac = a - id * sec;
-    vec2 lp = vec2(cos(ac), sin(ac)) * rr;
-    float len = mix(g * (0.55 + 0.9 * hash11(id + 7.3)), rectR(id * sec), s);
-    float along = clamp(lp.x / max(len, 1e-3), 0., 1.);
-    float rad = mix(mix(0.05, 0.008, along), 0.010, s) * (1. - fade);
-    float yy = mix(0.02 + 0.05 * (1. - along) * g, 0.010, s);
-    vec3 q = vec3(lp.x - clamp(lp.x, 0., len), p.y - yy, lp.y);
-    d = smin(d, (length(q) - rad + fade * 0.015) * 0.7, 0.04);
-  }
-  if(sr > 0.){
-    float sec = 2. * PI / 56.;
-    float a = ang + sec * 0.5;
-    float id = floor((a + sec * 0.5) / sec);
-    float ac = a - id * sec;
-    vec2 lp = vec2(cos(ac), sin(ac)) * rr;
-    float grow = clamp(sr * 1.4 - hash11(id * 1.37 + 2.1) * 0.4, 0., 1.);
-    float len = rectR(id * sec - sec * 0.5) * grow;
-    vec3 q = vec3(lp.x - clamp(lp.x, 0., len), p.y - 0.0075, lp.y);
-    d = min(d, length(q) - 0.0075 * (1. - fade) + fade * 0.015);
-  }
-  // central spike
-  d = smin(d, sdCap(p, vec3(0.), vec3(0., 0.5 * g * (1. - 0.85 * rg), 0.), 0.022 * (1. - 0.5 * rg)), 0.04);
-  if(rg > 0.){
-    // web: chords between neighbouring legs at two radii, then the outline
-    float sec = 2. * PI / 10.;
-    float a0 = floor(ang / sec) * sec, a1 = a0 + sec;
-    vec2 e0 = vec2(cos(a0), sin(a0)) * rectR(a0), e1 = vec2(cos(a1), sin(a1)) * rectR(a1);
-    float w = 1e9;
-    for(int i = 0; i < 2; i++){
-      float f = i == 0 ? 0.36 : 0.68;
-      float ap = smoothstep(4.75 + 0.22 * float(i), 5.15 + 0.22 * float(i), t);
-      w = min(w, sdSeg(p.xz, e0 * f, e1 * f) + (1. - ap) * 0.03);
-    }
-    if(t < 5.45) w = min(w, abs(sdBox2(p.xz, RECT)) + (1. - rg) * 0.03);   // the frame takes it over
-    d = min(d, length(vec2(w, p.y - 0.0085)) - 0.0085 * (1. - fade) + fade * 0.015);
-  }
-  res.x = d;
-  return res;
-}
-
 // ---------------------------------------------------------------- scene
 vec2 carScene(vec3 p){
   float bnd = sdBox(p - vec3(0., 0.80, 0.), vec3(2.42, 0.80, 1.06 + uWide * 0.08));
@@ -457,7 +354,6 @@ vec2 carScene(vec3 p){
 }
 
 vec2 scene(vec3 p){
-  if(gMode == 1) return carScene(p);
   if(gMode == 2){
     vec3 pb = vec3(p.x, p.y + uRide, p.z);
     vec2 res = vec2(bodySDF(pb), M_BODY);
@@ -473,37 +369,7 @@ vec2 scene(vec3 p){
     if(pb.x < -2.05 && pb.y < 0.4){ float inn; U(res, exhaustSDF(pb, inn), M_EXH); }
     return res;
   }
-  // intro
-  float t = uT;
-  vec2 res = vec2(1e9, M_LIQUID);
-  if(t < 1.95) U(res, emblemSDF(p + vec3(0., 0.04 * smoothstep(1.3, 1.95, t), 0.)), M_CHROME);
-  if(t < 8.6){ vec2 l = introLiquid(p, t); if(l.x < res.x) res = l; }
-  if(t > 5.25){
-    vec3 pb = vec3(p.x, p.y + uRide, p.z);
-    if(t < 10.1){
-      U(res, chassisSDF(pb, t), M_CHASSIS);
-      if(t > 6.5){ vec2 e = engineSDF(pb, t); if(e.x < res.x) res = e; }
-    }
-    if(t > 6.75){
-      vec2 w = wheelSDF(p);
-      w.x += (1. - (p.x > 0.04 ? smoothstep(7.1, 7.8, t) : smoothstep(6.8, 7.5, t))) * 0.35;
-      if(w.x < res.x) res = w;
-    }
-    if(t > 8.55){
-      // the body pours up over the frame as black liquid, then cures to paint front to back
-      float fill = mix(0.06, 1.46, smoothstep(8.6, 9.9, t));
-      fill += 0.03 * sin(pb.x * 5. + t * 6.) * sin(pb.z * 4. - t * 5.) * (1. - smoothstep(9.7, 10.0, t));
-      float b = max(bodySDF(pb), pb.y - fill);
-      if(t < 9.9 && (res.y == M_CHASSIS || res.y == M_ALU)) b = smin(b, res.x, 0.02);
-      bool cured = pb.x > mix(2.5, -2.5, smoothstep(10.0, 10.7, t));
-      U(res, b, cured ? M_BODY : M_LIQUID);
-      float ka = (1. - smoothstep(9.3, 10.0, t)) * 0.06;
-      U(res, carbonParts(pb) + ka, cured ? M_CARBON : M_LIQUID);
-      U(res, mirrorSDF(pb) + ka, cured ? (uMirror == 1 ? M_CARBON : M_PAINTONLY) : M_LIQUID);
-      if(pb.x < -2.05 && pb.y < 0.4 && t > 9.4){ float inn; U(res, exhaustSDF(pb, inn), M_EXH); }
-    }
-  }
-  return res;
+  return carScene(p);
 }
 
 vec3 calcN(vec3 p, float e){
@@ -523,8 +389,7 @@ vec2 boxHit(vec3 ro, vec3 rd, vec3 bmin, vec3 bmax){
 }
 
 void sceneBox(out vec3 bmin, out vec3 bmax){
-  if(gMode == 0){ bmin = vec3(-2.7, -0.05, -1.3); bmax = vec3(2.7, 1.62, 5.8); }
-  else { bmin = vec3(-2.62, -0.01, -1.22); bmax = vec3(2.62, 1.62, 1.22); }
+  bmin = vec3(-2.62, -0.01, -1.22); bmax = vec3(2.62, 1.62, 1.22);
 }
 
 vec2 march(vec3 ro, vec3 rd, float tmax, int steps){
@@ -533,7 +398,7 @@ vec2 march(vec3 ro, vec3 rd, float tmax, int steps){
   if(bh.x > bh.y || bh.y < 0.) return vec2(-1., 0.);
   float t = max(bh.x, 0.0);
   float t1 = min(bh.y, tmax);
-  float k = gMode == 0 ? 0.8 : 0.92;
+  float k = 0.92;
   for(int i = uZero; i < steps; i++){
     if(t > t1) break;
     vec2 h = scene(ro + rd * t);
@@ -788,15 +653,8 @@ vec3 shadeObj(vec3 p, vec3 rd, float mat, vec3 n, float ao, float t){
   if(mat == M_ALU){ base = vec3(0.55, 0.56, 0.58); rough = 0.35; metal = 1.; }
   if(mat == M_TURBO){ base = vec3(0.62, 0.50, 0.40); rough = 0.25; metal = 1.; }
   if(mat == M_SEAT){ base = vec3(0.02); rough = 0.6; }
-  if(mat == M_LIQUID){ base = vec3(0.004); rough = 0.0; coat = 1.; }
   if(mat == M_CHROME){ base = vec3(0.92); rough = 0.03; metal = 1.; }
   if(mat == M_COOLER){ base = vec3(0.10) * (0.4 + 0.6 * step(0.45, fract(p.y * 70.))); rough = 0.35; metal = 1.; }
-
-  // the cure line sweeping front to back as the liquid sets into paint
-  if(gMode == 0 && uT > 10.0 && uT < 10.75 && mat != M_LIQUID && mat != M_TIRE && mat != M_RIM){
-    float cx = mix(2.5, -2.5, smoothstep(10.0, 10.7, uT));
-    emis += vec3(0.75, 0.80, 0.88) * exp(-abs(pb.x - cx) * 28.) * 1.6;
-  }
 
   float sky = 0.5 + 0.5 * n.y;
   float spot = uShow * spotAt(p) * max(dot(n, normalize(SPOT - p)), 0.);
@@ -829,30 +687,15 @@ vec3 shadeFloor(vec3 p, vec3 rd, float t, out float aoOut){
   float E = (0.05 + 0.20 * exp(-lx * lx * 0.30) * (0.65 + 0.35 * exp(-lz * lz * 0.2))) * mix(1., 0.28, uShow);
   E += uShow * 0.50 * spotAt(p);
   float ao = 1.;
-  if(gMode != 0 || uT > 5.3){
-    float kb = gMode != 0 ? 1. : smoothstep(8.6, 10.0, uT);
+  {
+    // analytic contact shadow: the car's footprint plus four wheel patches
     float fp = sdRBox2(p.xz, vec2(2.24, 0.84 + uWide * 0.07), 0.42);
-    float a1 = mix(0.10, 1., smoothstep(-0.25, 0.9, fp));
-    a1 *= mix(0.25, 1., smoothstep(-0.35, 0.35, fp + 0.3));
-    float frame = gMode != 0 ? 1. : smoothstep(5.3, 6.4, uT);
-    ao = mix(mix(1., 0.55 + 0.45 * smoothstep(-0.2, 0.5, fp), frame), a1, kb);
-    float kw = gMode != 0 ? 1. : smoothstep(6.9, 7.8, uT);
+    ao = mix(0.10, 1., smoothstep(-0.25, 0.9, fp)) * mix(0.25, 1., smoothstep(-0.35, 0.35, fp + 0.3));
     for(int i = 0; i < 4; i++){
       vec2 c = vec2(i < 2 ? FX : RX, (i % 2 == 0 ? 1. : -1.) * (TRK + uWide * 0.05));
       float dw = sdRBox2(p.xz - c, vec2(0.16, 0.13), 0.08);
-      ao *= mix(1., mix(0.15, 1., smoothstep(-0.05, 0.35, dw)), kw);
+      ao *= mix(0.15, 1., smoothstep(-0.05, 0.35, dw));
     }
-  } else if(uT > 3.6){
-    float hubR = 0.22 * mix(1., 0.32, smoothstep(3.58, 3.9, uT));
-    ao = mix(0.25, 1., smoothstep(-0.05, 0.4, length(p.xz) - hubR));
-  } else if(abs(p.x) < 2.5 && abs(p.z) < 5.5){
-    float occ = 0.;
-    for(int i = uZero; i < 4; i++){
-      float h = 0.10 + 0.22 * float(i);
-      float d = scene(p + vec3(0., h, 0.)).x;
-      occ += max(h - d, 0.) * (1.0 - 0.18 * float(i));
-    }
-    ao = clamp(1. - 1.3 * occ, 0.05, 1.);
   }
   aoOut = ao;
   vec3 col = alb * E * ao;
@@ -893,9 +736,8 @@ void main(){
   float tb = min(tp, min(tFloor, tCeil));
   bool floorBg = tFloor <= tCeil && tFloor < tp;
 
-  bool intro = uT < BUILT;
-  bool xray = !intro && uXray > 0.002;
-  gMode = intro ? 0 : (xray ? 3 : 1);
+  bool xray = uXray > 0.002;
+  gMode = xray ? 3 : 1;
   vec3 bg = background(ro, rd, tp, pn, tFloor, tCeil);
   if(xray) bg *= mix(1., 0.35, uXray);
 
@@ -931,7 +773,7 @@ void main(){
       } else {
         col = mix(col, c, reflW);
       }
-    } else if(kind == 0 && !intro && !xray && floorBg && uReflect > 0.){
+    } else if(kind == 0 && !xray && floorBg && uReflect > 0.){
       vec3 fp = ro + rd * tFloor;
       vec3 r = reflect(rd, vec3(0., 1., 0.));
       float fr = 0.02 + 0.35 * pow(1. - max(-rd.y, 0.), 5.);

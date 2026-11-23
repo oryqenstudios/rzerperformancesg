@@ -19,10 +19,6 @@ const lerp3 = (a, b, t) => [lerp(a[0], b[0], t), lerp(a[1], b[1], t), lerp(a[2],
 const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
 const smooth = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
 const angDiff = (a, b) => { let d = (b - a) % (Math.PI * 2); if (d > Math.PI) d -= Math.PI * 2; if (d < -Math.PI) d += Math.PI * 2; return d; };
-const catmull = (p0, p1, p2, p3, t) => {
-  const t2 = t * t, t3 = t2 * t;
-  return p1.map((_, i) => 0.5 * ((2 * p1[i]) + (-p0[i] + p2[i]) * t + (2 * p0[i] - 5 * p1[i] + 4 * p2[i] - p3[i]) * t2 + (-p0[i] + 3 * p1[i] - 3 * p2[i] + p3[i]) * t3));
-};
 const toOrbit = (pos, target) => { const d = sub(pos, target); const r = len(d); return { target: target.slice(), r, th: Math.atan2(d[2], d[0]), ph: Math.asin(clamp(d[1] / r, -1, 1)) }; };
 const orbitPos = o => { const cp = Math.cos(o.ph); return [o.target[0] + o.r * cp * Math.cos(o.th), o.target[1] + o.r * Math.sin(o.ph), o.target[2] + o.r * cp * Math.sin(o.th)]; };
 
@@ -164,45 +160,6 @@ const BUILD_VIEWS = {
 for (const c of Object.values(HOME_CAMS)) c.orbit = toOrbit(c.pos, c.target);
 for (const c of Object.values(BUILD_VIEWS)) c.orbit = toOrbit(c.pos, c.target);
 
-// Beat for beat with the reference video (seconds):
-//   0-2.2 liquid slides in over the chrome emblem and gathers   2.2-3.6 drop -> lens -> crown
-//   3.6-5.3 burst, curling legs, rods and web to a rectangle    5.3-8.5 frame, towers, suspension, engine, wheels, cabin
-//   8.6-10.0 body pours over the frame   10.0-10.7 liquid cures to paint   10.9 headlights   11.2-12.4 showroom spot
-//   11.6-14.4 orbit to the front three-quarter, logo reveal
-const INTRO_LEN = 14.4;
-const INTRO_KEYS = [
-  { t: 0.0,  pos: [2.30, 0.20, -0.55], tgt: [-0.20, 0.10, 0.60] },
-  { t: 1.0,  pos: [2.25, 0.24, -0.40], tgt: [-0.10, 0.10, 0.30] },
-  { t: 1.9,  pos: [2.40, 0.40, -0.20], tgt: [0.00, 0.14, 0.06] },
-  { t: 2.7,  pos: [2.25, 0.75, 0.00],  tgt: [0.00, 0.10, 0.00] },
-  { t: 3.4,  pos: [2.15, 1.05, 0.00],  tgt: [0.00, 0.03, 0.00] },
-  { t: 4.1,  pos: [2.55, 1.50, 0.00],  tgt: [-0.15, 0.00, 0.00] },
-  { t: 4.8,  pos: [3.20, 1.95, 0.00],  tgt: [-0.40, 0.00, 0.00] },
-  { t: 5.4,  pos: [3.40, 2.25, 0.00],  tgt: [-0.45, 0.00, 0.00] },
-  { t: 6.3,  pos: [3.60, 2.95, 0.00],  tgt: [-0.25, 0.15, 0.00] },
-  { t: 7.2,  pos: [4.00, 2.30, 0.00],  tgt: [0.45, 0.35, 0.00] },
-  { t: 8.2,  pos: [4.80, 1.35, 0.00],  tgt: [0.30, 0.50, 0.00] },
-  { t: 9.0,  pos: [5.40, 1.00, 0.00],  tgt: [0.00, 0.60, 0.00] },
-  { t: 10.6, pos: [5.80, 0.92, 0.00],  tgt: [0.00, 0.62, 0.00] },
-  { t: 11.6, pos: [5.30, 0.85, 0.00],  tgt: [0.00, 0.60, 0.00] },
-  { t: 12.7, pos: [5.30, 0.95, -1.90], tgt: [0.00, 0.58, 0.00] },
-  { t: 13.6, pos: [4.90, 1.05, -2.90], tgt: [0.05, 0.55, 0.05] },
-  { t: 14.4, pos: HOME_CAMS.hero.pos, tgt: HOME_CAMS.hero.target },
-];
-function introCam(t) {
-  const k = INTRO_KEYS;
-  let i = 0; while (i < k.length - 2 && t > k[i + 1].t) i++;
-  const a = k[Math.max(0, i - 1)], b = k[i], c = k[i + 1], d = k[Math.min(k.length - 1, i + 2)];
-  const u = smooth(0, 1, clamp((t - b.t) / (c.t - b.t), 0, 1)) * 0.6 + clamp((t - b.t) / (c.t - b.t), 0, 1) * 0.4;
-  return { pos: catmull(a.pos, b.pos, c.pos, d.pos, u), tgt: catmull(a.tgt, b.tgt, c.tgt, d.tgt, u) };
-}
-function introLights(t) {
-  if (t < 10.9) return 0;
-  const k = t - 10.9;
-  if (k < 0.07) return 1; if (k < 0.16) return 0.05; if (k < 0.24) return 0.85; if (k < 0.38) return 0.12;
-  return Math.min(1, 0.55 + (k - 0.38) * 1.5);
-}
-
 // ------------------------------------------------------------------ WebGL
 const canvas = $('#stage');
 const loadingEl = $('#loading');
@@ -230,6 +187,8 @@ function initGL() {
   prog = gl.createProgram();
   gl.attachShader(prog, vs); gl.attachShader(prog, fs);
   gl.linkProgram(prog);
+  // Windows graphics drivers can take a while to compile the scene the first time (the browser caches it after)
+  setTimeout(() => { if (!ready && !glFailed) loadingEl.textContent = 'Preparing the 3D view. The first visit can take up to a minute on some graphics cards.'; }, 10000);
   const finish = () => {
     if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
       return failGL((gl.getShaderInfoLog(fs) || '') + (gl.getProgramInfoLog(prog) || ''));
@@ -237,7 +196,6 @@ function initGL() {
     gl.useProgram(prog);
     ready = true;
     loadingEl.classList.add('gone');
-    introClockStart = performance.now();
   };
   if (ext) {
     const poll = () => { if (gl.getProgramParameter(prog, ext.COMPLETION_STATUS_KHR)) finish(); else setTimeout(poll, 50); };
@@ -280,10 +238,6 @@ function adapt(dt) {
 }
 
 // ------------------------------------------------------------------ state
-// The hero now opens on a realistic film (see #hero-media), so the 3D liquid intro starts finished.
-// RZ.setIntro(t) still plays it for previews.
-const intro = { t: 99, speed: 1, done: true, revealed: true };
-let introClockStart = 0;
 const cam = { orbit: Object.assign({}, HOME_CAMS.hero.orbit, { target: HOME_CAMS.hero.target.slice() }), fov: 34, shift: [0, 0], pos: [0, 0, 0], tgt: [0, 0, 0] };
 let mode = 'home'; // home | build
 const live = {}; // smoothed uniforms
@@ -633,7 +587,7 @@ function frame(now) {
   update(dt, now / 1000);
   updateHeroCar();
   // at the top of the home page the hero film covers the stage: draw only now and then to stay warm
-  const covered = mode === 'home' && scrollY < 2 && intro.done;
+  const covered = mode === 'home' && scrollY < 2;
   if (ready && (!covered || coveredFrames++ % 30 === 0)) {
     draw(now / 1000);
     if (!covered) adapt(dt);
@@ -644,23 +598,6 @@ function frame(now) {
 let settle = false;
 function update(dt, time) {
   const k = settle ? 1 : 1 - Math.exp(-dt * 3.2);
-  // intro
-  if (!intro.done && ready) {
-    intro.t += dt * intro.speed;
-    const c = introCam(Math.min(intro.t, INTRO_LEN));
-    cam.pos = c.pos; cam.tgt = c.tgt;
-    cam.fov = 38 + (34 - 38) * smooth(12.6, 14.4, intro.t);
-    const hs = HOME_CAMS.hero.shift;
-    cam.shift = [hs[0] * smooth(12.8, 14.4, intro.t), hs[1] * smooth(12.8, 14.4, intro.t)];
-    lights = introLights(intro.t);
-    show = smooth(11.2, 12.4, intro.t);
-    exposure = 1.35 * smooth(0, 0.8, intro.t);
-    xray = 0; bay = 0;
-    if (intro.t >= INTRO_LEN) { intro.done = true; intro.t = 99; }
-    return;
-  }
-  if (!intro.done) return;
-
   let goal;
   if (mode === 'home') {
     goal = homeGoal();
@@ -725,7 +662,6 @@ function draw(time) {
   setU('uRes', [canvas.width, canvas.height]);
   setU('uTime', time % 1000);
   setU('uZero', 0);
-  setU('uT', intro.done ? 99 : intro.t);
   setU('uXray', xray < 0.003 ? 0 : xray);
   setU('uLights', lights);
   setU('uBay', bay < 0.003 ? 0 : bay);
@@ -749,8 +685,7 @@ requestAnimationFrame(frame);
 
 // test hook
 window.RZ = {
-  state: () => ({ intro: intro.t, done: intro.done, heroDone, heroTime: heroVideo.currentTime, mode, scale: quality.scale, ready, glFailed, xray, cam: { pos: cam.pos, tgt: cam.tgt } }),
-  setIntro: (t, hold) => { intro.done = false; intro.t = t; if (hold) intro.speed = 0; },   // previews the 3D liquid intro
+  state: () => ({ heroDone, heroTime: heroVideo.currentTime, mode, scale: quality.scale, ready, glFailed, xray, cam: { pos: cam.pos, tgt: cam.tgt } }),
   skipHero: () => finishIntro(),
   setConfig: c => { Object.assign(config, c); renderCard(); if (activeCat) setCategory(activeCat); },
   quality,

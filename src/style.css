@@ -353,6 +353,7 @@ fieldset.field { border: 0; margin: 0; padding: 0; }
 
 .loading {
   position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 30;
+  max-width: min(26rem, calc(100vw - 2 * var(--gutter))); text-align: center;
   font-size: 0.875rem; color: var(--steel); pointer-events: none; transition: opacity 0.4s ease;
 }
 .loading.gone { opacity: 0; }
@@ -367,6 +368,8 @@ body:not(.in-builder) .loading { display: none; }
   .b-card { top: 80px; }
 }
 @media (max-width: 900px) {
+  /* the configurator stage is the top part of the screen here, above the parts list */
+  .loading { top: 26%; }
   .nav-links { display: none; }
   .tach { display: none; }
   .panel { min-height: 120vh; align-items: end; padding: 10vh var(--gutter) 14vh; }
