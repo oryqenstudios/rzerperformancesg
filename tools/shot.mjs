@@ -6,7 +6,7 @@
 // <json> is one frame object or an array of them. Any key starting with "u" is
 // passed as a uniform; "cam" is [[pos],[target]]; "fov" is in degrees; "name"
 // is the output file name. Defaults below = the built car with the Rzer
-// signature build, headlights on.
+// signature build (silver Evo, showroom spotlight), headlights on.
 //
 //   node tools/shot.mjs '{"name":"hero"}'
 //   node tools/shot.mjs '{"name":"intro-spikes","uT":3.6,"uLights":0,"cam":[[2.6,1.6,1.4],[0,0.05,0]],"fov":38}'
@@ -44,12 +44,12 @@ for (const [i, opts] of frames.entries()) {
     gl.useProgram(pr);
     const L = n => gl.getUniformLocation(pr, n);
     const d = Object.assign({
-      uT: 99, uXray: 0, uLights: 1, uBay: 0, uReflect: 1, uExposure: 1.35, uDrl: [1, 0.97, 0.92],
-      uPaint: [0.006, 0.006, 0.007], uPaintRough: 0, uPaintMetal: 0,
+      uT: 99, uXray: 0, uLights: 1, uBay: 0, uShow: 1, uReflect: 1, uExposure: 1.35, uDrl: [1, 0.97, 0.92],
+      uPaint: [0.62, 0.63, 0.65], uPaintRough: 0.2, uPaintMetal: 1,
       uRimCol: [0.008, 0.008, 0.009], uRimRough: 0.05, uRimMetal: 0, uCaliper: [0.55, 0.02, 0.015],
-      uWheel: 0, uRimR: 0.254, uSpoiler: 1, uLip: 1, uSkirts: 1, uDiffuser: 1, uExhaust: 1, uExFinish: 1,
-      uRide: 0.055, uWide: 0, uHood: 0, uRoof: 1, uMirror: 1, uTint: 0.95, uTime: 1, uZero: 0, uShift: [0, 0],
-      cam: [[5.2, 1.0, 2.6], [0, 0.55, 0]], fov: 34
+      uWheel: 0, uRimR: 0.229, uSpoiler: 3, uLip: 2, uSkirts: 1, uDiffuser: 1, uExhaust: 0, uExFinish: 1,
+      uRide: 0.05, uWide: 0, uHood: 1, uRoof: 0, uMirror: 0, uTint: 0.6, uTime: 1, uZero: 0, uShift: [0, 0],
+      cam: [[5.6, 1.2, -3.4], [0.1, 0.5, 0.1]], fov: 34
     }, opts);
     const ints = ['uWheel', 'uSpoiler', 'uLip', 'uSkirts', 'uDiffuser', 'uExhaust', 'uExFinish', 'uHood', 'uRoof', 'uMirror', 'uZero'];
     for (const [k, v] of Object.entries(d)) {

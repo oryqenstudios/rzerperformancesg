@@ -9,10 +9,11 @@ uniform int   uZero;
 uniform vec3  uCamPos, uCamFwd, uCamRight, uCamUp;
 uniform float uTanHalf;
 uniform vec2  uShift;
-uniform float uT;          // intro clock (s). >= 9.5 : car fully built
+uniform float uT;          // intro clock (s). >= BUILT : car complete
 uniform float uXray;
 uniform float uLights;
 uniform float uBay;
+uniform float uShow;       // showroom lighting: overhead spotlight on, garage lights dimmed
 uniform float uReflect;
 uniform float uExposure;
 uniform vec3  uDrl;
@@ -26,15 +27,20 @@ uniform int   uHood, uRoof, uMirror;
 uniform float uTint;
 
 #define PI 3.14159265
-const float R    = 0.345;   // tyre radius
-const float FX   = 1.40;    // front axle
-const float RX   = -1.32;   // rear axle
-const float CEIL = 3.35;
+const float R     = 0.33;    // tyre radius
+const float FX    = 1.31;    // front axle
+const float RX    = -1.315;  // rear axle
+const float TRK   = 0.755;   // wheel centre |z| (half the track)
+const float CEIL  = 3.35;
+const float BUILT = 10.8;    // intro clock (s) at which the car is complete
+const vec3  SPOT  = vec3(0.0, 3.30, 0.0);   // showroom spotlight above the car, pointing down
+const vec3  SPOTC = vec3(1.0, 0.97, 0.92);
+const vec2  RECT  = vec2(2.15, 0.86);       // floor rectangle the rods run out to (half extents)
 
 // material ids
 const float M_BODY = 1., M_TIRE = 2., M_RIM = 3., M_ROTOR = 4., M_CALIPER = 5., M_CARBON = 6.,
             M_EXH = 7., M_PAINTONLY = 8., M_CHASSIS = 9., M_ALU = 10., M_LIQUID = 11., M_SEAT = 12.,
-            M_TURBO = 13., M_TRIM = 14.;
+            M_TURBO = 13., M_TRIM = 14., M_CHROME = 15., M_COOLER = 16.;
 
 int gMode; // 0 intro, 1 car, 2 shell (xray), 3 inner (xray)
 
@@ -54,17 +60,18 @@ float sdBox(vec3 p, vec3 b){ vec3 q = abs(p) - b; return length(max(q, 0.)) + mi
 float sdRBox(vec3 p, vec3 b, float r){ return sdBox(p, b - r) - r; }
 float sdBox2(vec2 p, vec2 b){ vec2 q = abs(p) - b; return length(max(q, 0.)) + min(max(q.x, q.y), 0.); }
 float sdRBox2(vec2 p, vec2 b, float r){ return sdBox2(p, b - r) - r; }
+float sdSeg(vec2 p, vec2 a, vec2 b){ vec2 pa = p - a, ba = b - a; float h = clamp(dot(pa, ba) / dot(ba, ba), 0., 1.); return length(pa - ba * h); }
 float sdCap(vec3 p, vec3 a, vec3 b, float r){ vec3 pa = p - a, ba = b - a; float h = clamp(dot(pa, ba) / dot(ba, ba), 0., 1.); return length(pa - ba * h) - r; }
 float sdEll(vec3 p, vec3 r){ float k0 = length(p / r); float k1 = length(p / (r * r)); return k0 * (k0 - 1.) / k1; }
 void U(inout vec2 r, float d, float m){ if(d < r.x) r = vec2(d, m); }
 
-// ---------------------------------------------------------------- body
+// ---------------------------------------------------------------- body (Evo IX-style four-door saloon)
 const int NP = 20;
 const vec2 PROF[NP] = vec2[NP](
-  vec2( 2.16, 0.13), vec2( 2.29, 0.20), vec2( 2.34, 0.32), vec2( 2.32, 0.44), vec2( 2.22, 0.575),
-  vec2( 1.95, 0.675), vec2( 1.45, 0.765), vec2( 0.98, 0.850), vec2( 0.55, 1.035), vec2( 0.20, 1.165),
-  vec2(-0.20, 1.232), vec2(-0.60, 1.228), vec2(-1.00, 1.160), vec2(-1.45, 1.040), vec2(-1.90, 0.950),
-  vec2(-2.22, 0.920), vec2(-2.28, 0.800), vec2(-2.31, 0.560), vec2(-2.25, 0.250), vec2(-2.10, 0.130));
+  vec2( 2.17, 0.145), vec2( 2.265, 0.190), vec2( 2.295, 0.340), vec2( 2.29, 0.520), vec2( 2.25, 0.665),
+  vec2( 2.13, 0.740), vec2( 1.75, 0.800), vec2( 1.25, 0.865), vec2( 0.84, 0.925), vec2( 0.42, 1.150),
+  vec2( 0.03, 1.360), vec2(-0.40, 1.405), vec2(-0.95, 1.390), vec2(-1.30, 1.250), vec2(-1.62, 1.080),
+  vec2(-2.17, 1.045), vec2(-2.26, 0.950), vec2(-2.285, 0.620), vec2(-2.25, 0.300), vec2(-2.12, 0.150));
 
 float sdProfile(vec2 p){
   float d = dot(p - PROF[0], p - PROF[0]); float s = 1.;
@@ -79,14 +86,14 @@ float sdProfile(vec2 p){
 }
 
 float halfW(float x){
-  float f = exp(-pow((x - FX) / 0.55, 2.)), r = exp(-pow((x - RX) / 0.6, 2.));
-  return 0.915 + 0.035 * f + 0.055 * r + uWide * (0.065 * f + 0.075 * r);
+  float f = exp(-pow((x - FX) / 0.50, 2.)), r = exp(-pow((x - RX) / 0.55, 2.));
+  return 0.845 + 0.035 * f + 0.030 * r + uWide * (0.07 * f + 0.08 * r);
 }
-float shoulderY(float x){ return mix(0.93, 0.80, smoothstep(-1.9, 1.6, x)); }
+float shoulderY(float x){ return mix(1.01, 0.975, smoothstep(-1.6, 0.8, x)); }   // beltline
 float cabinHW(vec3 pb){
   float t = pb.y - shoulderY(pb.x);
-  float tumble = 0.78 * 0.5 * (t + sqrt(t * t + 0.0025));
-  float tuck = 0.06 * smoothstep(0.36, 0.12, pb.y);
+  float tumble = 0.56 * 0.5 * (t + sqrt(t * t + 0.0025));
+  float tuck = 0.05 * smoothstep(0.34, 0.12, pb.y);
   return halfW(pb.x) - tumble - tuck;
 }
 vec2 exhaustSlot(float az, out float r){ // returns (zc, yc) of nearest tip for |z|=az
@@ -96,85 +103,88 @@ vec2 exhaustSlot(float az, out float r){ // returns (zc, yc) of nearest tip for 
 }
 
 float bodySDF(vec3 pb){
-  float bb = sdBox(pb - vec3(0., 0.69, 0.), vec3(2.36, 0.57, 1.06 + uWide * 0.08));
+  float hwm = 0.89 + uWide * 0.08;
+  float bb = sdBox(pb - vec3(0., 0.80, 0.), vec3(2.33, 0.66, hwm + 0.02));
   if(bb > 0.10) return bb;
   float side = sdProfile(pb.xy);
-  float hwm = 0.98 + uWide * 0.08;
-  float rr = pb.x > 0. ? 0.70 : 0.45;
-  vec2 q = abs(pb.xz) - vec2(2.31, hwm) + rr;
+  float rr = pb.x > 0. ? 0.42 : 0.30;
+  vec2 q = abs(pb.xz) - vec2(2.29, hwm) + rr;
   float plan = min(max(q.x, q.y), 0.) + length(max(q, 0.)) - rr;
   float sect = (abs(pb.z) - cabinHW(pb)) * 0.8;
-  float d = smax(side, plan, 0.07);
-  d = smax(d, sect, 0.09);
+  float d = smax(side, plan, 0.06);
+  d = smax(d, sect, 0.08);
   // wheel arches
-  float ax = pb.x > 0.04 ? FX : RX;
-  float arch = length(pb.xy - vec2(ax, R)) - (0.40 + uWide * 0.025);
-  arch = max(arch, 0.50 - abs(pb.z));
-  d = smax(d, -arch, 0.03);
-  // side scoop ahead of the rear wheel
-  float sc = sdEll(vec3(pb.x + 0.86, pb.y - 0.52, abs(pb.z) - halfW(pb.x) - 0.035), vec3(0.42, 0.12, 0.08));
-  d = smax(d, -sc, 0.05);
+  float ax = pb.x > 0. ? FX : RX;
+  float arch = length(pb.xy - vec2(ax, R)) - (0.395 + uWide * 0.025);
+  arch = max(arch, 0.46 - abs(pb.z));
+  d = smax(d, -arch, 0.025);
+  // big lower intake in the front bumper; the intercooler core shows through it
+  float iz = 0.53 - (pb.y - 0.21) * 0.30;
+  float intake = max(sdBox2(vec2(pb.x - 2.33, pb.y - 0.355), vec2(0.10, 0.135)), abs(pb.z) - iz);
+  d = smax(d, -intake, 0.02);
   // exhaust openings
   float er; vec2 ez = exhaustSlot(abs(pb.z), er);
-  float hole = max(length(vec2(pb.y - ez.y, abs(pb.z) - ez.x)) - er - 0.016, pb.x + 2.13);
+  float hole = max(length(vec2(pb.y - ez.y, abs(pb.z) - ez.x)) - er - 0.016, pb.x + 2.15);
   d = smax(d, -hole, 0.01);
-  // ducktail
-  if(uSpoiler == 1){
-    float dt = sdRBox(pb - vec3(-2.12, 0.95, 0.), vec3(0.18, 0.07, 0.80), 0.03);
-    dt = max(dt, pb.y - (0.94 + max(-1.98 - pb.x, 0.) * 0.38));
-    d = smin(d, dt, 0.06);
+  // factory wing: body-colour blade on two pedestals
+  if(uSpoiler == 1 && pb.x < -1.80 && pb.y > 0.98){
+    vec3 w = pb - vec3(-2.07, 1.17, 0.); w.xy = rot(0.10) * w.xy;
+    float blade = sdRBox(w, vec3(0.12, 0.014, 0.76), 0.012);
+    float ped = sdRBox(vec3(pb.x + 2.05, pb.y - 1.10, abs(pb.z) - 0.55), vec3(0.055, 0.07, 0.016), 0.012);
+    d = min(d, min(blade, ped));
   }
   return d;
 }
 
 float carbonParts(vec3 pb){
   float d = 1e9;
+  float hwm = 0.87 + uWide * 0.08;
   if(uLip > 0){
-    float ext = uLip == 1 ? 0.035 : 0.085;
-    vec2 q = abs(pb.xz) - vec2(2.31 + ext, 0.96 + uWide * 0.08) + 0.7;
-    float pl = min(max(q.x, q.y), 0.) + length(max(q, 0.)) - 0.7;
-    float lip = max(pl, abs(pb.y - 0.118) - (uLip == 1 ? 0.012 : 0.010));
-    lip = max(lip, 1.62 - pb.x);
+    float ext = uLip == 1 ? 0.03 : 0.075;
+    vec2 q = abs(pb.xz) - vec2(2.25 + ext, hwm) + 0.42;
+    float pl = min(max(q.x, q.y), 0.) + length(max(q, 0.)) - 0.42;
+    float lip = max(pl, abs(pb.y - 0.142) - (uLip == 1 ? 0.012 : 0.010));
+    lip = max(lip, 1.72 - pb.x);
     d = min(d, lip);
-    if(uLip == 2){
-      vec3 c = vec3(pb.x - 2.14, pb.y - 0.36, abs(pb.z) - 0.88);
-      c.xy = rot(-0.18) * c.xy;
-      d = min(d, sdRBox(c, vec3(0.09, 0.006, 0.09), 0.004));
+    if(uLip == 2){ // canards on the bumper corners
+      vec3 c = vec3(pb.x - 2.15, pb.y - 0.31, abs(pb.z) - 0.80);
+      c.xy = rot(-0.22) * c.xy;
+      d = min(d, sdRBox(c, vec3(0.075, 0.006, 0.075), 0.004));
     }
   }
   if(uSkirts == 1){
-    float sk = max(max(abs(pb.x) - 0.95, abs(pb.y - 0.162) - 0.036), abs(pb.z) - (halfW(pb.x) + 0.02));
+    float sk = max(max(abs(pb.x) - 0.90, abs(pb.y - 0.175) - 0.035), abs(pb.z) - (halfW(pb.x) + 0.02));
     d = min(d, sk - 0.004);
   }
   if(uDiffuser == 1 && pb.x < -1.8){
-    float base = sdBox(vec3(pb.x + 2.13, pb.y - 0.112, pb.z), vec3(0.22, 0.010, 0.72));
+    float base = sdBox(vec3(pb.x + 2.10, pb.y - 0.135, pb.z), vec3(0.15, 0.010, 0.70));
     float fz = mod(pb.z + 0.09, 0.18) - 0.09;
-    float top = 0.12 + max(-pb.x - 1.95, 0.) * 0.5;
-    float fin = max(abs(fz) - 0.005, max(pb.y - top, 0.10 - pb.y));
-    fin = max(fin, max(abs(pb.z) - 0.64, max(pb.x + 1.92, -2.37 - pb.x)));
+    float top = 0.14 + max(-pb.x - 1.98, 0.) * 0.5;
+    float fin = max(abs(fz) - 0.005, max(pb.y - top, 0.12 - pb.y));
+    fin = max(fin, max(abs(pb.z) - 0.64, max(pb.x + 1.95, -2.29 - pb.x)));
     d = min(d, min(base, fin));
   }
   if(uSpoiler == 2){
-    vec3 l = pb - vec3(-2.25, 0.938, 0.);
-    l.xy = rot(-0.35) * l.xy;
-    d = min(d, sdRBox(l, vec3(0.065, 0.008, 0.80), 0.006));
+    vec3 l = pb - vec3(-2.235, 1.06, 0.);
+    l.xy = rot(0.30) * l.xy;
+    d = min(d, sdRBox(l, vec3(0.06, 0.008, 0.78), 0.006));
   }
-  if(uSpoiler == 3 && pb.x < -1.6 && pb.y > 0.85){
-    vec3 w = pb - vec3(-2.04, 1.27, 0.);
-    w.xy = rot(-0.16) * w.xy;
-    float blade = sdRBox(w, vec3(0.17, 0.013, 0.93), 0.011);
-    float plate = sdRBox(vec3(pb.x + 2.04, pb.y - 1.245, abs(pb.z) - 0.935), vec3(0.20, 0.10, 0.006), 0.004);
-    float upr = sdRBox(vec3(pb.x + 1.99, pb.y - 1.10, abs(pb.z) - 0.40), vec3(0.06, 0.16, 0.007), 0.004);
+  if(uSpoiler == 3 && pb.x < -1.6 && pb.y > 0.98){
+    vec3 w = pb - vec3(-2.04, 1.41, 0.);
+    w.xy = rot(0.13) * w.xy;
+    float blade = sdRBox(w, vec3(0.17, 0.013, 0.90), 0.011);
+    float plate = sdRBox(vec3(pb.x + 2.04, pb.y - 1.39, abs(pb.z) - 0.905), vec3(0.17, 0.065, 0.006), 0.004);
+    float upr = sdRBox(vec3(pb.x + 2.00, pb.y - 1.22, abs(pb.z) - 0.42), vec3(0.06, 0.18, 0.007), 0.004);
     d = min(d, min(blade, min(plate, upr)));
   }
   return d;
 }
 
 float mirrorSDF(vec3 pb){
-  vec3 m = vec3(pb.x - 0.80, pb.y - 0.975, abs(pb.z) - 0.985);
+  vec3 m = vec3(pb.x - 0.70, pb.y - 1.04, abs(pb.z) - 0.90);
   if(dot(m, m) > 0.09) return length(m) - 0.2;
-  float head = sdEll(m, vec3(0.075, 0.048, 0.10));
-  float stalk = sdRBox(m - vec3(0.02, -0.035, -0.09), vec3(0.035, 0.012, 0.07), 0.008);
+  float head = sdEll(m, vec3(0.07, 0.05, 0.10));
+  float stalk = sdRBox(m - vec3(0.02, -0.035, -0.085), vec3(0.03, 0.012, 0.06), 0.008);
   return smin(head, stalk, 0.02);
 }
 
@@ -183,23 +193,23 @@ float exhaustSDF(vec3 pb, out float inner){
   vec2 yz = vec2(pb.y - ez.y, abs(pb.z) - ez.x);
   float rr = length(yz);
   inner = rr - r + 0.004;
-  return max(abs(rr - r) - 0.005, abs(pb.x + 2.27) - 0.085);
+  return max(abs(rr - r) - 0.005, abs(pb.x + 2.24) - 0.07);
 }
 
 // ---------------------------------------------------------------- wheels
 vec3 wheelLocal(vec3 p){
   float ax = p.x > 0.04 ? FX : RX;
-  return vec3(p.x - ax, p.y - R, abs(p.z) - (0.80 + uWide * 0.05));
+  return vec3(p.x - ax, p.y - R, abs(p.z) - (TRK + uWide * 0.05));
 }
 vec2 wheelSDF(vec3 p){
   vec3 q = wheelLocal(p);
   float bl = length(q);
-  if(bl > 0.48) return vec2(bl - 0.40, M_TIRE);
+  if(bl > 0.46) return vec2(bl - 0.38, M_TIRE);
   vec2 res = vec2(1e9, M_TIRE);
   float rim = uRimR;
   float r = length(q.xy);
   float rc = 0.5 * (R + rim + 0.006), hr = 0.5 * (R - rim - 0.006);
-  float tire = sdRBox2(vec2(r - rc, q.z), vec2(hr, 0.128), min(0.055, hr * 0.92));
+  float tire = sdRBox2(vec2(r - rc, q.z), vec2(hr, 0.128), min(0.05, hr * 0.92));
   U(res, tire, M_TIRE);
   // barrel + lip
   float barrel = sdRBox2(vec2(r - rim + 0.010, q.z), vec2(0.011, 0.118), 0.004);
@@ -227,148 +237,213 @@ vec2 wheelSDF(vec3 p){
     d2 = -slot;
   }
   d2 = max(d2, r - (rim - 0.008));
-  d2 = min(d2, r - 0.072);
+  d2 = min(d2, r - 0.068);
   float face = max(d2, abs(q.z - faceZ) - 0.017);
-  float cap = max(r - 0.036, abs(q.z - 0.068) - 0.012);
+  float cap = max(r - 0.034, abs(q.z - 0.068) - 0.012);
   rimD = min(rimD, min(face, cap));
   U(res, rimD, M_RIM);
   // brakes
-  float rotor = max(r - (rim - 0.036), abs(q.z + 0.020) - 0.013);
+  float rotor = max(r - (rim - 0.034), abs(q.z + 0.020) - 0.013);
   U(res, rotor, M_ROTOR);
   float th = p.x > 0.04 ? -2.09 : -1.05;
   vec2 cq = rot(th) * q.xy;
-  float cal = sdRBox(vec3(cq.x - (rim - 0.072), cq.y, q.z + 0.018), vec3(0.042, 0.095, 0.040), 0.016);
+  float cal = sdRBox(vec3(cq.x - (rim - 0.068), cq.y, q.z + 0.018), vec3(0.040, 0.090, 0.040), 0.016);
   U(res, cal, M_CALIPER);
   return res;
 }
 
 // ---------------------------------------------------------------- chassis / engine / interior
-float chassisSDF(vec3 p){
+// t is the intro clock: each group grows in over its window. The x-ray passes 99.
+float chassisSDF(vec3 p, float t){
   vec3 q = vec3(p.x, p.y, abs(p.z));
-  float d = sdRBox(q - vec3(0., 0.24, 0.58), vec3(2.05, 0.075, 0.05), 0.02);
-  d = min(d, sdCap(q, vec3(FX, 0.30, 0.0), vec3(FX, 0.30, 0.58), 0.045));
-  d = min(d, sdCap(q, vec3(RX, 0.30, 0.0), vec3(RX, 0.30, 0.58), 0.045));
-  d = min(d, sdCap(q, vec3(0.30, 0.22, 0.0), vec3(0.30, 0.22, 0.58), 0.030));
-  d = min(d, sdCap(q, vec3(-0.70, 0.22, 0.0), vec3(-0.70, 0.22, 0.58), 0.030));
-  d = min(d, sdCap(q, vec3(2.12, 0.32, 0.0), vec3(2.12, 0.32, 0.78), 0.034));
-  d = min(d, sdCap(q, vec3(-2.12, 0.32, 0.0), vec3(-2.12, 0.32, 0.78), 0.034));
-  // cage
-  d = min(d, sdCap(q, vec3(0.92, 0.26, 0.60), vec3(0.22, 1.10, 0.56), 0.022));
-  d = min(d, sdCap(q, vec3(-0.62, 0.26, 0.62), vec3(-0.62, 1.13, 0.56), 0.024));
-  d = min(d, sdCap(q, vec3(0.22, 1.10, 0.56), vec3(-0.62, 1.13, 0.56), 0.022));
-  d = min(d, sdCap(q, vec3(-0.62, 1.13, 0.0), vec3(-0.62, 1.13, 0.56), 0.022));
-  d = min(d, sdCap(q, vec3(-0.62, 1.13, 0.56), vec3(-1.65, 0.42, 0.60), 0.020));
-  // suspension
+  // perimeter frame, rising out of the rectangle the rods drew on the floor
+  float kr = smoothstep(5.3, 6.0, t);
+  vec2 hs = mix(RECT, vec2(2.02, 0.56), kr);
+  vec2 rq = vec2(abs(sdBox2(p.xz, hs)) - mix(0.004, 0.042, kr), abs(p.y - mix(0.0105 + uRide, 0.24, kr)) - mix(0.004, 0.058, kr));
+  float d = length(max(rq, 0.)) + min(max(rq.x, rq.y), 0.) - mix(0.006, 0.014, kr);
+  // cross members, inner aprons and top mounts (the blobs that swell at the corners)
+  float km = 1. - smoothstep(5.7, 6.35, t);
+  float c = sdCap(q, vec3(FX, 0.27, 0.0), vec3(FX, 0.27, 0.56), 0.045);
+  c = min(c, sdCap(q, vec3(RX, 0.27, 0.0), vec3(RX, 0.27, 0.56), 0.045));
+  c = min(c, sdCap(q, vec3(0.25, 0.22, 0.0), vec3(0.25, 0.22, 0.56), 0.030));
+  c = min(c, sdCap(q, vec3(-0.62, 0.22, 0.0), vec3(-0.62, 0.22, 0.56), 0.030));
   for(int i = 0; i < 2; i++){
     float ax = i == 0 ? FX : RX;
-    float tz = 0.80 + uWide * 0.05;
-    d = min(d, sdCap(q, vec3(ax - 0.18, 0.20, 0.56), vec3(ax, 0.22, tz - 0.12), 0.018));
-    d = min(d, sdCap(q, vec3(ax + 0.16, 0.20, 0.56), vec3(ax, 0.22, tz - 0.12), 0.018));
-    d = min(d, sdCap(q, vec3(ax - 0.14, 0.50, 0.52), vec3(ax, 0.50, tz - 0.13), 0.015));
-    vec3 s = q - vec3(ax - 0.03, 0.0, tz - 0.25);
-    float sh = 0.38;
-    float spring = length(vec2(length(s.xz) - 0.05 - 0.008 * sin(s.y * 95.), max(abs(s.y - 0.44) - sh * 0.5, 0.))) - 0.012;
-    d = min(d, spring * 0.8);
+    c = min(c, sdRBox(q - vec3(ax, 0.47, 0.41), vec3(0.13, 0.23, 0.025), 0.02));
+    c = min(c, sdRBox(q - vec3(ax - 0.03, 0.70, TRK - 0.25), vec3(0.08, 0.025, 0.08), 0.02));
   }
+  d = smin(d, c + km * 0.10, 0.05);
+  // suspension: wishbones and coilovers
+  float ks = 1. - smoothstep(6.2, 6.9, t);
+  float s = 1e9;
+  for(int i = 0; i < 2; i++){
+    float ax = i == 0 ? FX : RX;
+    float tz = TRK + uWide * 0.05;
+    s = min(s, sdCap(q, vec3(ax - 0.18, 0.20, 0.52), vec3(ax, 0.22, tz - 0.12), 0.018));
+    s = min(s, sdCap(q, vec3(ax + 0.16, 0.20, 0.52), vec3(ax, 0.22, tz - 0.12), 0.018));
+    s = min(s, sdCap(q, vec3(ax - 0.14, 0.50, 0.46), vec3(ax, 0.50, tz - 0.13), 0.015));
+    vec3 sp = q - vec3(ax - 0.03, 0.0, tz - 0.25);
+    float spring = length(vec2(length(sp.xz) - 0.05 - 0.008 * sin(sp.y * 95.), max(abs(sp.y - 0.46) - 0.19, 0.))) - 0.012;
+    s = min(s, spring * 0.8);
+  }
+  d = min(d, s + ks * 0.08);
+  // greenhouse frame: pillars and roof rails, there before the body pours over them
+  float kc = 1. - smoothstep(7.8, 8.5, t);
+  float g = sdCap(q, vec3(0.80, 0.94, 0.70), vec3(0.06, 1.33, 0.59), 0.022);
+  g = min(g, sdCap(q, vec3(0.06, 1.33, 0.59), vec3(-0.95, 1.35, 0.59), 0.022));
+  g = min(g, sdCap(q, vec3(-0.95, 1.35, 0.59), vec3(-1.62, 1.04, 0.72), 0.024));
+  g = min(g, sdCap(q, vec3(-0.27, 0.95, 0.80), vec3(-0.30, 1.36, 0.60), 0.022));
+  g = min(g, sdCap(q, vec3(0.06, 1.33, 0.0), vec3(0.06, 1.33, 0.59), 0.020));
+  g = min(g, sdCap(q, vec3(-0.95, 1.35, 0.0), vec3(-0.95, 1.35, 0.59), 0.020));
+  g = min(g, sdCap(q, vec3(0.82, 0.93, 0.0), vec3(0.82, 0.93, 0.74), 0.024));
+  g = min(g, sdCap(q, vec3(0.80, 0.94, 0.74), vec3(0.80, 0.26, 0.58), 0.026));
+  d = min(d, g + kc * 0.06);
   return d;
 }
 
-vec2 engineSDF(vec3 p){
+vec2 engineSDF(vec3 p, float t){
   vec2 res = vec2(1e9, M_ALU);
-  vec3 q = p - vec3(1.42, 0., 0.);
-  U(res, sdRBox(q - vec3(0., 0.42, 0.), vec3(0.30, 0.15, 0.22), 0.04), M_ALU);
-  vec3 h = vec3(q.x, q.y - 0.60, abs(q.z) - 0.16); h.yz = rot(0.55) * h.yz;
-  U(res, sdRBox(h, vec3(0.30, 0.05, 0.08), 0.03), M_CHASSIS);
-  U(res, sdCap(q, vec3(-0.24, 0.71, 0.), vec3(0.24, 0.71, 0.), 0.07), M_CARBON);
-  vec3 t = q - vec3(0.34, 0.48, 0.30);
-  U(res, length(vec2(length(t.xy) - 0.065, t.z)) - 0.045, M_TURBO);
-  U(res, sdCap(q, vec3(0.34, 0.48, 0.30), vec3(0.62, 0.34, 0.26), 0.03), M_ALU);
-  U(res, sdBox(p - vec3(2.07, 0.42, 0.), vec3(0.022, 0.16, 0.56)), M_CHASSIS);
-  U(res, sdCap(p, vec3(1.05, 0.40, 0.), vec3(0.20, 0.36, 0.), 0.11), M_ALU);
-  U(res, sdCap(p, vec3(0.20, 0.33, 0.), vec3(RX + 0.1, 0.33, 0.), 0.034), M_CHASSIS);
-  U(res, length(p - vec3(RX, 0.34, 0.)) - 0.12, M_ALU);
   vec3 a = vec3(p.x, p.y, abs(p.z));
-  U(res, sdCap(a, vec3(RX, 0.34, 0.), vec3(RX, 0.345, 0.70), 0.024), M_CHASSIS);
-  U(res, sdCap(a, vec3(1.10, 0.22, 0.33), vec3(-2.20, 0.215, 0.56), 0.034), M_TURBO);
-  // seats + wheel
-  vec3 s = vec3(p.x + 0.25, p.y, abs(p.z) - 0.38);
-  float seat = sdRBox(s - vec3(0., 0.36, 0.), vec3(0.24, 0.06, 0.20), 0.05);
-  vec3 sb = s - vec3(-0.24, 0.66, 0.); sb.xy = rot(-0.22) * sb.xy;
+  // transverse turbo four: block, cam cover, intake plenum
+  float ke = (1. - smoothstep(6.6, 7.4, t)) * 0.12;
+  vec3 q = p - vec3(1.50, 0., -0.05);
+  U(res, sdRBox(q - vec3(0., 0.46, 0.), vec3(0.19, 0.16, 0.30), 0.035) + ke, M_ALU);
+  U(res, sdRBox(q - vec3(-0.02, 0.655, 0.), vec3(0.12, 0.04, 0.27), 0.03) + ke, M_CHASSIS);
+  U(res, sdCap(q, vec3(0.17, 0.60, -0.24), vec3(0.17, 0.60, 0.24), 0.055) + ke, M_CARBON);
+  // turbo and downpipe on the bulkhead side
+  vec3 tq = q - vec3(-0.27, 0.47, 0.10);
+  U(res, length(vec2(length(tq.xy) - 0.06, tq.z)) - 0.042 + ke, M_TURBO);
+  U(res, sdCap(q, vec3(-0.27, 0.47, 0.10), vec3(-0.42, 0.22, 0.10), 0.034) + ke, M_TURBO);
+  // front-mount intercooler and its pipes
+  float kc = (1. - smoothstep(7.0, 7.6, t)) * 0.10;
+  U(res, sdRBox(p - vec3(2.12, 0.355, 0.), vec3(0.03, 0.12, 0.48), 0.01) + kc, M_COOLER);
+  U(res, sdCap(a, vec3(2.08, 0.40, 0.46), vec3(1.72, 0.56, 0.36), 0.03) + kc, M_ALU);
+  // four-wheel-drive driveline and exhaust
+  float kd = (1. - smoothstep(6.8, 7.5, t)) * 0.10;
+  U(res, sdRBox(p - vec3(1.42, 0.34, 0.36), vec3(0.16, 0.12, 0.10), 0.04) + kd, M_ALU);
+  U(res, sdCap(p, vec3(1.25, 0.28, 0.), vec3(RX + 0.1, 0.30, 0.), 0.034) + kd, M_CHASSIS);
+  U(res, length(p - vec3(RX, 0.33, 0.)) - 0.11 + kd, M_ALU);
+  U(res, sdCap(a, vec3(RX, 0.33, 0.), vec3(RX, 0.33, TRK - 0.06), 0.024) + kd, M_CHASSIS);
+  U(res, sdCap(a, vec3(FX, 0.33, 0.), vec3(FX, 0.33, TRK - 0.06), 0.024) + kd, M_CHASSIS);
+  U(res, sdCap(a, vec3(1.0, 0.20, 0.12), vec3(-2.18, 0.215, 0.56), 0.034) + kd, M_TURBO);
+  // seats and steering wheel (right-hand drive, +z)
+  float kk = (1. - smoothstep(7.6, 8.2, t)) * 0.10;
+  vec3 s = vec3(p.x + 0.12, p.y, abs(p.z) - 0.38);
+  float seat = sdRBox(s - vec3(0., 0.38, 0.), vec3(0.24, 0.06, 0.20), 0.05);
+  vec3 sb = s - vec3(-0.24, 0.68, 0.); sb.xy = rot(-0.22) * sb.xy;
   seat = min(seat, sdRBox(sb, vec3(0.06, 0.30, 0.20), 0.05));
-  U(res, seat, M_SEAT);
-  vec3 w = p - vec3(0.50, 0.86, 0.38); w.xy = rot(0.45) * w.xy;
-  U(res, length(vec2(length(w.yz) - 0.17, w.x)) - 0.018, M_SEAT);
+  seat = min(seat, sdRBox(vec3(p.x + 1.02, p.y - 0.42, p.z), vec3(0.24, 0.07, 0.60), 0.05));
+  seat = min(seat, sdRBox(vec3(p.x + 1.26, p.y - 0.70, p.z), vec3(0.06, 0.26, 0.60), 0.05));
+  U(res, seat + kk, M_SEAT);
+  vec3 w = p - vec3(0.42, 0.90, 0.38); w.xy = rot(0.45) * w.xy;
+  U(res, length(vec2(length(w.yz) - 0.17, w.x)) - 0.018 + kk, M_SEAT);
   return res;
 }
 
 // ---------------------------------------------------------------- intro
-float rectR(float a){ return min(2.35 / max(abs(cos(a)), 1e-3), 1.05 / max(abs(sin(a)), 1e-3)); }
+float rectR(float a){ return min(RECT.x / max(abs(cos(a)), 1e-3), RECT.y / max(abs(sin(a)), 1e-3)); }
+
+// chrome RZER roundel lying on the floor: a ring around a Z
+float emblemSDF(vec3 p){
+  float bb = length(p) - 0.36;
+  if(bb > 0.08) return bb;
+  vec2 u = vec2(-p.z, -p.x) / 0.30;   // reads upright from the opening camera
+  float ring = abs(length(u) - 0.90) - 0.075;
+  float z = min(min(sdSeg(u, vec2(-0.44, 0.42), vec2(0.44, 0.42)), sdSeg(u, vec2(0.44, 0.42), vec2(-0.44, -0.42))), sdSeg(u, vec2(-0.44, -0.42), vec2(0.44, -0.42))) - 0.085;
+  vec2 w = vec2(min(ring, z) * 0.30, abs(p.y - 0.013) - 0.009);
+  return min(max(w.x, w.y), 0.) + length(max(w, 0.)) - 0.004;
+}
 
 vec2 introLiquid(vec3 p, float t){
   vec2 res = vec2(1e9, M_LIQUID);
-  if(t < 3.0){
-    float d;
-    float m1 = smoothstep(1.7, 2.35, t), m2 = smoothstep(2.35, 3.0, t);
-    float drop = sdEll(p - vec3(0., 0.17, 0.), vec3(0.42, 0.33, 0.42));
-    float dome = length(p) - 0.85;
+  if(t < 3.62){
+    // the pool slides in from the left, swallows the emblem and gathers into a mound
+    float d = sdEll(p - vec3(0.02, 0., 0.05), vec3(0.64, 0.46, 0.66));
+    float m1 = smoothstep(1.65, 2.2, t);
     if(m1 < 1.){
-      float k = smoothstep(0.0, 2.1, t);
+      float k = smoothstep(-0.2, 1.6, t);
+      vec3 head = vec3(0.04, 0., mix(2.9, 0.12, k));
+      float L = mix(2.3, 0., smoothstep(1.2, 2.05, t));
       float pd = 1e9;
-      for(int i = 0; i < 5; i++){
-        float fi = float(i);
-        vec3 st = vec3(-2.4 - fi * 0.45, 0., 1.5 + sin(fi * 2.3) * 0.7);
-        vec3 c = mix(st, vec3(0.), smoothstep(0., 1., k * 1.15 - fi * 0.05));
-        pd = smin(pd, sdEll(p - c, vec3(0.62 - fi * 0.05, 0.15, 0.42)), 0.45);
+      for(int i = 0; i < 6; i++){
+        float fi = float(i) / 5.;
+        vec3 c = head + vec3(sin(fi * 4.2 + t * 1.6) * 0.16 * fi, 0., fi * L);
+        pd = smin(pd, sdEll(p - c, vec3(mix(0.50, 0.34, fi), mix(0.30, 0.07, fi), 0.30 + L * 0.10)), 0.30);
       }
-      pd += 0.018 * sin(p.x * 7. + t * 3.) * sin(p.z * 6. - t * 2.);
-      d = mix(pd, dome, m1);
-    } else d = dome;
-    d = mix(d, drop, m2);
+      float fk = smoothstep(0.7, 1.4, t) * (1. - smoothstep(1.55, 2.0, t));
+      if(fk > 0.){ // fingers that run ahead and out to the sides as it spreads
+        vec3 fq = p - head; fq.x = abs(fq.x);
+        pd = smin(pd, sdEll(fq - vec3(0.25 + 0.45 * fk, 0., -0.15 - 0.25 * fk), vec3(0.01 + 0.34 * fk, 0.05, 0.16)), 0.18);
+      }
+      pd += 0.016 * sin(p.x * 8. + t * 3.) * sin(p.z * 6. - t * 2.4);
+      d = mix(pd, d, m1);
+    }
+    // a sitting drop, a flattened lens, then a crown just before it bursts
+    if(t > 2.2) d = mix(d, sdEll(p - vec3(0., 0.15, 0.), vec3(0.40, 0.33, 0.40)), smoothstep(2.2, 2.65, t));
+    if(t > 2.75) d = mix(d, sdEll(p, vec3(0.34, 0.13, 0.34)), smoothstep(2.75, 3.25, t));
+    if(t > 3.3){
+      float crown = smin(sdEll(p, vec3(0.22, 0.085, 0.22)), sdCap(p, vec3(0.), vec3(0., 0.15, 0.), 0.028), 0.06);
+      d = mix(d, crown, smoothstep(3.3, 3.58, t));
+    }
     res.x = d;
     return res;
   }
-  // spikes -> lattice
-  float g = smoothstep(3.0, 3.85, t);
-  float l = smoothstep(3.95, 5.0, t);
-  float fade = smoothstep(5.3, 6.0, t);
-  float hub = sdEll(p - vec3(0., 0.12 * (1. - g) + 0.02, 0.), vec3(0.42, 0.33, 0.42) * mix(1., 0.16, g)) ;
-  float n = 30.;
-  float a = atan(p.z, p.x);
-  float sec = 2. * PI / n;
-  float id = floor((a + sec * 0.5) / sec);
-  float ac = a - id * sec;
+  // burst -> curling legs -> thin rods + web -> rectangle
+  float g  = smoothstep(3.58, 3.9, t);     // burst
+  float s  = smoothstep(4.2, 4.95, t);     // legs straighten and run out to the rectangle
+  float sr = smoothstep(4.35, 5.05, t);    // thin rods fan out between them
+  float rg = smoothstep(4.75, 5.3, t);     // web and outline
+  float fade = smoothstep(7.2, 8.6, t);    // the floor web dissolves as the body pours
   float rr = length(p.xz);
-  vec2 lp = vec2(cos(ac), sin(ac)) * rr;
-  float h = hash11(id + 3.1);
-  float len = mix(g * (0.7 + 1.7 * h), rectR(id * sec), l);
-  float along = clamp(lp.x / max(len, 1e-3), 0., 1.);
-  float rad = mix(mix(0.07, 0.004, along), 0.0105, l) * (1. - fade);
-  float yy = mix(0.03 + 0.10 * (1. - along) * g, 0.0105, l);
-  vec3 q = vec3(lp.x - clamp(lp.x, 0., len), p.y - yy, lp.y);
-  float sp = (length(q) - rad) * 0.85;
-  // central spike
-  float cs = sdCap(p, vec3(0.), vec3(0., 0.55 * g * (1. - l), 0.), 0.03 * (1. - l));
-  float d = smin(hub, sp, 0.05);
-  d = smin(d, cs, 0.05);
-  // rectangle rings
-  if(l > 0.0){
-    float wr = 0.0105 * (1. - fade);
-    for(int i = 0; i < 3; i++){
-      float s = (float(i) + 1.) / 3.;
-      float ap = smoothstep(4.15 + float(2 - i) * 0.18, 4.6 + float(2 - i) * 0.18, t);
-      float ring = abs(sdBox2(p.xz, vec2(2.35, 1.05) * s)) ;
-      float rd = length(vec2(ring, p.y - 0.0105)) - wr * ap;
-      d = min(d, rd);
-    }
+  float ang = atan(p.z, p.x);
+  float d = sdEll(p, vec3(0.22, 0.085, 0.22) * mix(1., 0.32, g));
+  {
+    float sec = 2. * PI / 10.;
+    float a = ang - 0.32 * rr * (1. - s);
+    float id = floor((a + sec * 0.5) / sec);
+    float ac = a - id * sec;
+    vec2 lp = vec2(cos(ac), sin(ac)) * rr;
+    float len = mix(g * (0.55 + 0.9 * hash11(id + 7.3)), rectR(id * sec), s);
+    float along = clamp(lp.x / max(len, 1e-3), 0., 1.);
+    float rad = mix(mix(0.05, 0.008, along), 0.010, s) * (1. - fade);
+    float yy = mix(0.02 + 0.05 * (1. - along) * g, 0.010, s);
+    vec3 q = vec3(lp.x - clamp(lp.x, 0., len), p.y - yy, lp.y);
+    d = smin(d, (length(q) - rad + fade * 0.015) * 0.7, 0.04);
   }
-  if(fade > 0.) d += fade * 0.02;
+  if(sr > 0.){
+    float sec = 2. * PI / 56.;
+    float a = ang + sec * 0.5;
+    float id = floor((a + sec * 0.5) / sec);
+    float ac = a - id * sec;
+    vec2 lp = vec2(cos(ac), sin(ac)) * rr;
+    float grow = clamp(sr * 1.4 - hash11(id * 1.37 + 2.1) * 0.4, 0., 1.);
+    float len = rectR(id * sec - sec * 0.5) * grow;
+    vec3 q = vec3(lp.x - clamp(lp.x, 0., len), p.y - 0.0075, lp.y);
+    d = min(d, length(q) - 0.0075 * (1. - fade) + fade * 0.015);
+  }
+  // central spike
+  d = smin(d, sdCap(p, vec3(0.), vec3(0., 0.5 * g * (1. - 0.85 * rg), 0.), 0.022 * (1. - 0.5 * rg)), 0.04);
+  if(rg > 0.){
+    // web: chords between neighbouring legs at two radii, then the outline
+    float sec = 2. * PI / 10.;
+    float a0 = floor(ang / sec) * sec, a1 = a0 + sec;
+    vec2 e0 = vec2(cos(a0), sin(a0)) * rectR(a0), e1 = vec2(cos(a1), sin(a1)) * rectR(a1);
+    float w = 1e9;
+    for(int i = 0; i < 2; i++){
+      float f = i == 0 ? 0.36 : 0.68;
+      float ap = smoothstep(4.75 + 0.22 * float(i), 5.15 + 0.22 * float(i), t);
+      w = min(w, sdSeg(p.xz, e0 * f, e1 * f) + (1. - ap) * 0.03);
+    }
+    if(t < 5.45) w = min(w, abs(sdBox2(p.xz, RECT)) + (1. - rg) * 0.03);   // the frame takes it over
+    d = min(d, length(vec2(w, p.y - 0.0085)) - 0.0085 * (1. - fade) + fade * 0.015);
+  }
   res.x = d;
   return res;
 }
 
 // ---------------------------------------------------------------- scene
 vec2 carScene(vec3 p){
-  float bnd = sdBox(p - vec3(0., 0.80, 0.), vec3(2.48, 0.80, 1.12 + uWide * 0.08));
+  float bnd = sdBox(p - vec3(0., 0.80, 0.), vec3(2.42, 0.80, 1.06 + uWide * 0.08));
   if(bnd > 0.12) return vec2(bnd, M_BODY);
   vec3 pb = vec3(p.x, p.y + uRide, p.z);
   vec2 res = vec2(1e9, M_BODY);
@@ -393,36 +468,39 @@ vec2 scene(vec3 p){
   if(gMode == 3){
     vec3 pb = vec3(p.x, p.y + uRide, p.z);
     vec2 res = wheelSDF(p);
-    U(res, chassisSDF(pb), M_CHASSIS);
-    vec2 e = engineSDF(pb); if(e.x < res.x) res = e;
+    U(res, chassisSDF(pb, 99.), M_CHASSIS);
+    vec2 e = engineSDF(pb, 99.); if(e.x < res.x) res = e;
     if(pb.x < -2.05 && pb.y < 0.4){ float inn; U(res, exhaustSDF(pb, inn), M_EXH); }
     return res;
   }
   // intro
   float t = uT;
   vec2 res = vec2(1e9, M_LIQUID);
-  if(t < 6.0) res = introLiquid(p, t);
+  if(t < 1.95) U(res, emblemSDF(p + vec3(0., 0.04 * smoothstep(1.3, 1.95, t), 0.)), M_CHROME);
+  if(t < 8.6){ vec2 l = introLiquid(p, t); if(l.x < res.x) res = l; }
   if(t > 5.25){
     vec3 pb = vec3(p.x, p.y + uRide, p.z);
-    float c = smoothstep(5.3, 6.5, t);
-    if(t < 8.4){
-      U(res, chassisSDF(pb) + (1. - c) * 0.08, M_CHASSIS);
-      vec2 e = engineSDF(pb); e.x += (1. - smoothstep(5.6, 6.7, t)) * 0.12; if(e.x < res.x) res = e;
+    if(t < 10.1){
+      U(res, chassisSDF(pb, t), M_CHASSIS);
+      if(t > 6.5){ vec2 e = engineSDF(pb, t); if(e.x < res.x) res = e; }
     }
-    vec2 w = wheelSDF(p);
-    w.x += (1. - smoothstep(5.8, 6.9, t)) * 0.35;
-    if(w.x < res.x) res = w;
-    if(t > 6.55){
-      float fill = mix(-0.05, 1.42, smoothstep(6.6, 8.1, t));
-      fill += 0.03 * sin(pb.x * 5. + t * 6.) * sin(pb.z * 4. - t * 5.);
+    if(t > 6.75){
+      vec2 w = wheelSDF(p);
+      w.x += (1. - (p.x > 0.04 ? smoothstep(7.1, 7.8, t) : smoothstep(6.8, 7.5, t))) * 0.35;
+      if(w.x < res.x) res = w;
+    }
+    if(t > 8.55){
+      // the body pours up over the frame as black liquid, then cures to paint front to back
+      float fill = mix(0.06, 1.46, smoothstep(8.6, 9.9, t));
+      fill += 0.03 * sin(pb.x * 5. + t * 6.) * sin(pb.z * 4. - t * 5.) * (1. - smoothstep(9.7, 10.0, t));
       float b = max(bodySDF(pb), pb.y - fill);
-      float fm = t > 8.15 ? M_BODY : M_LIQUID;
-      if(res.y == M_CHASSIS || res.y == M_ALU) b = smin(b, res.x, 0.02);
-      U(res, b, fm);
-      float cp = carbonParts(pb) + (1. - smoothstep(7.6, 8.3, t)) * 0.05;
-      U(res, cp, M_CARBON);
-      U(res, mirrorSDF(pb) + (1. - smoothstep(7.8, 8.3, t)) * 0.06, uMirror == 1 ? M_CARBON : M_PAINTONLY);
-      if(pb.x < -2.05 && pb.y < 0.4 && t > 7.6){ float inn; U(res, exhaustSDF(pb, inn), M_EXH); }
+      if(t < 9.9 && (res.y == M_CHASSIS || res.y == M_ALU)) b = smin(b, res.x, 0.02);
+      bool cured = pb.x > mix(2.5, -2.5, smoothstep(10.0, 10.7, t));
+      U(res, b, cured ? M_BODY : M_LIQUID);
+      float ka = (1. - smoothstep(9.3, 10.0, t)) * 0.06;
+      U(res, carbonParts(pb) + ka, cured ? M_CARBON : M_LIQUID);
+      U(res, mirrorSDF(pb) + ka, cured ? (uMirror == 1 ? M_CARBON : M_PAINTONLY) : M_LIQUID);
+      if(pb.x < -2.05 && pb.y < 0.4 && t > 9.4){ float inn; U(res, exhaustSDF(pb, inn), M_EXH); }
     }
   }
   return res;
@@ -445,7 +523,7 @@ vec2 boxHit(vec3 ro, vec3 rd, vec3 bmin, vec3 bmax){
 }
 
 void sceneBox(out vec3 bmin, out vec3 bmax){
-  if(gMode == 0){ bmin = vec3(-5.2, -0.05, -3.0); bmax = vec3(3.0, 1.62, 3.0); }
+  if(gMode == 0){ bmin = vec3(-2.7, -0.05, -1.3); bmax = vec3(2.7, 1.62, 5.8); }
   else { bmin = vec3(-2.62, -0.01, -1.22); bmax = vec3(2.62, 1.62, 1.22); }
 }
 
@@ -486,7 +564,14 @@ float tubes(vec2 c, float w){
   return (a * b) * norm + exp(-abs(lx) * 7.) * b * 0.05;
 }
 
-vec3 headlightPos(float s){ return vec3(2.27, 0.535 - uRide, 0.66 * s); }
+// overhead spotlight cone at p, 0..1 (no shadowing)
+float spotAt(vec3 p){
+  vec3 L = SPOT - p;
+  float c = L.y / length(L);
+  return smoothstep(0.74, 0.90, c) * (0.8 + 0.2 * smoothstep(0.93, 0.995, c));
+}
+
+vec3 headlightPos(float s){ return vec3(2.24, 0.643 - uRide, 0.62 * s); }
 
 vec3 envCol(vec3 p, vec3 r, float rough){
   vec3 c;
@@ -494,20 +579,24 @@ vec3 envCol(vec3 p, vec3 r, float rough){
     float t = (CEIL - p.y) / max(r.y, 1e-3);
     vec2 cp = p.xz + r.xz * t;
     float w = 0.02 + rough * 0.55 + t * 0.003;
-    c = vec3(0.010) + vec3(1.0, 0.98, 0.95) * tubes(cp, w) * 7.5 * exp(-t * 0.035);
+    c = vec3(0.010) + vec3(1.0, 0.98, 0.95) * tubes(cp, w) * 7.5 * exp(-t * 0.035) * mix(1., 0.22, uShow);
     c += vec3(0.008) * smoothstep(0.9, 0.2, r.y);
+    // the spotlight's lens and its soft halo
+    float ds = length(cp - SPOT.xz);
+    c += SPOTC * uShow * (30. * (1. - smoothstep(0.16, 0.16 + w * 2., ds)) + 0.5 * exp(-ds * ds * 1.5));
     c = mix(vec3(0.018), c, smoothstep(0.0, 0.22, r.y));
   } else {
     float t = -p.y / min(r.y, -1e-3);
     vec2 fp = p.xz + r.xz * t;
     float lx = mod(fp.x + 1.5, 3.0) - 1.5;
-    c = vec3(0.012) * (0.5 + exp(-lx * lx * 0.35));
+    c = vec3(0.012) * (0.5 + exp(-lx * lx * 0.35)) * mix(1., 0.3, uShow);
+    c += vec3(0.24) * uShow * spotAt(vec3(fp.x, 0., fp.y));   // the lit pool on the floor
     c = mix(vec3(0.018), c, smoothstep(0.0, -0.2, r.y));
   }
   // distant aisle glow at the horizon defines side surfaces
-  c += vec3(0.16, 0.16, 0.17) * exp(-abs(r.y) * 38.) * (0.35 + 0.65 * smoothstep(0.3, 1., abs(r.x)));
+  c += vec3(0.16, 0.16, 0.17) * exp(-abs(r.y) * 38.) * (0.35 + 0.65 * smoothstep(0.3, 1., abs(r.x))) * mix(1., 0.4, uShow);
   // lit side bays: a soft wall glow the body sides can pick up
-  c += vec3(0.075, 0.075, 0.08) * smoothstep(0.35, 0.95, abs(r.z)) * smoothstep(0.45, 0.0, abs(r.y - 0.05));
+  c += vec3(0.075, 0.075, 0.08) * smoothstep(0.35, 0.95, abs(r.z)) * smoothstep(0.45, 0.0, abs(r.y - 0.05)) * mix(1., 0.45, uShow);
   // configurator bay: tall softboxes either side
   if(uBay > 0.){
     float side = smoothstep(0.55, 0.75, abs(r.z)) * smoothstep(0.55, 0.05, abs(r.y - 0.12)) * smoothstep(0.9, 0.3, abs(r.x));
@@ -556,7 +645,7 @@ vec3 shadePillar(vec3 p, vec3 n){
   }
   float lx = mod(p.x + 1.5, 3.0) - 1.5;
   float E = 0.10 + 0.22 * smoothstep(3.3, 1.0, p.y) * (0.5 + 0.5 * exp(-lx * lx));
-  return alb * E;
+  return alb * E * mix(1., 0.3, uShow);
 }
 
 
@@ -567,74 +656,96 @@ vec3 shadeObj(vec3 p, vec3 rd, float mat, vec3 n, float ao, float t){
   vec3 pb = vec3(p.x, p.y + uRide, p.z);
   vec3 base = vec3(0.02); float rough = 0.3, metal = 0., coat = 0., gap = 0.;
   vec3 emis = vec3(0.);
-  float xrayGrid = 0.;
 
   if(mat == M_BODY || mat == M_PAINTONLY){
     base = uPaint; rough = uPaintRough; metal = uPaintMetal; coat = 1.;
     if(mat == M_BODY){
+      float az = abs(pb.z);
       float sy = shoulderY(pb.x);
-      float edge = cabinHW(pb) - abs(pb.z);
-      bool upper = pb.y > sy + 0.035;
-      bool roof = pb.y > 1.15 && pb.x > -0.98 && pb.x < 0.16;
-      bool glass = false;
-      if(upper && !roof){
-        if(pb.x < 0.98 && pb.x > 0.15 && n.x > 0.25 && edge > 0.075) glass = true;               // windscreen
-        if(abs(n.z) > 0.55 && pb.x > -0.95 && pb.x < 0.86 && pb.y > sy + 0.035 + max(-0.5 - pb.x, 0.) * 0.28) glass = true; // side
-        if(pb.x < -0.98 && pb.x > -1.50 && n.y > 0.6 && edge > 0.10) glass = true;                // rear
-      }
-      if(glass){
-        base = mix(vec3(0.03, 0.032, 0.035), vec3(0.002), uTint); rough = 0.0; metal = 0.; coat = 0.;
-        base *= 1.0;
-      }
-      if(roof && uRoof == 1){ mat = M_CARBON; }
-      // hood
-      bool hood = pb.x > 1.0 && pb.x < 2.12 && n.y > 0.55 && pb.y > 0.70;
-      if(hood && uHood == 1){
-        mat = M_CARBON;
-        float vz = abs(pb.z);
-        if(vz > 0.22 && vz < 0.56 && pb.x > 1.25 && pb.x < 1.72){
-          float sl = smoothstep(0.35, 0.5, abs(fract(pb.x * 22.) - 0.5));
-          gap = max(gap, 1. - sl);
+      float edge = cabinHW(pb) - az;
+      bool upper = pb.y > sy + 0.02;
+      bool roof = pb.y > 1.30 && n.y > 0.75 && pb.x > -0.92 && pb.x < 0.0;
+      bool glass = false, black = false;
+      if(upper){
+        float prof = sdProfile(pb.xy);
+        if(pb.x > 0.07 && pb.x < 0.86 && n.x > 0.25 && edge > 0.07) glass = true;            // windscreen
+        float front = 0.77 - (pb.y - 0.925) * 1.86;   // follows the A-pillar
+        float rear  = -1.17 + (pb.y - 1.0) * 0.45;    // C-pillar
+        if(abs(n.z) > 0.45 && pb.x < front && pb.x > rear && prof < -0.045){                  // side glass
+          glass = true;
+          if(abs(pb.x + 0.27) < 0.045){ glass = false; black = true; }                         // B-pillar
         }
+        if(pb.x < -0.97 && pb.x > -1.58 && n.y > 0.35 && edge > 0.08) glass = true;             // rear screen
       }
-      // panel gaps
-      if(abs(n.z) > 0.4 && pb.y < sy + 0.01){
-        gap = max(gap, 1. - smoothstep(0.0, 0.006, abs(pb.x - (0.90 - (pb.y - 0.3) * 0.12))));
-        gap = max(gap, 1. - smoothstep(0.0, 0.006, abs(pb.x - (-0.62 + (pb.y - 0.3) * 0.18))));
-        if(pb.x < -0.30 && pb.x > -0.46 && abs(pb.y - 0.79) < 0.012) gap = max(gap, 0.85);
+      if(glass){ base = mix(vec3(0.03, 0.032, 0.035), vec3(0.002), uTint); rough = 0.; metal = 0.; coat = 0.; }
+      if(black){ base = vec3(0.004); rough = 0.; metal = 0.; coat = 1.; }
+      if(roof && uRoof == 1) mat = M_CARBON;
+      // wheel wells: the inside of the arch cut stays dark
+      if(length(pb.xy - vec2(pb.x > 0. ? FX : RX, R)) < 0.42 + uWide * 0.025 && az < cabinHW(pb) - 0.015){
+        base = vec3(0.006); rough = 0.6; metal = 0.; coat = 0.;
       }
-      if(n.y > 0.4 && pb.x > 1.0 && pb.x < 2.05) gap = max(gap, 1. - smoothstep(0.0, 0.006, abs(abs(pb.z) - 0.70)));
+      // bonnet: optional carbon, factory vents either way
+      bool hood = pb.x > 0.95 && pb.x < 2.13 && n.y > 0.5 && pb.y > 0.72 && az < 0.71;
+      if(hood){
+        if(uHood == 1) mat = M_CARBON;
+        float sl = 0.;
+        if(az < 0.20 && pb.x > 1.50 && pb.x < 1.86) sl = 1. - smoothstep(0.30, 0.45, abs(fract(pb.x * 26.) - 0.5));
+        if(az > 0.30 && az < 0.52 && pb.x > 1.05 && pb.x < 1.40) sl = 1. - smoothstep(0.30, 0.45, abs(fract(pb.x * 24.) - 0.5));
+        gap = max(gap, sl * 0.9);
+      }
+      // panel gaps: four doors, handles, bonnet and boot shut lines
+      if(abs(n.z) > 0.4 && pb.y < sy + 0.005 && pb.y > 0.22){
+        gap = max(gap, 1. - smoothstep(0.0, 0.006, abs(pb.x - (0.80 - (pb.y - 0.95) * 0.12))));
+        gap = max(gap, 1. - smoothstep(0.0, 0.006, abs(pb.x + 0.27)));
+        if(pb.y > 0.62) gap = max(gap, 1. - smoothstep(0.0, 0.006, abs(pb.x + 1.02)));
+        if(abs(pb.y - 0.89) < 0.011 && (abs(pb.x - 0.20) < 0.075 || abs(pb.x + 0.62) < 0.075)) gap = max(gap, 0.8);
+      }
+      if(n.y > 0.4 && pb.x > 0.95 && pb.x < 2.10) gap = max(gap, 1. - smoothstep(0.0, 0.006, abs(az - 0.71)));
+      if(n.y > 0.4 && az < 0.71 && pb.x > 0.92 && pb.x < 0.98) gap = max(gap, 1. - smoothstep(0.0, 0.006, abs(pb.x - 0.95)));
+      if(n.y > 0.4 && pb.x < -1.64) gap = max(gap, 1. - smoothstep(0.0, 0.006, abs(az - 0.68)));
       // front end
-      if(pb.x > 1.9 && n.x > 0.15){
-        float az = abs(pb.z);
-        float yc = 0.535 - (az - 0.40) * 0.06;
-        if(az > 0.36 && az < 0.86 && abs(pb.y - yc) < 0.040){
-          base = vec3(0.004); rough = 0.; metal = 0.; coat = 1.; mat = M_TRIM;
-          float strip = (1. - smoothstep(0.003, 0.007, abs(pb.y - (yc + 0.022)))) * step(0.40, az) * step(az, 0.84);
-          float fang = 0.;
-          float proj = 0.;
-          for(int i = 0; i < 2; i++){ float zc = i == 0 ? 0.62 : 0.74; proj = max(proj, 1. - smoothstep(0.014, 0.02, length(vec2(az - zc, pb.y - yc + 0.004)))); }
-          float m = max(strip, fang);
-          emis = uDrl * (m * 9. + proj * 4.) * uLights;
-          base += vec3(0.35) * max(m, proj * 0.6) * (1. - uLights);
+      if(pb.x > 1.95){
+        // lower intake: the intercooler core behind the opening
+        if(pb.x < 2.27 && pb.y > 0.21 && pb.y < 0.50 && az < 0.53 - (pb.y - 0.21) * 0.30){
+          base = vec3(0.06) * (0.35 + 0.65 * step(0.45, fract(pb.y * 70.))); rough = 0.35; metal = 1.; coat = 0.; mat = M_TRIM;
         }
-        if(pb.x > 2.2 && pb.y > 0.18 && pb.y < 0.40){
-          float hc = (az < 0.50 && pb.y < 0.37) ? 1. : ((az > 0.62 && az < 0.84 && pb.y < 0.31) ? 1. : 0.);
-          if(hc > 0.){
+        if(n.x > 0.2){
+          // headlights: clear lens over a dark housing, two projectors each with a halo ring
+          float y0 = 0.578 + (0.84 - az) * 0.05, y1 = 0.705 - (az - 0.42) * 0.02;
+          if(az > 0.40 && az < 0.85 && pb.y > y0 && pb.y < y1){
+            base = vec3(0.02); rough = 0.; metal = 0.5; coat = 1.; mat = M_TRIM;
+            float ring = 0., lens = 0.;
+            for(int i = 0; i < 2; i++){
+              float dd = length(vec2(az - (i == 0 ? 0.53 : 0.71), pb.y - 0.643));
+              ring = max(ring, 1. - smoothstep(0.004, 0.009, abs(dd - 0.040)));
+              lens = max(lens, 1. - smoothstep(0.020, 0.026, dd));
+            }
+            emis = uDrl * (ring * 10. + lens * 5.) * uLights;
+            base += vec3(0.25) * max(ring, lens * 0.6) * (1. - uLights);
+          }
+          // upper grille between the lights, and the corner intakes
+          bool grille = az < 0.37 && pb.y > 0.60 && pb.y < 0.70;
+          bool corner = az > 0.60 && az < 0.83 && pb.y > 0.24 && pb.y < 0.40;
+          if(grille || corner){
             vec2 hp = vec2(pb.z, pb.y) * 38.; hp.x += mod(floor(hp.y), 2.) * 0.5;
             float hex = smoothstep(0.25, 0.4, length(fract(hp) - 0.5));
-            base = vec3(0.004 + 0.02 * hex); coat = 0.3; rough = 0.4; mat = M_TRIM;
+            base = vec3(0.004 + 0.02 * hex); coat = 0.3; rough = 0.4; metal = 0.; mat = M_TRIM;
           }
         }
       }
-      // rear end
-      if(pb.x < -2.12 && n.x < -0.15){
-        float az = abs(pb.z);
-        if(abs(pb.y - 0.795) < 0.016 && az < 0.92){
-          base = vec3(0.06, 0.0, 0.0); coat = 1.; rough = 0.;
-          emis = vec3(1.0, 0.03, 0.02) * (0.25 + 3.2 * uLights) * (1. - smoothstep(0.004, 0.012, abs(pb.y - 0.795)));
+      // rear end: round tail lamps in the corners
+      if(pb.x < -2.10 && n.x < -0.15){
+        float az2 = abs(pb.z);
+        if(az2 > 0.40 && az2 < 0.86 && pb.y > 0.80 && pb.y < 0.955 - (az2 - 0.40) * 0.06){
+          base = vec3(0.07, 0.0, 0.0); coat = 1.; rough = 0.; metal = 0.;
+          float ring = 0.;
+          for(int i = 0; i < 2; i++){
+            float dd = length(vec2(az2 - (i == 0 ? 0.56 : 0.74), pb.y - 0.875));
+            ring = max(ring, 1. - smoothstep(0.006, 0.014, abs(dd - 0.045)));
+          }
+          emis = vec3(1.0, 0.03, 0.02) * (0.25 + 3.2 * uLights) * (0.05 + ring);
         }
-        if(pb.y < 0.30) { base = vec3(0.006); rough = 0.5; coat = 0.2; }
+        if(pb.y < 0.30){ base = vec3(0.006); rough = 0.5; coat = 0.2; metal = 0.; }
       }
     }
   }
@@ -663,11 +774,11 @@ vec3 shadeObj(vec3 p, vec3 rd, float mat, vec3 n, float ao, float t){
     float fib = dir > 0.5 ? 0.5 + 0.5 * sin(uv.y * PI * 6.) : 0.5 + 0.5 * sin(uv.x * PI * 6.);
     float contrast = smoothstep(7.0, 1.5, t);
     base = vec3(0.022, 0.023, 0.026) * (1. + contrast * (0.9 * dir - 0.45 + 0.35 * fib));
-    rough = 0.12; coat = 1.;
+    rough = 0.12; coat = 1.; metal = 0.;
   }
   if(mat == M_EXH){
     float inn; exhaustSDF(pb, inn);
-    float u = clamp((pb.x + 2.36) / 0.18, 0., 1.);
+    float u = clamp((pb.x + 2.31) / 0.14, 0., 1.);
     if(uExFinish == 1){ base = mix(mix(vec3(0.20, 0.35, 0.80), vec3(0.50, 0.25, 0.62), u), vec3(0.80, 0.58, 0.28), u * u); rough = 0.12; metal = 1.; }
     else if(uExFinish == 2){ base = vec3(0.035); rough = 0.45; coat = 0.4; }
     else { base = vec3(0.92); rough = 0.04; metal = 1.; }
@@ -678,9 +789,21 @@ vec3 shadeObj(vec3 p, vec3 rd, float mat, vec3 n, float ao, float t){
   if(mat == M_TURBO){ base = vec3(0.62, 0.50, 0.40); rough = 0.25; metal = 1.; }
   if(mat == M_SEAT){ base = vec3(0.02); rough = 0.6; }
   if(mat == M_LIQUID){ base = vec3(0.004); rough = 0.0; coat = 1.; }
+  if(mat == M_CHROME){ base = vec3(0.92); rough = 0.03; metal = 1.; }
+  if(mat == M_COOLER){ base = vec3(0.10) * (0.4 + 0.6 * step(0.45, fract(p.y * 70.))); rough = 0.35; metal = 1.; }
+
+  // the cure line sweeping front to back as the liquid sets into paint
+  if(gMode == 0 && uT > 10.0 && uT < 10.75 && mat != M_LIQUID && mat != M_TIRE && mat != M_RIM){
+    float cx = mix(2.5, -2.5, smoothstep(10.0, 10.7, uT));
+    emis += vec3(0.75, 0.80, 0.88) * exp(-abs(pb.x - cx) * 28.) * 1.6;
+  }
 
   float sky = 0.5 + 0.5 * n.y;
-  vec3 diff = base * (1. - metal) * (0.05 + 0.55 * sky * sky) * ao;
+  float spot = uShow * spotAt(p) * max(dot(n, normalize(SPOT - p)), 0.);
+  // light bouncing up off the lit floor pool onto the body sides
+  float bounce = uShow * spotAt(vec3(p.x + n.x * 0.7, 0., p.z + n.z * 0.7)) * (0.5 - 0.5 * n.y) * 0.45;
+  vec3 diff = base * (1. - metal) * ((0.05 + 0.55 * sky * sky) * mix(1., 0.4, uShow) + spot * 1.5 + bounce) * ao;
+  diff += base * metal * (spot * 0.9 + bounce * 0.6) * ao;   // metallic flake picks up the spot
   vec3 F0 = mix(vec3(0.04), base, metal);
   vec3 F = F0 + (1. - F0) * pow(1. - ndv, 5.) * (1. - rough * 0.7);
   vec3 spec = envCol(p, r, rough) * F;
@@ -688,7 +811,6 @@ vec3 shadeObj(vec3 p, vec3 rd, float mat, vec3 n, float ao, float t){
     float fc = 0.04 + 0.96 * pow(1. - ndv, 5.);
     spec += envCol(p, r, 0.0) * fc * coat * (mat == M_BODY && uPaintRough > 0.3 ? 0.15 : 1.);
   }
-  // headlight bounce on nearby surfaces
   vec3 col = diff + spec * mix(1., ao, 0.65);
   col *= 1. - 0.9 * gap;
   col += emis;
@@ -704,24 +826,26 @@ vec3 shadeFloor(vec3 p, vec3 rd, float t, out float aoOut){
   alb = mix(alb, vec3(0.62, 0.62, 0.6), max(lane, bay) * 0.8);
   float lx = mod(p.x + 1.5, 3.0) - 1.5;
   float lz = mod(p.z + 1.75, 3.5) - 1.75;
-  float E = 0.05 + 0.20 * exp(-lx * lx * 0.30) * (0.65 + 0.35 * exp(-lz * lz * 0.2));
+  float E = (0.05 + 0.20 * exp(-lx * lx * 0.30) * (0.65 + 0.35 * exp(-lz * lz * 0.2))) * mix(1., 0.28, uShow);
+  E += uShow * 0.50 * spotAt(p);
   float ao = 1.;
   if(gMode != 0 || uT > 5.3){
-    float kb = gMode != 0 ? 1. : smoothstep(5.4, 8.0, uT);
-    float fp = sdRBox2(p.xz, vec2(2.30, 0.93 + uWide * 0.07), 0.5);
+    float kb = gMode != 0 ? 1. : smoothstep(8.6, 10.0, uT);
+    float fp = sdRBox2(p.xz, vec2(2.24, 0.84 + uWide * 0.07), 0.42);
     float a1 = mix(0.10, 1., smoothstep(-0.25, 0.9, fp));
     a1 *= mix(0.25, 1., smoothstep(-0.35, 0.35, fp + 0.3));
-    ao = mix(mix(1., 0.55 + 0.45 * smoothstep(-0.2, 0.5, fp), smoothstep(5.3, 6.4, uT)), a1, kb);
-    float kw = gMode != 0 ? 1. : smoothstep(5.9, 6.9, uT);
+    float frame = gMode != 0 ? 1. : smoothstep(5.3, 6.4, uT);
+    ao = mix(mix(1., 0.55 + 0.45 * smoothstep(-0.2, 0.5, fp), frame), a1, kb);
+    float kw = gMode != 0 ? 1. : smoothstep(6.9, 7.8, uT);
     for(int i = 0; i < 4; i++){
-      vec2 c = vec2(i < 2 ? FX : RX, (i % 2 == 0 ? 1. : -1.) * (0.80 + uWide * 0.05));
-      float dw = sdRBox2(p.xz - c, vec2(0.17, 0.14), 0.08);
+      vec2 c = vec2(i < 2 ? FX : RX, (i % 2 == 0 ? 1. : -1.) * (TRK + uWide * 0.05));
+      float dw = sdRBox2(p.xz - c, vec2(0.16, 0.13), 0.08);
       ao *= mix(1., mix(0.15, 1., smoothstep(-0.05, 0.35, dw)), kw);
     }
-  } else if(uT > 3.0){
-    float hubR = 0.42 * mix(1., 0.16, smoothstep(3.0, 3.85, uT));
-    ao = mix(0.2, 1., smoothstep(-0.05, 0.6, length(p.xz) - hubR));
-  } else if(abs(p.x) < 5.5 && abs(p.z) < 3.3){
+  } else if(uT > 3.6){
+    float hubR = 0.22 * mix(1., 0.32, smoothstep(3.58, 3.9, uT));
+    ao = mix(0.25, 1., smoothstep(-0.05, 0.4, length(p.xz) - hubR));
+  } else if(abs(p.x) < 2.5 && abs(p.z) < 5.5){
     float occ = 0.;
     for(int i = uZero; i < 4; i++){
       float h = 0.10 + 0.22 * float(i);
@@ -748,7 +872,10 @@ vec3 background(vec3 ro, vec3 rd, float tp, vec3 pn, float tFloor, float tCeil){
   if(tp < min(tFloor, tCeil)) return shadePillar(ro + rd * tp, pn);
   if(tFloor < tCeil){ float ao; return shadeFloor(ro + rd * tFloor, rd, tFloor, ao); }
   vec3 p = ro + rd * tCeil;
-  return vec3(0.012) + tubes(p.xz, 0.004 + tCeil * 0.0012) * vec3(1., 0.98, 0.95) * 7.5;
+  vec3 c = vec3(0.012) + tubes(p.xz, 0.004 + tCeil * 0.0012) * vec3(1., 0.98, 0.95) * 7.5 * mix(1., 0.25, uShow);
+  float ds = length(p.xz - SPOT.xz);   // the spotlight fixture
+  c += SPOTC * uShow * (14. * (1. - smoothstep(0.15, 0.17, ds)) + 0.25 * exp(-ds * ds * 3.));
+  return c;
 }
 
 vec3 aces(vec3 x){ return clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), 0., 1.); }
@@ -766,7 +893,7 @@ void main(){
   float tb = min(tp, min(tFloor, tCeil));
   bool floorBg = tFloor <= tCeil && tFloor < tp;
 
-  bool intro = uT < 9.5;
+  bool intro = uT < BUILT;
   bool xray = !intro && uXray > 0.002;
   gMode = intro ? 0 : (xray ? 3 : 1);
   vec3 bg = background(ro, rd, tp, pn, tFloor, tCeil);
@@ -808,7 +935,7 @@ void main(){
       vec3 fp = ro + rd * tFloor;
       vec3 r = reflect(rd, vec3(0., 1., 0.));
       float fr = 0.02 + 0.35 * pow(1. - max(-rd.y, 0.), 5.);
-      reflW = uReflect * (0.20 + 0.45 * fr) * (1. - smoothstep(6., 14., tFloor));
+      reflW = uReflect * (0.20 + 0.45 * fr) * (1. - smoothstep(6., 14., tFloor)) * (1. + 0.5 * uShow);
       pro = fp + r * 0.002; prd = r; ptmax = 6.; tOff = tFloor;
     }
   }
@@ -832,6 +959,22 @@ void main(){
   }
 
   float tf = min(tHit, tb);
+
+  // the spotlight beam hanging in the air
+  if(uShow > 0.01){
+    float dd = dot(rd.xz, rd.xz);
+    float ts = dd > 1e-5 ? -dot(ro.xz - SPOT.xz, rd.xz) / dd : 0.;
+    float behind = step(tf, ts);
+    ts = clamp(ts, 0., tf);
+    vec3 ps = ro + rd * ts;
+    float hgt = clamp(ps.y, 0., CEIL);
+    float coneR = (SPOT.y - hgt) * 0.68 + 0.10;
+    float rad = length(ps.xz - SPOT.xz);
+    float beam = exp(-rad * rad / (coneR * coneR) * 2.4) * min(1.6, coneR / max(sqrt(dd), 0.3));
+    beam *= 0.35 + 0.65 * smoothstep(0., SPOT.y, hgt);
+    col += SPOTC * beam * uShow * 0.085 * (1. - 0.6 * behind);
+  }
+
   col = mix(col, vec3(0.001, 0.001, 0.0012), 1. - exp(-tf * 0.06));
   col *= uExposure;
   col = aces(col);

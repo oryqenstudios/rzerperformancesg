@@ -103,19 +103,41 @@ p { margin: 0; }
 
 /* ---------- hero */
 main { position: relative; z-index: 1; }
-.hero { position: relative; min-height: 100svh; }
+.hero { position: relative; min-height: 100svh; background: var(--black); }
+/* fade from the hero's black into the 3D stage behind the next section */
+.hero::after { content: ""; position: absolute; left: 0; right: 0; top: 100%; height: 26vh; background: linear-gradient(var(--black), rgba(0, 0, 0, 0)); pointer-events: none; }
+.hero-media { position: absolute; inset: 0; z-index: 0; overflow: hidden; background: var(--black); }
+.hero-media video, .hero-media img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 60% 50%; }
+.hero-still { opacity: 0; transition: opacity 0.7s ease; }
+.hero-media.is-final .hero-still { opacity: 1; }
+/* keep the copy legible on the left and melt the bottom edge into the 3D stage below */
+.hero-media::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(90deg, rgba(0, 0, 0, 0.5) 0%, rgba(0, 0, 0, 0) 46%), linear-gradient(180deg, rgba(0, 0, 0, 0) 72%, var(--black) 100%);
+}
+.hero-copy, .intro-ui, .scroll-cue { z-index: 1; }
+/* portrait screens: the car fills the top of the screen and the copy sits on black below it */
+@media (max-aspect-ratio: 9/10) {
+  .hero-media { bottom: auto; height: 72svh; }
+  .hero-media video, .hero-media img { object-position: 68% 45%; }
+  .hero-media::after { background: linear-gradient(180deg, rgba(0, 0, 0, 0.35) 0%, rgba(0, 0, 0, 0) 22%, rgba(0, 0, 0, 0) 58%, var(--black) 100%); }
+}
 .hero-copy {
   position: absolute; left: var(--gutter); bottom: clamp(64px, 11vh, 128px);
   display: grid; gap: 22px; max-width: min(92vw, 980px);
 }
-.wordmark {
-  font-size: clamp(5.2rem, 18vw, 16rem);
-  font-weight: 900; line-height: 0.78; letter-spacing: -0.02em;
-  clip-path: inset(0 0 0 0);
-  transition: clip-path 1.5s cubic-bezier(0.7, 0, 0.2, 1);
-}
-.is-intro .wordmark:not(.revealed) { clip-path: inset(0 100% 0 0); }
-.hero-line { font-size: clamp(1rem, 1.4vw, 1.25rem); color: var(--chrome); max-width: 30em; }
+/* RZER Performance logo: the roofline draws in like a light trace, then the words wipe in */
+.logo { margin: 0; width: clamp(260px, 31vw, 520px); line-height: 0; }
+.logo-svg { display: block; width: 100%; height: auto; overflow: visible; }
+.logo-line { fill: none; stroke: #fff; stroke-width: 3.2; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 1; stroke-dashoffset: 0; filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.35)); transition: stroke-dashoffset 1.6s cubic-bezier(0.6, 0, 0.2, 1) 0.35s; }
+.logo-words { clip-path: inset(0 0 0 0); transition: clip-path 1.2s cubic-bezier(0.7, 0, 0.2, 1) 1.2s; }
+.logo-rzer { fill: #fff; font-family: var(--font); font-weight: 900; font-stretch: 125%; font-size: 84px; transform: skewX(-12deg); transform-origin: 30px 212px; }
+.logo-perf { fill: none; stroke: #fff; stroke-width: 1.4; font-family: var(--font); font-weight: 800; font-stretch: 125%; font-size: 44px; letter-spacing: 0.02em; transform: skewX(-12deg); transform-origin: 280px 212px; }
+.is-intro .logo:not(.revealed) .logo-line { stroke-dashoffset: 1; }
+.is-intro .logo:not(.revealed) .logo-words { clip-path: inset(0 100% 0 0); }
+.hero-line, .hero-actions { transition: opacity 0.8s ease 0.3s; }
+.is-intro .hero-line, .is-intro .hero-actions { opacity: 0; pointer-events: none; }
+.hero-line { font-size: clamp(1rem, 1.4vw, 1.25rem); color: var(--chrome); max-width: 24em; }
 .hero-actions { display: flex; flex-wrap: wrap; gap: 12px; }
 
 .intro-ui {
@@ -318,6 +340,8 @@ fieldset.field { border: 0; margin: 0; padding: 0; }
   font-size: 0.875rem; color: var(--steel); pointer-events: none; transition: opacity 0.4s ease;
 }
 .loading.gone { opacity: 0; }
+/* the hero film covers the stage on the home page, so the 3D loading note only shows in the configurator */
+body:not(.in-builder) .loading { display: none; }
 .nogl-note { position: fixed; left: var(--gutter); top: 84px; z-index: 30; max-width: 28rem; font-size: 0.875rem; color: var(--steel); }
 .nogl-note[hidden] { display: none; }
 
@@ -351,6 +375,6 @@ fieldset.field { border: 0; margin: 0; padding: 0; }
 
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
-  .wordmark { transition: none; }
+  .logo-line, .logo-words, .hero-line, .hero-actions { transition: none; }
   .btn { transition: none; }
 }

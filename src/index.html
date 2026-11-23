@@ -13,7 +13,7 @@
 </style>
 </head>
 <body class="is-intro">
-<canvas id="stage" aria-label="3D view of the Rzer demo coupe in an underground car park"></canvas>
+<canvas id="stage" aria-label="3D view of the Rzer Evo IX build in an underground car park"></canvas>
 <p class="loading" id="loading">Loading the 3D scene</p>
 <p class="nogl-note" id="nogl" hidden>This browser could not start the 3D view, so the page is showing without it. Try a current version of Chrome, Safari, Edge or Firefox to see the car.</p>
 
@@ -30,8 +30,24 @@
 
 <main id="home">
   <section class="hero" id="top" data-cam="hero" aria-label="Introduction">
+    <div class="hero-media" id="hero-media" aria-hidden="true">
+      <video class="hero-video" id="hero-video" muted playsinline preload="auto" poster="assets/hero-poster.jpg">
+        <source src="assets/hero-intro.mp4" type="video/mp4">
+        <source src="assets/hero-intro.webm" type="video/webm">
+      </video>
+      <img class="hero-still" src="assets/hero-final.jpg" alt="" decoding="async">
+    </div>
     <div class="hero-copy">
-      <h1 class="wordmark display chrome" id="wordmark">RZER</h1>
+      <h1 class="logo" id="logo">
+        <span class="sr-only">RZER Performance</span>
+        <svg class="logo-svg" viewBox="0 0 640 230" aria-hidden="true" focusable="false">
+          <path class="logo-line" pathLength="1" d="M34 158 C96 151 150 143 196 131 C226 123 248 116 262 108 C286 94 312 76 342 64 C360 57 380 54 404 54 C438 54 462 57 482 66 C500 74 516 86 532 96 C548 105 566 110 588 112 L598 101 L603 115 C611 118 617 123 620 131"/>
+          <g class="logo-words">
+            <text class="logo-rzer" x="30" y="212" textLength="236" lengthAdjust="spacingAndGlyphs">RZER</text>
+            <text class="logo-perf" x="280" y="212" textLength="336" lengthAdjust="spacingAndGlyphs">PERFORMANCE</text>
+          </g>
+        </svg>
+      </h1>
       <p class="hero-line">Performance tuning, fitment and builds in Singapore.</p>
       <div class="hero-actions">
         <a class="btn btn-chrome" href="#build">Build yours</a>
@@ -137,16 +153,16 @@
 </div>
 
 <div class="hotspots" aria-hidden="true">
-  <div class="hotspot" data-pos="1.76,0.50,0.30"><span>Turbo and ECU map</span></div>
-  <div class="hotspot" data-pos="1.40,0.62,0.62"><span>Coilovers</span></div>
-  <div class="hotspot" data-pos="1.40,0.40,0.92"><span>Big-brake kit</span></div>
-  <div class="hotspot" data-pos="-2.34,0.21,0.56"><span>Valved exhaust</span></div>
+  <div class="hotspot" data-pos="1.23,0.60,0.05"><span>Turbo and ECU map</span></div>
+  <div class="hotspot" data-pos="1.28,0.62,0.52"><span>Coilovers</span></div>
+  <div class="hotspot" data-pos="1.31,0.40,0.84"><span>Big-brake kit</span></div>
+  <div class="hotspot" data-pos="-2.30,0.215,0.56"><span>Valved exhaust</span></div>
 </div>
 
 <div class="builder" id="builder" hidden>
   <div class="b-top">
     <a class="btn btn-ghost btn-small" href="#top"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10 3 5 8l5 5" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>Back to site</a>
-    <div class="b-title"><strong>RZER</strong><span>Build yours on the demo coupe</span></div>
+    <div class="b-title"><strong>RZER</strong><span>Build yours on the Evo IX</span></div>
     <button class="btn btn-ghost btn-small b-card-toggle" id="card-toggle" type="button" aria-controls="jobcard" aria-expanded="true">Job card <span class="count" id="card-count">0</span></button>
   </div>
 

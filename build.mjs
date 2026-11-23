@@ -1,5 +1,5 @@
-// Inlines src/style.css, src/scene.frag and src/app.js into src/index.html
-// and writes one self-contained page to dist/index.html.
+// Inlines src/style.css, src/scene.frag and src/app.js into src/index.html,
+// writes the page to dist/index.html and copies assets/site/* to dist/assets/.
 //   node build.mjs           build once
 //   node build.mjs --watch   rebuild on every change in src/
 import fs from 'fs';
@@ -19,6 +19,9 @@ function build() {
   html = html.replace('/*__JS__*/', () => read('app.js'));
   fs.mkdirSync(path.dirname(out), { recursive: true });
   fs.writeFileSync(out, html);
+  // hero film, poster and final still ship next to the page
+  const assetsIn = path.join(root, 'assets', 'site'), assetsOut = path.join(root, 'dist', 'assets');
+  if (fs.existsSync(assetsIn)) fs.cpSync(assetsIn, assetsOut, { recursive: true });
   console.log(`[build] dist/index.html ${(html.length / 1024).toFixed(1)} KB`);
 }
 

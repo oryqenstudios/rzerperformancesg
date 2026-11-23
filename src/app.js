@@ -45,9 +45,9 @@ const CATS = [
       { id: 'aero', name: 'Aero disc', note: 'Closed face with angled cooling slots', mark: 'A', u: { uWheel: 3 } },
     ] },
     { key: 'size', label: 'Size', card: 'Wheel size', items: [
-      { id: '19', name: '19 inch', note: 'Factory size, tallest sidewall', mark: '19', u: { uRimR: 0.241 } },
-      { id: '20', name: '20 inch', note: 'Lower profile tyre', mark: '20', u: { uRimR: 0.254 } },
-      { id: '21', name: '21 inch', note: 'Thinnest sidewall, sharpest look', mark: '21', u: { uRimR: 0.267 } },
+      { id: '17', name: '17 inch', note: 'Factory size, tallest sidewall', mark: '17', u: { uRimR: 0.216 } },
+      { id: '18', name: '18 inch', note: 'Lower profile tyre', mark: '18', u: { uRimR: 0.229 } },
+      { id: '19', name: '19 inch', note: 'Thinnest sidewall, sharpest look', mark: '19', u: { uRimR: 0.241 } },
     ] },
     { key: 'rimfin', label: 'Finish', card: 'Wheel finish', items: [
       { id: 'silver', name: 'Silver', note: 'Factory painted silver', swatch: '#c4c8cd', u: { uRimCol: [0.72, 0.73, 0.75], uRimRough: 0.2, uRimMetal: 1 } },
@@ -76,9 +76,9 @@ const CATS = [
       { id: 'factory', name: 'Factory valance', note: 'As delivered', mark: '—', u: { uDiffuser: 0 } },
       { id: 'carbon', name: 'Carbon diffuser', note: 'Seven-fin diffuser', mark: 'D', u: { uDiffuser: 1 } },
     ] },
-    { key: 'spoiler', label: 'Spoiler', card: 'Spoiler', items: [
-      { id: 'none', name: 'No spoiler', note: 'Factory boot lid', mark: '—', u: { uSpoiler: 0 } },
-      { id: 'duck', name: 'Ducktail', note: 'Body-colour kick on the boot lid', mark: 'D', u: { uSpoiler: 1 } },
+    { key: 'spoiler', label: 'Wing', card: 'Wing', items: [
+      { id: 'factory', name: 'Factory wing', note: 'Body-colour blade on twin pedestals', mark: 'F', u: { uSpoiler: 1 } },
+      { id: 'none', name: 'Wing delete', note: 'Clean boot lid', mark: '—', u: { uSpoiler: 0 } },
       { id: 'lip', name: 'Carbon lip spoiler', note: 'Thin blade on the boot edge', mark: 'L', u: { uSpoiler: 2 } },
       { id: 'gt', name: 'GT wing', note: 'Carbon wing on twin uprights', mark: 'GT', u: { uSpoiler: 3 } },
     ] } ] },
@@ -86,7 +86,7 @@ const CATS = [
     { key: 'ride', label: 'Ride height', card: 'Ride height', items: [
       { id: 'factory', name: 'Factory height', note: 'As delivered', mark: '0', u: { uRide: 0 } },
       { id: 'springs', name: 'Lowering springs', note: 'About 30 mm lower', mark: '30', u: { uRide: 0.03 } },
-      { id: 'coilovers', name: 'Coilovers', note: 'About 55 mm lower, adjustable', mark: '55', u: { uRide: 0.055 } },
+      { id: 'coilovers', name: 'Coilovers', note: 'About 50 mm lower, adjustable', mark: '50', u: { uRide: 0.05 } },
     ] },
     { key: 'wide', label: 'Body', card: 'Body', items: [
       { id: 'factory', name: 'Factory width', note: 'As delivered', mark: '—', u: { uWide: 0 } },
@@ -116,8 +116,8 @@ const CATS = [
     ] } ] },
   { id: 'carbon', label: 'Carbon', view: 'carbon', groups: [
     { key: 'hood', label: 'Bonnet', card: 'Bonnet', items: [
-      { id: 'factory', name: 'Factory bonnet', note: 'Body colour', mark: '—', u: { uHood: 0 } },
-      { id: 'vented', name: 'Vented carbon bonnet', note: 'Louvres over the engine', mark: 'V', u: { uHood: 1 } },
+      { id: 'factory', name: 'Factory bonnet', note: 'Body colour with the factory vents', mark: '—', u: { uHood: 0 } },
+      { id: 'carbon', name: 'Carbon bonnet', note: 'Vented, exposed twill weave', mark: 'C', u: { uHood: 1 } },
     ] },
     { key: 'roof', label: 'Roof', card: 'Roof', items: [
       { id: 'factory', name: 'Body colour', note: 'As delivered', mark: '—', u: { uRoof: 0 } },
@@ -130,9 +130,10 @@ const CATS = [
 ];
 const GROUPS = CATS.flatMap(c => c.groups.map(g => Object.assign(g, { cat: c })));
 const STOCK = Object.fromEntries(GROUPS.map(g => [g.key, g.items[0].id]));
+// the Rzer showcase build, styled on the client's Evo IX: silver, carbon bonnet, black wheels, splitter
 const SIGNATURE = Object.assign({}, STOCK, {
-  wheel: 'rz5', size: '20', rimfin: 'black', caliper: 'red', lip: 'lip', skirts: 'carbon', diffuser: 'carbon',
-  spoiler: 'duck', ride: 'coilovers', exhaust: 'quad', exfin: 'titanium', tint: 'dark', roof: 'carbon', mirror: 'carbon'
+  paint: 'silver', wheel: 'rz5', size: '18', rimfin: 'black', caliper: 'red', lip: 'splitter', skirts: 'carbon',
+  diffuser: 'carbon', spoiler: 'gt', ride: 'coilovers', exhaust: 'dual', exfin: 'titanium', tint: 'medium', hood: 'carbon'
 });
 const item = (key, id) => { const g = GROUPS.find(x => x.key === key); return g.items.find(i => i.id === id) || g.items[0]; };
 const uniformsFor = cfg => { const u = {}; for (const g of GROUPS) Object.assign(u, item(g.key, cfg[g.key]).u); return u; };
@@ -142,7 +143,7 @@ const INTS = new Set(['uWheel', 'uSpoiler', 'uLip', 'uSkirts', 'uDiffuser', 'uEx
 
 // ------------------------------------------------------------------ cameras
 const HOME_CAMS = {
-  hero:        { pos: [6.6, 1.25, 3.4],  target: [0.1, 0.45, -0.1], fov: 34, shift: [0.34, 0.14], xray: 0 },
+  hero:        { pos: [5.6, 1.2, -3.4],  target: [0.1, 0.5, 0.1],   fov: 34, shift: [0.34, 0.14], xray: 0 },
   about:       { pos: [0.5, 0.85, 7.6],  target: [0.0, 0.55, 0.0], fov: 34, shift: [0.26, 0.04],  xray: 0 },
   services:    { pos: [-5.6, 1.5, 4.0],  target: [-0.2, 0.5, 0.0], fov: 34, shift: [-0.3, 0.04], xray: 0 },
   engineering: { pos: [3.6, 3.1, 3.9],   target: [0.1, 0.35, 0.0], fov: 34, shift: [0.28, -0.04], xray: 1 },
@@ -163,17 +164,30 @@ const BUILD_VIEWS = {
 for (const c of Object.values(HOME_CAMS)) c.orbit = toOrbit(c.pos, c.target);
 for (const c of Object.values(BUILD_VIEWS)) c.orbit = toOrbit(c.pos, c.target);
 
-const INTRO_LEN = 9.6;
+// Beat for beat with the reference video (seconds):
+//   0-2.2 liquid slides in over the chrome emblem and gathers   2.2-3.6 drop -> lens -> crown
+//   3.6-5.3 burst, curling legs, rods and web to a rectangle    5.3-8.5 frame, towers, suspension, engine, wheels, cabin
+//   8.6-10.0 body pours over the frame   10.0-10.7 liquid cures to paint   10.9 headlights   11.2-12.4 showroom spot
+//   11.6-14.4 orbit to the front three-quarter, logo reveal
+const INTRO_LEN = 14.4;
 const INTRO_KEYS = [
-  { t: 0.0, pos: [3.2, 0.42, 1.9],  tgt: [-0.7, 0.05, 0.45] },
-  { t: 1.8, pos: [2.9, 0.68, 1.6],  tgt: [-0.1, 0.12, 0.1] },
-  { t: 2.9, pos: [2.6, 0.95, 1.3],  tgt: [0.0, 0.22, 0.0] },
-  { t: 3.8, pos: [2.6, 1.8, 1.5],   tgt: [0.0, 0.05, 0.0] },
-  { t: 4.9, pos: [2.3, 3.6, 1.6],   tgt: [0.0, 0.0, 0.0] },
-  { t: 6.0, pos: [4.0, 1.8, 2.5],   tgt: [0.2, 0.35, 0.0] },
-  { t: 7.4, pos: [5.0, 1.15, 1.6],  tgt: [0.1, 0.45, 0.0] },
-  { t: 8.6, pos: [5.8, 0.85, 0.25], tgt: [0.0, 0.5, 0.0] },
-  { t: 9.6, pos: HOME_CAMS.hero.pos, tgt: HOME_CAMS.hero.target },
+  { t: 0.0,  pos: [2.30, 0.20, -0.55], tgt: [-0.20, 0.10, 0.60] },
+  { t: 1.0,  pos: [2.25, 0.24, -0.40], tgt: [-0.10, 0.10, 0.30] },
+  { t: 1.9,  pos: [2.40, 0.40, -0.20], tgt: [0.00, 0.14, 0.06] },
+  { t: 2.7,  pos: [2.25, 0.75, 0.00],  tgt: [0.00, 0.10, 0.00] },
+  { t: 3.4,  pos: [2.15, 1.05, 0.00],  tgt: [0.00, 0.03, 0.00] },
+  { t: 4.1,  pos: [2.55, 1.50, 0.00],  tgt: [-0.15, 0.00, 0.00] },
+  { t: 4.8,  pos: [3.20, 1.95, 0.00],  tgt: [-0.40, 0.00, 0.00] },
+  { t: 5.4,  pos: [3.40, 2.25, 0.00],  tgt: [-0.45, 0.00, 0.00] },
+  { t: 6.3,  pos: [3.60, 2.95, 0.00],  tgt: [-0.25, 0.15, 0.00] },
+  { t: 7.2,  pos: [4.00, 2.30, 0.00],  tgt: [0.45, 0.35, 0.00] },
+  { t: 8.2,  pos: [4.80, 1.35, 0.00],  tgt: [0.30, 0.50, 0.00] },
+  { t: 9.0,  pos: [5.40, 1.00, 0.00],  tgt: [0.00, 0.60, 0.00] },
+  { t: 10.6, pos: [5.80, 0.92, 0.00],  tgt: [0.00, 0.62, 0.00] },
+  { t: 11.6, pos: [5.30, 0.85, 0.00],  tgt: [0.00, 0.60, 0.00] },
+  { t: 12.7, pos: [5.30, 0.95, -1.90], tgt: [0.00, 0.58, 0.00] },
+  { t: 13.6, pos: [4.90, 1.05, -2.90], tgt: [0.05, 0.55, 0.05] },
+  { t: 14.4, pos: HOME_CAMS.hero.pos, tgt: HOME_CAMS.hero.target },
 ];
 function introCam(t) {
   const k = INTRO_KEYS;
@@ -183,8 +197,8 @@ function introCam(t) {
   return { pos: catmull(a.pos, b.pos, c.pos, d.pos, u), tgt: catmull(a.tgt, b.tgt, c.tgt, d.tgt, u) };
 }
 function introLights(t) {
-  if (t < 8.2) return 0;
-  const k = t - 8.2;
+  if (t < 10.9) return 0;
+  const k = t - 10.9;
   if (k < 0.07) return 1; if (k < 0.16) return 0.05; if (k < 0.24) return 0.85; if (k < 0.38) return 0.12;
   return Math.min(1, 0.55 + (k - 0.38) * 1.5);
 }
@@ -202,7 +216,6 @@ function failGL(msg) {
   body.classList.add('nogl-bg');
   $('#nogl').hidden = false;
   loadingEl.classList.add('gone');
-  finishIntro();
 }
 
 function initGL() {
@@ -267,29 +280,56 @@ function adapt(dt) {
 }
 
 // ------------------------------------------------------------------ state
-const intro = { t: 0, speed: 1, done: false, revealed: false };
+// The hero now opens on a realistic film (see #hero-media), so the 3D liquid intro starts finished.
+// RZ.setIntro(t) still plays it for previews.
+const intro = { t: 99, speed: 1, done: true, revealed: true };
 let introClockStart = 0;
 const cam = { orbit: Object.assign({}, HOME_CAMS.hero.orbit, { target: HOME_CAMS.hero.target.slice() }), fov: 34, shift: [0, 0], pos: [0, 0, 0], tgt: [0, 0, 0] };
 let mode = 'home'; // home | build
 const live = {}; // smoothed uniforms
-let xray = 0, lights = 0, bay = 0, exposure = 0, reflect = 1;
+let xray = 0, lights = 0, bay = 0, show = 0, exposure = 0, reflect = 1;
 let lightsOn = true, compare = false;
 let orbitGoal = null; // build mode target orbit
 let userOrbit = null;
 let lastInteract = 0;
 
+// ------------------------------------------------------------------ hero intro: realistic film -> final still -> logo
+const heroMedia = $('#hero-media'), heroVideo = $('#hero-video'), introBar = $('#intro-bar');
+let heroDone = false;
 function finishIntro() {
-  if (intro.done) return;
-  intro.done = true; intro.t = 99;
+  if (heroDone) return;
+  heroDone = true;
+  heroMedia.classList.add('is-final');
+  try { heroVideo.pause(); } catch (e) { /* never started */ }
+  introBar.style.width = '100%';
   body.classList.remove('is-intro'); body.classList.add('intro-done');
-  $('#wordmark').classList.add('revealed');
-  cam.orbit = toOrbit(cam.pos[0] || cam.pos[1] ? cam.pos : HOME_CAMS.hero.pos, cam.tgt[0] || cam.tgt[1] ? cam.tgt : HOME_CAMS.hero.target);
+  $('#logo').classList.add('revealed');
 }
-function fastForward() { if (!intro.done) intro.speed = 7; }
-$('#skip').addEventListener('click', fastForward);
+// Esc, wheel or a swipe speed the film up; the skip button cuts straight to the final frame
+function fastForward() {
+  if (heroDone) return;
+  if (!heroVideo.paused && heroVideo.readyState >= 2) heroVideo.playbackRate = 4; else finishIntro();
+}
+$('#skip').addEventListener('click', finishIntro);
 addEventListener('keydown', e => { if (e.key === 'Escape') fastForward(); });
-addEventListener('wheel', () => { if (!intro.done && mode === 'home') fastForward(); }, { passive: true });
-addEventListener('touchmove', () => { if (!intro.done && mode === 'home') fastForward(); }, { passive: true });
+addEventListener('wheel', () => { if (!heroDone && mode === 'home') fastForward(); }, { passive: true });
+addEventListener('touchmove', () => { if (!heroDone && mode === 'home') fastForward(); }, { passive: true });
+heroVideo.addEventListener('timeupdate', () => {
+  if (heroVideo.duration) introBar.style.width = (heroVideo.currentTime / heroVideo.duration * 100).toFixed(1) + '%';
+});
+heroVideo.addEventListener('ended', finishIntro);
+heroVideo.addEventListener('error', finishIntro);
+// the browser falls through the <source> list; only the last one failing means there is no film
+const heroSources = $$('source', heroVideo);
+if (heroSources.length) heroSources[heroSources.length - 1].addEventListener('error', finishIntro);
+function startHero() {
+  if (heroDone) return;
+  heroVideo.muted = true;
+  const p = heroVideo.play();
+  if (p && p.catch) p.catch(finishIntro);   // autoplay refused: show the still
+  // a film that has not started after 7 s (slow connection) should not hold the page
+  setTimeout(() => { if (!heroDone && heroVideo.currentTime < 0.1) finishIntro(); }, 7000);
+}
 
 // ------------------------------------------------------------------ scroll mapping
 let sections = [];
@@ -566,12 +606,17 @@ function project(p) {
 
 // ------------------------------------------------------------------ frame loop
 let last = performance.now();
+let coveredFrames = 0;
 function frame(now) {
   const dt = Math.min(0.1, Math.max(0.001, (now - last) / 1000));
   last = now;
   update(dt, now / 1000);
-  if (ready) draw(now / 1000);
-  if (ready) adapt(dt);
+  // at the top of the home page the hero film covers the stage: draw only now and then to stay warm
+  const covered = mode === 'home' && scrollY < 2 && intro.done;
+  if (ready && (!covered || coveredFrames++ % 30 === 0)) {
+    draw(now / 1000);
+    if (!covered) adapt(dt);
+  }
   requestAnimationFrame(frame);
 }
 
@@ -581,17 +626,16 @@ function update(dt, time) {
   // intro
   if (!intro.done && ready) {
     intro.t += dt * intro.speed;
-    $('#intro-bar').style.width = (clamp(intro.t / INTRO_LEN, 0, 1) * 100).toFixed(1) + '%';
-    if (intro.t > 8.7 && !intro.revealed) { intro.revealed = true; $('#wordmark').classList.add('revealed'); }
     const c = introCam(Math.min(intro.t, INTRO_LEN));
     cam.pos = c.pos; cam.tgt = c.tgt;
-    cam.fov = 38 + (34 - 38) * smooth(8.0, 9.6, intro.t);
+    cam.fov = 38 + (34 - 38) * smooth(12.6, 14.4, intro.t);
     const hs = HOME_CAMS.hero.shift;
-    cam.shift = [hs[0] * smooth(8.4, 9.6, intro.t), hs[1] * smooth(8.4, 9.6, intro.t)];
+    cam.shift = [hs[0] * smooth(12.8, 14.4, intro.t), hs[1] * smooth(12.8, 14.4, intro.t)];
     lights = introLights(intro.t);
+    show = smooth(11.2, 12.4, intro.t);
     exposure = 1.35 * smooth(0, 0.8, intro.t);
     xray = 0; bay = 0;
-    if (intro.t >= INTRO_LEN) finishIntro();
+    if (intro.t >= INTRO_LEN) { intro.done = true; intro.t = 99; }
     return;
   }
   if (!intro.done) return;
@@ -602,6 +646,7 @@ function update(dt, time) {
     if (!reduceMotion && scrollY < innerHeight * 0.5) { goal.orbit.th += Math.sin(time * 0.13) * 0.06; goal.orbit.ph += Math.sin(time * 0.17) * 0.015; }
     xray += (goal.xray - xray) * k;
     bay += (0 - bay) * k;
+    show += (1 - show) * k;
     lights += (1 - lights) * k;
     reflect = quality.reflect;
   } else {
@@ -610,6 +655,7 @@ function update(dt, time) {
     goal = { orbit: o, fov: 34, shift: buildShift() };
     xray += (0 - xray) * k;
     bay += (1 - bay) * k;
+    show += (1 - show) * k;
     lights += ((lightsOn ? 1 : 0) - lights) * k * 2;
     reflect = quality.reflect;
   }
@@ -631,11 +677,11 @@ function update(dt, time) {
   cam.shift = [lerp(cam.shift[0], goal.shift[0], k), lerp(cam.shift[1], goal.shift[1], k)];
 
   // hotspots
-  const show = mode === 'home' ? smooth(0.6, 0.95, xray) : 0;
+  const spotsOn = mode === 'home' ? smooth(0.6, 0.95, xray) : 0;
   for (const h of hotspots) {
-    const s = show > 0.01 ? project(add(h.p, [0, -(live.uRide || 0), 0])) : null;
+    const s = spotsOn > 0.01 ? project(add(h.p, [0, -(live.uRide || 0), 0])) : null;
     if (!s) { h.el.style.opacity = '0'; continue; }
-    h.el.style.opacity = show.toFixed(2);
+    h.el.style.opacity = spotsOn.toFixed(2);
     h.el.style.transform = `translate(${s[0].toFixed(1)}px, ${s[1].toFixed(1)}px) translateY(-50%)`;
   }
 }
@@ -662,6 +708,7 @@ function draw(time) {
   setU('uXray', xray < 0.003 ? 0 : xray);
   setU('uLights', lights);
   setU('uBay', bay < 0.003 ? 0 : bay);
+  setU('uShow', show);
   setU('uReflect', reflect);
   setU('uExposure', exposure);
   gl.drawArrays(gl.TRIANGLES, 0, 3);
@@ -676,12 +723,14 @@ if (reduceMotion) finishIntro();
 initGL();
 route();
 if (location.hash && location.hash !== '#build' && location.hash !== '#top') finishIntro();
+startHero();
 requestAnimationFrame(frame);
 
 // test hook
 window.RZ = {
-  state: () => ({ intro: intro.t, done: intro.done, mode, scale: quality.scale, ready, glFailed, xray, cam: { pos: cam.pos, tgt: cam.tgt } }),
-  setIntro: t => { intro.t = t; },
+  state: () => ({ intro: intro.t, done: intro.done, heroDone, heroTime: heroVideo.currentTime, mode, scale: quality.scale, ready, glFailed, xray, cam: { pos: cam.pos, tgt: cam.tgt } }),
+  setIntro: (t, hold) => { intro.done = false; intro.t = t; if (hold) intro.speed = 0; },   // previews the 3D liquid intro
+  skipHero: () => finishIntro(),
   setConfig: c => { Object.assign(config, c); renderCard(); if (activeCat) setCategory(activeCat); },
   quality,
   settle: v => { settle = v; },
