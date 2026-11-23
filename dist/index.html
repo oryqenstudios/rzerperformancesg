@@ -1,0 +1,2078 @@
+<!DOCTYPE html>
+<html lang="en-SG">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RZER Performance</title>
+<meta name="description" content="Rzer is a Singapore workshop for ECU tuning, exhaust, suspension, aero and wheels. Try parts on a live 3D car before we fit them.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&amp;display=swap" rel="stylesheet">
+<style>
+:root {
+  /* Layout idea: one fixed 3D stage; copy sits in the negative space the camera leaves, swapping sides as the car turns. */
+  --black: #000000;
+  --chrome: #e8ebee;
+  --steel: #a3a9b1;
+  --graphite: #5d636b;
+  --hair: rgba(232, 235, 238, 0.14);
+  --redline: #ff3b2f;
+  --font: "Archivo", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --display-stretch: 125%;
+  --gutter: clamp(20px, 6vw, 96px);
+  --sheen: 30%;
+  color-scheme: dark;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html { background: var(--black); scroll-behavior: smooth; }
+body {
+  margin: 0;
+  background: var(--black);
+  color: var(--chrome);
+  font-family: var(--font);
+  font-size: 1rem;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+img, svg { max-width: 100%; }
+a { color: inherit; }
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--chrome); outline-offset: 3px; }
+
+#stage {
+  position: fixed; inset: 0;
+  width: 100vw; height: 100vh;
+  display: block;
+  z-index: 0;
+  touch-action: none;
+}
+.nogl-bg #stage { display: none; }
+.nogl-bg { background: radial-gradient(120% 80% at 70% 60%, #1a1c1f 0%, #000 60%); }
+
+/* ---------- type */
+.display {
+  font-stretch: var(--display-stretch);
+  font-weight: 800;
+  text-transform: uppercase;
+  line-height: 0.94;
+  letter-spacing: -0.005em;
+  text-wrap: balance;
+  margin: 0;
+}
+.chrome {
+  background-image:
+    linear-gradient(104deg, transparent calc(var(--sheen) - 14%), rgba(255, 255, 255, 0.9) var(--sheen), transparent calc(var(--sheen) + 14%)),
+    linear-gradient(180deg, #ffffff 0%, #e6e9ec 36%, #737a83 51%, #d9dde1 63%, #9ca3ab 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+h2.display { font-size: clamp(2.1rem, 4.4vw, 4.3rem); }
+h3 { font-size: 1.0625rem; font-weight: 600; margin: 0; letter-spacing: 0.005em; }
+p { margin: 0; }
+.lede { color: var(--steel); font-size: 1.0625rem; max-width: 34em; }
+
+/* ---------- buttons */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+  min-height: 46px; padding: 0 22px;
+  border-radius: 3px;
+  border: 1px solid transparent;
+  font-size: 0.9375rem; font-weight: 600; letter-spacing: 0.01em;
+  text-decoration: none; cursor: pointer;
+  transition: transform 0.15s ease, background-color 0.2s ease, border-color 0.2s ease;
+  white-space: nowrap;
+}
+.btn-chrome {
+  color: #000;
+  background: linear-gradient(180deg, #ffffff 0%, #dfe3e7 45%, #b9c0c7 55%, #eef1f3 100%);
+  box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.25);
+}
+.btn-chrome:hover { transform: translateY(-1px); }
+.btn-ghost { color: var(--chrome); border-color: rgba(232, 235, 238, 0.32); background: rgba(0, 0, 0, 0.35); }
+.btn-ghost:hover { border-color: var(--chrome); }
+.btn-small { min-height: 38px; padding: 0 14px; font-size: 0.875rem; }
+.btn svg { width: 16px; height: 16px; flex: none; }
+
+/* ---------- nav */
+.nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 20;
+  display: flex; align-items: center; justify-content: space-between; gap: 24px;
+  padding: 18px var(--gutter);
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.75), rgba(0, 0, 0, 0));
+}
+.brand {
+  font-stretch: var(--display-stretch); font-weight: 900; font-size: 1.25rem;
+  letter-spacing: 0.04em; text-decoration: none;
+}
+.nav-links { display: flex; gap: clamp(16px, 2.4vw, 36px); }
+.nav-links a { color: var(--steel); text-decoration: none; font-size: 0.9375rem; }
+.nav-links a:hover { color: var(--chrome); }
+.in-builder .nav { display: none; }
+
+/* ---------- hero */
+main { position: relative; z-index: 1; }
+.hero { position: relative; min-height: 100svh; }
+.hero-copy {
+  position: absolute; left: var(--gutter); bottom: clamp(64px, 11vh, 128px);
+  display: grid; gap: 22px; max-width: min(92vw, 980px);
+}
+.wordmark {
+  font-size: clamp(5.2rem, 18vw, 16rem);
+  font-weight: 900; line-height: 0.78; letter-spacing: -0.02em;
+  clip-path: inset(0 0 0 0);
+  transition: clip-path 1.5s cubic-bezier(0.7, 0, 0.2, 1);
+}
+.is-intro .wordmark:not(.revealed) { clip-path: inset(0 100% 0 0); }
+.hero-line { font-size: clamp(1rem, 1.4vw, 1.25rem); color: var(--chrome); max-width: 30em; }
+.hero-actions { display: flex; flex-wrap: wrap; gap: 12px; }
+
+.intro-ui {
+  position: absolute; right: var(--gutter); bottom: clamp(64px, 11vh, 128px);
+  display: flex; align-items: center; gap: 16px;
+  font-size: 0.875rem; color: var(--steel);
+}
+.intro-bar { width: 140px; height: 2px; background: var(--hair); overflow: hidden; }
+.intro-bar span { display: block; height: 100%; width: 0; background: var(--chrome); }
+.skip { background: none; border: 0; padding: 8px 0; color: var(--chrome); cursor: pointer; text-decoration: underline; text-underline-offset: 4px; }
+.intro-done .intro-ui { display: none; }
+
+.scroll-cue {
+  position: absolute; left: 50%; bottom: 22px; transform: translateX(-50%);
+  display: grid; justify-items: center; gap: 8px;
+  font-size: 0.8125rem; color: var(--steel);
+}
+.scroll-cue::after { content: ""; width: 1px; height: 36px; background: linear-gradient(var(--chrome), transparent); }
+.is-intro .scroll-cue { visibility: hidden; }
+
+/* ---------- panels */
+.panel {
+  position: relative;
+  min-height: 135vh;
+  display: grid; align-items: center;
+  padding: 18vh var(--gutter);
+}
+.panel.right { justify-items: end; padding-right: calc(var(--gutter) + 56px); }
+.panel-inner { position: relative; max-width: 33rem; display: grid; gap: 24px; }
+.panel-inner::before {
+  content: ""; position: absolute; inset: -18% -28%; z-index: -1;
+  background: radial-gradient(closest-side, rgba(0, 0, 0, 0.78), rgba(0, 0, 0, 0.45) 55%, transparent);
+  pointer-events: none;
+}
+
+.services { list-style: none; margin: 8px 0 0; padding: 0; display: grid; }
+.services li { display: grid; grid-template-columns: 11rem 1fr; gap: 6px 20px; padding: 16px 0; border-top: 1px solid var(--hair); }
+.services li:last-child { border-bottom: 1px solid var(--hair); }
+.services p { color: var(--steel); font-size: 0.9375rem; line-height: 1.5; }
+
+.steps { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 18px; counter-reset: step; }
+.steps li { display: grid; grid-template-columns: 3.2rem 1fr; gap: 4px 12px; align-items: baseline; }
+.steps .n { font-stretch: var(--display-stretch); font-weight: 800; color: var(--graphite); font-size: 1.125rem; font-variant-numeric: tabular-nums; }
+.steps p { grid-column: 2; color: var(--steel); font-size: 0.9375rem; line-height: 1.5; }
+
+.cta-list { margin: 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 8px; }
+.cta-list li { border: 1px solid var(--hair); padding: 6px 12px; border-radius: 3px; font-size: 0.875rem; color: var(--steel); }
+
+/* ---------- contact */
+.contact-form { display: grid; gap: 16px; }
+.field { display: grid; gap: 6px; }
+.field label, .field legend { font-size: 0.875rem; color: var(--steel); padding: 0; }
+.field input, .field textarea {
+  width: 100%; background: rgba(0, 0, 0, 0.55); color: var(--chrome);
+  border: 1px solid rgba(232, 235, 238, 0.22); border-radius: 3px;
+  padding: 12px 14px; font: inherit; font-size: 1rem;
+}
+.field textarea { min-height: 96px; resize: vertical; }
+.field input:focus, .field textarea:focus { border-color: var(--chrome); outline: none; }
+fieldset.field { border: 0; margin: 0; padding: 0; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { position: relative; }
+.chip input { position: absolute; opacity: 0; inset: 0; cursor: pointer; }
+.chip span { display: inline-block; padding: 7px 13px; border: 1px solid rgba(232, 235, 238, 0.25); border-radius: 3px; font-size: 0.875rem; color: var(--steel); }
+.chip input:checked + span { color: #000; background: var(--chrome); border-color: var(--chrome); }
+.chip input:focus-visible + span { outline: 2px solid var(--chrome); outline-offset: 2px; }
+.form-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.form-status { font-size: 0.9375rem; color: var(--chrome); min-height: 1.6em; }
+.form-status.error { color: #ff8a80; }
+.handle { color: var(--chrome); }
+
+.footer {
+  position: relative; z-index: 1;
+  display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px;
+  padding: 28px var(--gutter) 36px; border-top: 1px solid var(--hair);
+  color: var(--graphite); font-size: 0.875rem; background: rgba(0, 0, 0, 0.7);
+}
+.footer a { color: var(--steel); }
+
+/* ---------- rev counter scroll gauge */
+.tach {
+  position: fixed; right: 22px; top: 50%; transform: translateY(-50%); z-index: 15;
+  height: 42vh; width: 72px;
+  display: grid; grid-template-rows: 1fr auto; gap: 10px; justify-items: end;
+  pointer-events: none;
+}
+.tach-scale { position: relative; width: 100%; height: 100%; }
+.tach-scale i {
+  position: absolute; right: 0; height: 1px; width: 8px; background: var(--graphite);
+  font-style: normal; font-size: 0.6875rem; color: var(--graphite); line-height: 0;
+  font-variant-numeric: tabular-nums;
+}
+.tach-scale i.major { width: 14px; background: var(--steel); }
+.tach-scale i.major::before { content: attr(data-n); position: absolute; right: 20px; top: 0; color: var(--steel); }
+.tach-scale i.red { background: var(--redline); }
+.tach-scale i.red::before { color: var(--redline); }
+.tach-needle { position: absolute; right: -4px; width: 26px; height: 2px; background: var(--chrome); box-shadow: 0 0 10px rgba(255, 255, 255, 0.6); transform: translateY(-1px); }
+.tach-needle.hot { background: var(--redline); box-shadow: 0 0 12px rgba(255, 59, 47, 0.8); }
+.tach-unit { font-size: 0.6875rem; color: var(--graphite); white-space: nowrap; }
+.in-builder .tach, .is-intro .tach { display: none; }
+
+/* ---------- hotspots */
+.hotspots { position: fixed; inset: 0; z-index: 2; pointer-events: none; }
+.hotspot { position: absolute; left: 0; top: 0; display: flex; align-items: center; gap: 10px; opacity: 0; will-change: transform, opacity; }
+.hotspot::before { content: ""; width: 9px; height: 9px; border-radius: 50%; background: var(--chrome); box-shadow: 0 0 0 4px rgba(232, 235, 238, 0.18), 0 0 16px rgba(255, 255, 255, 0.7); flex: none; transform: translateX(-4px); }
+.hotspot span { font-size: 0.8125rem; font-weight: 600; color: var(--chrome); background: rgba(0, 0, 0, 0.6); padding: 4px 9px; border-left: 1px solid var(--chrome); white-space: nowrap; }
+.in-builder .hotspots { display: none; }
+
+/* ---------- configurator */
+.builder { position: fixed; inset: 0; z-index: 10; pointer-events: none; }
+.builder[hidden] { display: none; }
+.builder > * { pointer-events: auto; }
+.in-builder main, .in-builder .footer { display: none; }
+
+.b-top {
+  position: absolute; top: 0; left: 0; right: 0;
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding: 16px 20px;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0));
+  pointer-events: none;
+}
+.b-top > * { pointer-events: auto; }
+.b-title { display: flex; align-items: baseline; gap: 14px; }
+.b-title strong { font-stretch: var(--display-stretch); font-weight: 900; font-size: 1.25rem; letter-spacing: 0.04em; }
+.b-title span { color: var(--steel); font-size: 0.9375rem; }
+.b-card-toggle .count { font-variant-numeric: tabular-nums; color: var(--steel); }
+
+.glass {
+  background: rgba(0, 0, 0, 0.58);
+  -webkit-backdrop-filter: blur(16px) saturate(120%);
+  backdrop-filter: blur(16px) saturate(120%);
+  border: 1px solid rgba(232, 235, 238, 0.1);
+  border-radius: 4px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.b-panel {
+  position: absolute; left: 20px; top: 80px; bottom: 96px; width: 352px;
+  display: grid; grid-template-rows: auto 1fr; overflow: hidden;
+}
+.b-tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; padding: 10px; border-bottom: 1px solid var(--hair); }
+.b-tab {
+  min-width: 0; padding: 9px 4px; border: 0; border-radius: 3px; background: transparent;
+  color: var(--steel); font-size: 0.8125rem; font-weight: 600; cursor: pointer;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.b-tab:hover { color: var(--chrome); background: rgba(255, 255, 255, 0.05); }
+.b-tab[aria-selected="true"] { color: #000; background: var(--chrome); }
+.b-options { overflow-y: auto; padding: 14px 14px 20px; display: grid; gap: 20px; align-content: start; overscroll-behavior: contain; }
+.og { border: 0; margin: 0; padding: 0; display: grid; gap: 8px; min-width: 0; }
+.og legend { font-size: 0.8125rem; color: var(--steel); padding: 0 0 8px; }
+.og-items { display: grid; gap: 6px; }
+.opt {
+  display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 2px 12px;
+  width: 100%; text-align: left; padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(232, 235, 238, 0.1); border-radius: 3px;
+  cursor: pointer; transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+.opt:hover { border-color: rgba(232, 235, 238, 0.35); }
+.opt[aria-pressed="true"] { border-color: var(--chrome); background: rgba(255, 255, 255, 0.08); }
+.opt .sw { grid-row: span 2; width: 26px; height: 26px; border-radius: 50%; background: var(--sw); box-shadow: inset 0 2px 3px rgba(255, 255, 255, 0.35), inset 0 -3px 5px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.15); }
+.opt .mark { grid-row: span 2; width: 26px; height: 26px; display: grid; place-items: center; border-radius: 50%; border: 1px solid rgba(232, 235, 238, 0.2); font-size: 0.6875rem; font-weight: 700; color: var(--steel); font-variant-numeric: tabular-nums; }
+.opt-name { font-weight: 600; font-size: 0.9375rem; }
+.opt-note { grid-column: 2; font-size: 0.8125rem; color: var(--steel); line-height: 1.35; }
+.opt .tick { grid-row: 1 / span 2; grid-column: 3; width: 18px; height: 18px; opacity: 0; }
+.opt[aria-pressed="true"] .tick { opacity: 1; }
+.opt .stock-tag { font-size: 0.6875rem; color: var(--graphite); margin-left: 6px; font-weight: 500; }
+
+.b-card {
+  position: absolute; right: 20px; top: 80px; width: 318px; max-height: calc(100% - 176px);
+  display: grid; grid-template-rows: auto 1fr auto; overflow: hidden;
+}
+.b-card[hidden] { display: none; }
+.jc-head { padding: 16px 18px 12px; border-bottom: 1px dashed rgba(232, 235, 238, 0.2); display: grid; gap: 4px; }
+.jc-head h2 { margin: 0; font-size: 1rem; font-weight: 700; display: flex; justify-content: space-between; gap: 12px; }
+.jc-code { font-variant-numeric: tabular-nums; color: var(--steel); font-weight: 600; letter-spacing: 0.02em; }
+.jc-sub { font-size: 0.8125rem; color: var(--steel); }
+.jc-list { list-style: none; margin: 0; padding: 8px 18px; overflow-y: auto; }
+.jc-list li { display: grid; grid-template-columns: 6.5rem 1fr; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--hair); font-size: 0.875rem; }
+.jc-list li span:first-child { color: var(--steel); }
+.jc-empty { color: var(--steel); font-size: 0.875rem; padding: 10px 0; }
+.jc-actions { display: grid; gap: 8px; padding: 14px 18px 18px; border-top: 1px dashed rgba(232, 235, 238, 0.2); }
+.jc-note { font-size: 0.75rem; color: var(--graphite); }
+.jc-copy { position: absolute; left: -9999px; }
+
+.b-dock {
+  position: absolute; left: 50%; bottom: 22px; transform: translateX(-50%);
+  display: flex; gap: 8px; padding: 8px; flex-wrap: nowrap;
+}
+.b-dock .btn { min-height: 40px; padding: 0 14px; font-size: 0.875rem; }
+.b-dock .btn[aria-pressed="true"] { border-color: var(--chrome); background: rgba(255, 255, 255, 0.1); }
+#hold.is-down { background: var(--chrome); color: #000; }
+.b-hint { position: absolute; left: 50%; bottom: 90px; transform: translateX(-50%); margin: 0; font-size: 0.8125rem; color: var(--steel); pointer-events: none; transition: opacity 0.6s ease; white-space: nowrap; }
+.b-hint.gone { opacity: 0; }
+.b-stock-badge { position: absolute; left: 50%; top: 84px; transform: translateX(-50%); padding: 6px 14px; font-size: 0.8125rem; font-weight: 600; color: #000; background: var(--chrome); border-radius: 3px; pointer-events: none; }
+.b-stock-badge[hidden] { display: none; }
+
+.loading {
+  position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 30;
+  font-size: 0.875rem; color: var(--steel); pointer-events: none; transition: opacity 0.4s ease;
+}
+.loading.gone { opacity: 0; }
+.nogl-note { position: fixed; left: var(--gutter); top: 84px; z-index: 30; max-width: 28rem; font-size: 0.875rem; color: var(--steel); }
+.nogl-note[hidden] { display: none; }
+
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+@media (max-width: 1240px) {
+  .b-card { top: 80px; }
+}
+@media (max-width: 900px) {
+  .nav-links { display: none; }
+  .tach { display: none; }
+  .panel { min-height: 120vh; align-items: end; padding: 10vh var(--gutter) 14vh; }
+  .panel.right { justify-items: start; }
+  .panel-inner::before { inset: -14% -14%; background: radial-gradient(closest-side, rgba(0, 0, 0, 0.85), rgba(0, 0, 0, 0.6) 60%, transparent); }
+  .services li { grid-template-columns: 1fr; }
+  .intro-ui { left: var(--gutter); right: auto; bottom: 26px; }
+  .hero-copy { bottom: 88px; }
+  .scroll-cue { display: none; }
+
+  .b-panel { left: 0; right: 0; bottom: 0; top: auto; width: auto; height: 44vh; border-radius: 10px 10px 0 0; }
+  .b-tabs { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; }
+  .b-tab { flex: none; padding: 9px 14px; scroll-snap-align: start; }
+  .b-options { padding: 12px; }
+  .b-card { left: 12px; right: 12px; width: auto; top: 70px; max-height: calc(56vh - 90px); }
+  .b-dock { bottom: calc(44vh + 10px); left: 12px; right: 12px; transform: none; justify-content: flex-start; overflow-x: auto; padding: 0; background: none; border: 0; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
+  .b-dock .btn { background: rgba(0, 0, 0, 0.6); min-height: 36px; padding: 0 11px; font-size: 0.8125rem; }
+  .card-open .b-hint { display: none; }
+  .b-hint { bottom: calc(44vh + 64px); }
+  .b-title span { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .wordmark { transition: none; }
+  .btn { transition: none; }
+}
+
+</style>
+</head>
+<body class="is-intro">
+<canvas id="stage" aria-label="3D view of the Rzer demo coupe in an underground car park"></canvas>
+<p class="loading" id="loading">Loading the 3D scene</p>
+<p class="nogl-note" id="nogl" hidden>This browser could not start the 3D view, so the page is showing without it. Try a current version of Chrome, Safari, Edge or Firefox to see the car.</p>
+
+<header class="nav">
+  <a class="brand" href="#top" aria-label="Rzer, back to top">RZER</a>
+  <nav class="nav-links" aria-label="Sections">
+    <a href="#services">Services</a>
+    <a href="#engineering">Engineering</a>
+    <a href="#process">Process</a>
+    <a href="#contact">Contact</a>
+  </nav>
+  <a class="btn btn-chrome btn-small" href="#build">Build yours</a>
+</header>
+
+<main id="home">
+  <section class="hero" id="top" data-cam="hero" aria-label="Introduction">
+    <div class="hero-copy">
+      <h1 class="wordmark display chrome" id="wordmark">RZER</h1>
+      <p class="hero-line">Performance tuning, fitment and builds in Singapore.</p>
+      <div class="hero-actions">
+        <a class="btn btn-chrome" href="#build">Build yours</a>
+        <a class="btn btn-ghost" href="#services">See what we do</a>
+      </div>
+    </div>
+    <div class="intro-ui" id="intro-ui">
+      <div class="intro-bar" aria-hidden="true"><span id="intro-bar"></span></div>
+      <button class="skip" id="skip" type="button">Skip intro</button>
+    </div>
+    <div class="scroll-cue" aria-hidden="true">Scroll</div>
+  </section>
+
+  <section class="panel" id="about" data-cam="about">
+    <div class="panel-inner">
+      <h2 class="display chrome">Built around how you drive</h2>
+      <p class="lede">Rzer tunes and modifies road cars for owners who want them sharper, faster and unmistakably theirs. Every build starts with how the car is used day to day, then gets planned part by part before anything is unbolted.</p>
+    </div>
+  </section>
+
+  <section class="panel right" id="services" data-cam="services">
+    <div class="panel-inner">
+      <h2 class="display chrome">What goes on the lift</h2>
+      <ul class="services">
+        <li><h3>ECU remaps</h3><p>Stage 1 and Stage 2 software, matched to your hardware and fuel.</p></li>
+        <li><h3>Intake and exhaust</h3><p>Downpipes, cat-backs and valved systems, fitted and mapped together.</p></li>
+        <li><h3>Suspension</h3><p>Coilovers, lowering springs and alignment set up for Singapore roads.</p></li>
+        <li><h3>Aero and body</h3><p>Lips, skirts, diffusers, wings and widebody kits, test-fitted before paint.</p></li>
+        <li><h3>Wheels and brakes</h3><p>Fitment checked for offset and clearance. Big-brake kits and caliper colours.</p></li>
+        <li><h3>Wraps and carbon</h3><p>Gloss, satin and colour-change film, carbon trim and window tint.</p></li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="panel" id="engineering" data-cam="engineering">
+    <div class="panel-inner">
+      <h2 class="display chrome">See what changes under the skin</h2>
+      <p class="lede">Power, chassis, brakes and exhaust are planned as one system. Upgrade the turbo and the brakes, cooling and suspension have to keep up, so we spec them together.</p>
+    </div>
+  </section>
+
+  <section class="panel right" id="process" data-cam="process">
+    <div class="panel-inner">
+      <h2 class="display chrome">How a build runs</h2>
+      <ol class="steps">
+        <li><span class="n">01</span><h3>Consult</h3><p>Tell us the car, how you use it and what you want from it.</p></li>
+        <li><span class="n">02</span><h3>Plan</h3><p>We spec parts that work together and quote before any work starts.</p></li>
+        <li><span class="n">03</span><h3>Fit</h3><p>Parts go on in our workshop, test-fitted, torqued and aligned.</p></li>
+        <li><span class="n">04</span><h3>Tune</h3><p>Software is mapped to the new hardware and checked on the road.</p></li>
+        <li><span class="n">05</span><h3>Hand-over</h3><p>You collect the car with a job sheet listing everything that was done.</p></li>
+      </ol>
+    </div>
+  </section>
+
+  <section class="panel" id="try" data-cam="try">
+    <div class="panel-inner">
+      <h2 class="display chrome">Try the parts before we fit them</h2>
+      <p class="lede">Change paint, wheels, aero, stance and exhaust on a live 3D car, then send the build to us for a quote.</p>
+      <ul class="cta-list" aria-label="What you can change">
+        <li>6 paint finishes</li><li>4 wheel designs</li><li>3 ride heights</li><li>Widebody kit</li><li>GT wing</li><li>Exhaust tips</li>
+      </ul>
+      <div><a class="btn btn-chrome" href="#build">Open the configurator</a></div>
+    </div>
+  </section>
+
+  <section class="panel right" id="contact" data-cam="contact">
+    <div class="panel-inner">
+      <h2 class="display chrome">Book a bay</h2>
+      <p class="lede">Send your car and what you have in mind. Rzer takes bookings by message on Instagram at <span class="handle">@rzerperformance.sg</span>.</p>
+      <form class="contact-form" id="contact-form" novalidate>
+        <div class="field"><label for="cf-name">Your name</label><input id="cf-name" name="name" autocomplete="name" required></div>
+        <div class="field"><label for="cf-car">Car (make, model, year)</label><input id="cf-car" name="car" placeholder="e.g. Golf R Mk8, 2022" required></div>
+        <fieldset class="field">
+          <legend>Work you're interested in</legend>
+          <div class="chips">
+            <label class="chip"><input type="checkbox" name="work" value="ECU tuning" id="cf-w1"><span>ECU tuning</span></label>
+            <label class="chip"><input type="checkbox" name="work" value="Exhaust" id="cf-w2"><span>Exhaust</span></label>
+            <label class="chip"><input type="checkbox" name="work" value="Suspension" id="cf-w3"><span>Suspension</span></label>
+            <label class="chip"><input type="checkbox" name="work" value="Aero and body" id="cf-w4"><span>Aero and body</span></label>
+            <label class="chip"><input type="checkbox" name="work" value="Wheels and brakes" id="cf-w5"><span>Wheels and brakes</span></label>
+            <label class="chip"><input type="checkbox" name="work" value="Wrap and carbon" id="cf-w6"><span>Wrap and carbon</span></label>
+          </div>
+        </fieldset>
+        <div class="field"><label for="cf-notes">Anything else</label><textarea id="cf-notes" name="notes" placeholder="Current mods, budget, timing"></textarea></div>
+        <div class="form-row">
+          <button class="btn btn-chrome" type="submit">Copy my request</button>
+          <a class="btn btn-ghost" href="https://www.instagram.com/rzerperformance.sg/" target="_blank" rel="noopener">Open Instagram</a>
+        </div>
+        <p class="form-status" id="form-status" role="status" aria-live="polite"></p>
+      </form>
+    </div>
+  </section>
+</main>
+
+<footer class="footer">
+  <span>RZER Performance, Singapore</span>
+  <a href="https://www.instagram.com/rzerperformance.sg/" target="_blank" rel="noopener">@rzerperformance.sg on Instagram</a>
+</footer>
+
+<div class="tach" aria-hidden="true">
+  <div class="tach-scale" id="tach-scale"><div class="tach-needle" id="tach-needle"></div></div>
+  <span class="tach-unit">×1000 r/min</span>
+</div>
+
+<div class="hotspots" aria-hidden="true">
+  <div class="hotspot" data-pos="1.76,0.50,0.30"><span>Turbo and ECU map</span></div>
+  <div class="hotspot" data-pos="1.40,0.62,0.62"><span>Coilovers</span></div>
+  <div class="hotspot" data-pos="1.40,0.40,0.92"><span>Big-brake kit</span></div>
+  <div class="hotspot" data-pos="-2.34,0.21,0.56"><span>Valved exhaust</span></div>
+</div>
+
+<div class="builder" id="builder" hidden>
+  <div class="b-top">
+    <a class="btn btn-ghost btn-small" href="#top"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10 3 5 8l5 5" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>Back to site</a>
+    <div class="b-title"><strong>RZER</strong><span>Build yours on the demo coupe</span></div>
+    <button class="btn btn-ghost btn-small b-card-toggle" id="card-toggle" type="button" aria-controls="jobcard" aria-expanded="true">Job card <span class="count" id="card-count">0</span></button>
+  </div>
+
+  <aside class="b-panel glass" aria-label="Parts">
+    <div class="b-tabs" role="tablist" id="b-tabs"></div>
+    <div class="b-options" id="b-options" role="tabpanel"></div>
+  </aside>
+
+  <aside class="b-card glass" id="jobcard" aria-label="Job card">
+    <div class="jc-head">
+      <h2>Job card <span class="jc-code" id="jc-code">RZ-0</span></h2>
+      <p class="jc-sub" id="jc-sub">Stock car</p>
+    </div>
+    <ul class="jc-list" id="jc-list"></ul>
+    <div class="jc-actions">
+      <button class="btn btn-chrome" id="copy-build" type="button">Copy build</button>
+      <a class="btn btn-ghost" href="https://www.instagram.com/rzerperformance.sg/" target="_blank" rel="noopener">Send it on Instagram</a>
+      <p class="jc-note" id="jc-note">Paste the copied build into a message. Rzer confirms fitment and price for your exact car.</p>
+    </div>
+    <textarea class="jc-copy" id="jc-copy" aria-hidden="true" tabindex="-1"></textarea>
+  </aside>
+
+  <p class="b-stock-badge" id="stock-badge" hidden>Showing stock</p>
+  <p class="b-hint" id="b-hint">Drag to turn the car. Scroll or pinch to zoom.</p>
+
+  <div class="b-dock glass">
+    <button class="btn btn-ghost" id="hold" type="button">Hold to compare stock</button>
+    <button class="btn btn-ghost" id="lights" type="button" aria-pressed="true">Headlights</button>
+    <button class="btn btn-ghost" id="preset" type="button">Rzer signature build</button>
+    <button class="btn btn-ghost" id="reset" type="button">Reset to stock</button>
+  </div>
+</div>
+
+<script type="x-shader/x-fragment" id="frag">
+#version 300 es
+precision highp float;
+precision highp int;
+out vec4 fragColor;
+
+uniform vec2  uRes;
+uniform float uTime;
+uniform int   uZero;
+uniform vec3  uCamPos, uCamFwd, uCamRight, uCamUp;
+uniform float uTanHalf;
+uniform vec2  uShift;
+uniform float uT;          // intro clock (s). >= 9.5 : car fully built
+uniform float uXray;
+uniform float uLights;
+uniform float uBay;
+uniform float uReflect;
+uniform float uExposure;
+uniform vec3  uDrl;
+uniform vec3  uPaint;  uniform float uPaintRough; uniform float uPaintMetal;
+uniform vec3  uRimCol; uniform float uRimRough;   uniform float uRimMetal;
+uniform vec3  uCaliper;
+uniform int   uWheel;  uniform float uRimR;
+uniform int   uSpoiler, uLip, uSkirts, uDiffuser, uExhaust, uExFinish;
+uniform float uRide, uWide;
+uniform int   uHood, uRoof, uMirror;
+uniform float uTint;
+
+#define PI 3.14159265
+const float R    = 0.345;   // tyre radius
+const float FX   = 1.40;    // front axle
+const float RX   = -1.32;   // rear axle
+const float CEIL = 3.35;
+
+// material ids
+const float M_BODY = 1., M_TIRE = 2., M_RIM = 3., M_ROTOR = 4., M_CALIPER = 5., M_CARBON = 6.,
+            M_EXH = 7., M_PAINTONLY = 8., M_CHASSIS = 9., M_ALU = 10., M_LIQUID = 11., M_SEAT = 12.,
+            M_TURBO = 13., M_TRIM = 14.;
+
+int gMode; // 0 intro, 1 car, 2 shell (xray), 3 inner (xray)
+
+// ---------------------------------------------------------------- utils
+mat2 rot(float a){ float c = cos(a), s = sin(a); return mat2(c, s, -s, c); }
+float hash11(float n){ return fract(sin(n * 127.1) * 43758.5453); }
+float hash21(vec2 p){ p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
+float vnoise(vec2 p){
+  vec2 i = floor(p), f = fract(p); vec2 u = f * f * (3. - 2. * f);
+  return mix(mix(hash21(i), hash21(i + vec2(1, 0)), u.x), mix(hash21(i + vec2(0, 1)), hash21(i + vec2(1, 1)), u.x), u.y);
+}
+float fbm(vec2 p){ float a = 0.5, s = 0.; for(int i = 0; i < 4; i++){ s += a * vnoise(p); p *= 2.03; a *= 0.5; } return s; }
+
+float smin(float a, float b, float k){ float h = max(k - abs(a - b), 0.) / k; return min(a, b) - h * h * k * 0.25; }
+float smax(float a, float b, float k){ return -smin(-a, -b, k); }
+float sdBox(vec3 p, vec3 b){ vec3 q = abs(p) - b; return length(max(q, 0.)) + min(max(q.x, max(q.y, q.z)), 0.); }
+float sdRBox(vec3 p, vec3 b, float r){ return sdBox(p, b - r) - r; }
+float sdBox2(vec2 p, vec2 b){ vec2 q = abs(p) - b; return length(max(q, 0.)) + min(max(q.x, q.y), 0.); }
+float sdRBox2(vec2 p, vec2 b, float r){ return sdBox2(p, b - r) - r; }
+float sdCap(vec3 p, vec3 a, vec3 b, float r){ vec3 pa = p - a, ba = b - a; float h = clamp(dot(pa, ba) / dot(ba, ba), 0., 1.); return length(pa - ba * h) - r; }
+float sdEll(vec3 p, vec3 r){ float k0 = length(p / r); float k1 = length(p / (r * r)); return k0 * (k0 - 1.) / k1; }
+void U(inout vec2 r, float d, float m){ if(d < r.x) r = vec2(d, m); }
+
+// ---------------------------------------------------------------- body
+const int NP = 20;
+const vec2 PROF[NP] = vec2[NP](
+  vec2( 2.16, 0.13), vec2( 2.29, 0.20), vec2( 2.34, 0.32), vec2( 2.32, 0.44), vec2( 2.22, 0.575),
+  vec2( 1.95, 0.675), vec2( 1.45, 0.765), vec2( 0.98, 0.850), vec2( 0.55, 1.035), vec2( 0.20, 1.165),
+  vec2(-0.20, 1.232), vec2(-0.60, 1.228), vec2(-1.00, 1.160), vec2(-1.45, 1.040), vec2(-1.90, 0.950),
+  vec2(-2.22, 0.920), vec2(-2.28, 0.800), vec2(-2.31, 0.560), vec2(-2.25, 0.250), vec2(-2.10, 0.130));
+
+float sdProfile(vec2 p){
+  float d = dot(p - PROF[0], p - PROF[0]); float s = 1.;
+  for(int i = 0, j = NP - 1; i < NP; j = i, i++){
+    vec2 e = PROF[j] - PROF[i]; vec2 w = p - PROF[i];
+    vec2 b = w - e * clamp(dot(w, e) / dot(e, e), 0., 1.);
+    d = min(d, dot(b, b));
+    bvec3 c = bvec3(p.y >= PROF[i].y, p.y < PROF[j].y, e.x * w.y > e.y * w.x);
+    if(all(c) || all(not(c))) s *= -1.;
+  }
+  return s * sqrt(d);
+}
+
+float halfW(float x){
+  float f = exp(-pow((x - FX) / 0.55, 2.)), r = exp(-pow((x - RX) / 0.6, 2.));
+  return 0.915 + 0.035 * f + 0.055 * r + uWide * (0.065 * f + 0.075 * r);
+}
+float shoulderY(float x){ return mix(0.93, 0.80, smoothstep(-1.9, 1.6, x)); }
+float cabinHW(vec3 pb){
+  float t = pb.y - shoulderY(pb.x);
+  float tumble = 0.78 * 0.5 * (t + sqrt(t * t + 0.0025));
+  float tuck = 0.06 * smoothstep(0.36, 0.12, pb.y);
+  return halfW(pb.x) - tumble - tuck;
+}
+vec2 exhaustSlot(float az, out float r){ // returns (zc, yc) of nearest tip for |z|=az
+  if(uExhaust == 1){ r = 0.043; return vec2(az < 0.57 ? 0.50 : 0.64, 0.215); }
+  if(uExhaust == 2){ r = 0.056; return vec2(0.085, 0.235); }
+  r = 0.054; return vec2(0.56, 0.215);
+}
+
+float bodySDF(vec3 pb){
+  float bb = sdBox(pb - vec3(0., 0.69, 0.), vec3(2.36, 0.57, 1.06 + uWide * 0.08));
+  if(bb > 0.10) return bb;
+  float side = sdProfile(pb.xy);
+  float hwm = 0.98 + uWide * 0.08;
+  float rr = pb.x > 0. ? 0.70 : 0.45;
+  vec2 q = abs(pb.xz) - vec2(2.31, hwm) + rr;
+  float plan = min(max(q.x, q.y), 0.) + length(max(q, 0.)) - rr;
+  float sect = (abs(pb.z) - cabinHW(pb)) * 0.8;
+  float d = smax(side, plan, 0.07);
+  d = smax(d, sect, 0.09);
+  // wheel arches
+  float ax = pb.x > 0.04 ? FX : RX;
+  float arch = length(pb.xy - vec2(ax, R)) - (0.40 + uWide * 0.025);
+  arch = max(arch, 0.50 - abs(pb.z));
+  d = smax(d, -arch, 0.03);
+  // side scoop ahead of the rear wheel
+  float sc = sdEll(vec3(pb.x + 0.86, pb.y - 0.52, abs(pb.z) - halfW(pb.x) - 0.035), vec3(0.42, 0.12, 0.08));
+  d = smax(d, -sc, 0.05);
+  // exhaust openings
+  float er; vec2 ez = exhaustSlot(abs(pb.z), er);
+  float hole = max(length(vec2(pb.y - ez.y, abs(pb.z) - ez.x)) - er - 0.016, pb.x + 2.13);
+  d = smax(d, -hole, 0.01);
+  // ducktail
+  if(uSpoiler == 1){
+    float dt = sdRBox(pb - vec3(-2.12, 0.95, 0.), vec3(0.18, 0.07, 0.80), 0.03);
+    dt = max(dt, pb.y - (0.94 + max(-1.98 - pb.x, 0.) * 0.38));
+    d = smin(d, dt, 0.06);
+  }
+  return d;
+}
+
+float carbonParts(vec3 pb){
+  float d = 1e9;
+  if(uLip > 0){
+    float ext = uLip == 1 ? 0.035 : 0.085;
+    vec2 q = abs(pb.xz) - vec2(2.31 + ext, 0.96 + uWide * 0.08) + 0.7;
+    float pl = min(max(q.x, q.y), 0.) + length(max(q, 0.)) - 0.7;
+    float lip = max(pl, abs(pb.y - 0.118) - (uLip == 1 ? 0.012 : 0.010));
+    lip = max(lip, 1.62 - pb.x);
+    d = min(d, lip);
+    if(uLip == 2){
+      vec3 c = vec3(pb.x - 2.14, pb.y - 0.36, abs(pb.z) - 0.88);
+      c.xy = rot(-0.18) * c.xy;
+      d = min(d, sdRBox(c, vec3(0.09, 0.006, 0.09), 0.004));
+    }
+  }
+  if(uSkirts == 1){
+    float sk = max(max(abs(pb.x) - 0.95, abs(pb.y - 0.162) - 0.036), abs(pb.z) - (halfW(pb.x) + 0.02));
+    d = min(d, sk - 0.004);
+  }
+  if(uDiffuser == 1 && pb.x < -1.8){
+    float base = sdBox(vec3(pb.x + 2.13, pb.y - 0.112, pb.z), vec3(0.22, 0.010, 0.72));
+    float fz = mod(pb.z + 0.09, 0.18) - 0.09;
+    float top = 0.12 + max(-pb.x - 1.95, 0.) * 0.5;
+    float fin = max(abs(fz) - 0.005, max(pb.y - top, 0.10 - pb.y));
+    fin = max(fin, max(abs(pb.z) - 0.64, max(pb.x + 1.92, -2.37 - pb.x)));
+    d = min(d, min(base, fin));
+  }
+  if(uSpoiler == 2){
+    vec3 l = pb - vec3(-2.25, 0.938, 0.);
+    l.xy = rot(-0.35) * l.xy;
+    d = min(d, sdRBox(l, vec3(0.065, 0.008, 0.80), 0.006));
+  }
+  if(uSpoiler == 3 && pb.x < -1.6 && pb.y > 0.85){
+    vec3 w = pb - vec3(-2.04, 1.27, 0.);
+    w.xy = rot(-0.16) * w.xy;
+    float blade = sdRBox(w, vec3(0.17, 0.013, 0.93), 0.011);
+    float plate = sdRBox(vec3(pb.x + 2.04, pb.y - 1.245, abs(pb.z) - 0.935), vec3(0.20, 0.10, 0.006), 0.004);
+    float upr = sdRBox(vec3(pb.x + 1.99, pb.y - 1.10, abs(pb.z) - 0.40), vec3(0.06, 0.16, 0.007), 0.004);
+    d = min(d, min(blade, min(plate, upr)));
+  }
+  return d;
+}
+
+float mirrorSDF(vec3 pb){
+  vec3 m = vec3(pb.x - 0.80, pb.y - 0.975, abs(pb.z) - 0.985);
+  if(dot(m, m) > 0.09) return length(m) - 0.2;
+  float head = sdEll(m, vec3(0.075, 0.048, 0.10));
+  float stalk = sdRBox(m - vec3(0.02, -0.035, -0.09), vec3(0.035, 0.012, 0.07), 0.008);
+  return smin(head, stalk, 0.02);
+}
+
+float exhaustSDF(vec3 pb, out float inner){
+  float r; vec2 ez = exhaustSlot(abs(pb.z), r);
+  vec2 yz = vec2(pb.y - ez.y, abs(pb.z) - ez.x);
+  float rr = length(yz);
+  inner = rr - r + 0.004;
+  return max(abs(rr - r) - 0.005, abs(pb.x + 2.27) - 0.085);
+}
+
+// ---------------------------------------------------------------- wheels
+vec3 wheelLocal(vec3 p){
+  float ax = p.x > 0.04 ? FX : RX;
+  return vec3(p.x - ax, p.y - R, abs(p.z) - (0.80 + uWide * 0.05));
+}
+vec2 wheelSDF(vec3 p){
+  vec3 q = wheelLocal(p);
+  float bl = length(q);
+  if(bl > 0.48) return vec2(bl - 0.40, M_TIRE);
+  vec2 res = vec2(1e9, M_TIRE);
+  float rim = uRimR;
+  float r = length(q.xy);
+  float rc = 0.5 * (R + rim + 0.006), hr = 0.5 * (R - rim - 0.006);
+  float tire = sdRBox2(vec2(r - rc, q.z), vec2(hr, 0.128), min(0.055, hr * 0.92));
+  U(res, tire, M_TIRE);
+  // barrel + lip
+  float barrel = sdRBox2(vec2(r - rim + 0.010, q.z), vec2(0.011, 0.118), 0.004);
+  float lip = sdRBox2(vec2(r - rim + 0.006, q.z - 0.113), vec2(0.016, 0.010), 0.005);
+  float rimD = min(barrel, lip);
+  // face
+  float faceZ = mix(0.058, 0.098, clamp(r / rim, 0., 1.));
+  float a = atan(q.y, q.x);
+  float n = uWheel == 1 ? 10. : (uWheel == 0 ? 5. : (uWheel == 2 ? 6. : 14.));
+  float sec = 2. * PI / n;
+  float ac = mod(a + sec * 0.5, sec) - sec * 0.5;
+  vec2 sp = vec2(cos(ac), sin(ac)) * r;
+  float d2;
+  if(uWheel == 0){
+    d2 = abs(abs(sp.y) - (0.010 + 0.11 * max(sp.x - 0.07, 0.))) - 0.0115;
+  } else if(uWheel == 1){
+    d2 = abs(sp.y) - (0.006 + 0.016 * (sp.x / rim));
+    d2 = min(d2, abs(r - 0.62 * rim) - 0.006);
+  } else if(uWheel == 2){
+    d2 = abs(sp.y) - (0.022 + 0.085 * sp.x);
+    d2 = max(d2, -(abs(sp.y) - 0.006 - 0.03 * max(sp.x - 0.1, 0.)) * step(0.1, sp.x)); // groove
+  } else {
+    float slot = abs(sp.y - (sp.x - 0.11) * 0.32) - 0.0125;
+    slot = max(slot, max(0.105 - sp.x, sp.x - (rim - 0.034)));
+    d2 = -slot;
+  }
+  d2 = max(d2, r - (rim - 0.008));
+  d2 = min(d2, r - 0.072);
+  float face = max(d2, abs(q.z - faceZ) - 0.017);
+  float cap = max(r - 0.036, abs(q.z - 0.068) - 0.012);
+  rimD = min(rimD, min(face, cap));
+  U(res, rimD, M_RIM);
+  // brakes
+  float rotor = max(r - (rim - 0.036), abs(q.z + 0.020) - 0.013);
+  U(res, rotor, M_ROTOR);
+  float th = p.x > 0.04 ? -2.09 : -1.05;
+  vec2 cq = rot(th) * q.xy;
+  float cal = sdRBox(vec3(cq.x - (rim - 0.072), cq.y, q.z + 0.018), vec3(0.042, 0.095, 0.040), 0.016);
+  U(res, cal, M_CALIPER);
+  return res;
+}
+
+// ---------------------------------------------------------------- chassis / engine / interior
+float chassisSDF(vec3 p){
+  vec3 q = vec3(p.x, p.y, abs(p.z));
+  float d = sdRBox(q - vec3(0., 0.24, 0.58), vec3(2.05, 0.075, 0.05), 0.02);
+  d = min(d, sdCap(q, vec3(FX, 0.30, 0.0), vec3(FX, 0.30, 0.58), 0.045));
+  d = min(d, sdCap(q, vec3(RX, 0.30, 0.0), vec3(RX, 0.30, 0.58), 0.045));
+  d = min(d, sdCap(q, vec3(0.30, 0.22, 0.0), vec3(0.30, 0.22, 0.58), 0.030));
+  d = min(d, sdCap(q, vec3(-0.70, 0.22, 0.0), vec3(-0.70, 0.22, 0.58), 0.030));
+  d = min(d, sdCap(q, vec3(2.12, 0.32, 0.0), vec3(2.12, 0.32, 0.78), 0.034));
+  d = min(d, sdCap(q, vec3(-2.12, 0.32, 0.0), vec3(-2.12, 0.32, 0.78), 0.034));
+  // cage
+  d = min(d, sdCap(q, vec3(0.92, 0.26, 0.60), vec3(0.22, 1.10, 0.56), 0.022));
+  d = min(d, sdCap(q, vec3(-0.62, 0.26, 0.62), vec3(-0.62, 1.13, 0.56), 0.024));
+  d = min(d, sdCap(q, vec3(0.22, 1.10, 0.56), vec3(-0.62, 1.13, 0.56), 0.022));
+  d = min(d, sdCap(q, vec3(-0.62, 1.13, 0.0), vec3(-0.62, 1.13, 0.56), 0.022));
+  d = min(d, sdCap(q, vec3(-0.62, 1.13, 0.56), vec3(-1.65, 0.42, 0.60), 0.020));
+  // suspension
+  for(int i = 0; i < 2; i++){
+    float ax = i == 0 ? FX : RX;
+    float tz = 0.80 + uWide * 0.05;
+    d = min(d, sdCap(q, vec3(ax - 0.18, 0.20, 0.56), vec3(ax, 0.22, tz - 0.12), 0.018));
+    d = min(d, sdCap(q, vec3(ax + 0.16, 0.20, 0.56), vec3(ax, 0.22, tz - 0.12), 0.018));
+    d = min(d, sdCap(q, vec3(ax - 0.14, 0.50, 0.52), vec3(ax, 0.50, tz - 0.13), 0.015));
+    vec3 s = q - vec3(ax - 0.03, 0.0, tz - 0.25);
+    float sh = 0.38;
+    float spring = length(vec2(length(s.xz) - 0.05 - 0.008 * sin(s.y * 95.), max(abs(s.y - 0.44) - sh * 0.5, 0.))) - 0.012;
+    d = min(d, spring * 0.8);
+  }
+  return d;
+}
+
+vec2 engineSDF(vec3 p){
+  vec2 res = vec2(1e9, M_ALU);
+  vec3 q = p - vec3(1.42, 0., 0.);
+  U(res, sdRBox(q - vec3(0., 0.42, 0.), vec3(0.30, 0.15, 0.22), 0.04), M_ALU);
+  vec3 h = vec3(q.x, q.y - 0.60, abs(q.z) - 0.16); h.yz = rot(0.55) * h.yz;
+  U(res, sdRBox(h, vec3(0.30, 0.05, 0.08), 0.03), M_CHASSIS);
+  U(res, sdCap(q, vec3(-0.24, 0.71, 0.), vec3(0.24, 0.71, 0.), 0.07), M_CARBON);
+  vec3 t = q - vec3(0.34, 0.48, 0.30);
+  U(res, length(vec2(length(t.xy) - 0.065, t.z)) - 0.045, M_TURBO);
+  U(res, sdCap(q, vec3(0.34, 0.48, 0.30), vec3(0.62, 0.34, 0.26), 0.03), M_ALU);
+  U(res, sdBox(p - vec3(2.07, 0.42, 0.), vec3(0.022, 0.16, 0.56)), M_CHASSIS);
+  U(res, sdCap(p, vec3(1.05, 0.40, 0.), vec3(0.20, 0.36, 0.), 0.11), M_ALU);
+  U(res, sdCap(p, vec3(0.20, 0.33, 0.), vec3(RX + 0.1, 0.33, 0.), 0.034), M_CHASSIS);
+  U(res, length(p - vec3(RX, 0.34, 0.)) - 0.12, M_ALU);
+  vec3 a = vec3(p.x, p.y, abs(p.z));
+  U(res, sdCap(a, vec3(RX, 0.34, 0.), vec3(RX, 0.345, 0.70), 0.024), M_CHASSIS);
+  U(res, sdCap(a, vec3(1.10, 0.22, 0.33), vec3(-2.20, 0.215, 0.56), 0.034), M_TURBO);
+  // seats + wheel
+  vec3 s = vec3(p.x + 0.25, p.y, abs(p.z) - 0.38);
+  float seat = sdRBox(s - vec3(0., 0.36, 0.), vec3(0.24, 0.06, 0.20), 0.05);
+  vec3 sb = s - vec3(-0.24, 0.66, 0.); sb.xy = rot(-0.22) * sb.xy;
+  seat = min(seat, sdRBox(sb, vec3(0.06, 0.30, 0.20), 0.05));
+  U(res, seat, M_SEAT);
+  vec3 w = p - vec3(0.50, 0.86, 0.38); w.xy = rot(0.45) * w.xy;
+  U(res, length(vec2(length(w.yz) - 0.17, w.x)) - 0.018, M_SEAT);
+  return res;
+}
+
+// ---------------------------------------------------------------- intro
+float rectR(float a){ return min(2.35 / max(abs(cos(a)), 1e-3), 1.05 / max(abs(sin(a)), 1e-3)); }
+
+vec2 introLiquid(vec3 p, float t){
+  vec2 res = vec2(1e9, M_LIQUID);
+  if(t < 3.0){
+    float d;
+    float m1 = smoothstep(1.7, 2.35, t), m2 = smoothstep(2.35, 3.0, t);
+    float drop = sdEll(p - vec3(0., 0.17, 0.), vec3(0.42, 0.33, 0.42));
+    float dome = length(p) - 0.85;
+    if(m1 < 1.){
+      float k = smoothstep(0.0, 2.1, t);
+      float pd = 1e9;
+      for(int i = 0; i < 5; i++){
+        float fi = float(i);
+        vec3 st = vec3(-2.4 - fi * 0.45, 0., 1.5 + sin(fi * 2.3) * 0.7);
+        vec3 c = mix(st, vec3(0.), smoothstep(0., 1., k * 1.15 - fi * 0.05));
+        pd = smin(pd, sdEll(p - c, vec3(0.62 - fi * 0.05, 0.15, 0.42)), 0.45);
+      }
+      pd += 0.018 * sin(p.x * 7. + t * 3.) * sin(p.z * 6. - t * 2.);
+      d = mix(pd, dome, m1);
+    } else d = dome;
+    d = mix(d, drop, m2);
+    res.x = d;
+    return res;
+  }
+  // spikes -> lattice
+  float g = smoothstep(3.0, 3.85, t);
+  float l = smoothstep(3.95, 5.0, t);
+  float fade = smoothstep(5.3, 6.0, t);
+  float hub = sdEll(p - vec3(0., 0.12 * (1. - g) + 0.02, 0.), vec3(0.42, 0.33, 0.42) * mix(1., 0.16, g)) ;
+  float n = 30.;
+  float a = atan(p.z, p.x);
+  float sec = 2. * PI / n;
+  float id = floor((a + sec * 0.5) / sec);
+  float ac = a - id * sec;
+  float rr = length(p.xz);
+  vec2 lp = vec2(cos(ac), sin(ac)) * rr;
+  float h = hash11(id + 3.1);
+  float len = mix(g * (0.7 + 1.7 * h), rectR(id * sec), l);
+  float along = clamp(lp.x / max(len, 1e-3), 0., 1.);
+  float rad = mix(mix(0.07, 0.004, along), 0.0105, l) * (1. - fade);
+  float yy = mix(0.03 + 0.10 * (1. - along) * g, 0.0105, l);
+  vec3 q = vec3(lp.x - clamp(lp.x, 0., len), p.y - yy, lp.y);
+  float sp = (length(q) - rad) * 0.85;
+  // central spike
+  float cs = sdCap(p, vec3(0.), vec3(0., 0.55 * g * (1. - l), 0.), 0.03 * (1. - l));
+  float d = smin(hub, sp, 0.05);
+  d = smin(d, cs, 0.05);
+  // rectangle rings
+  if(l > 0.0){
+    float wr = 0.0105 * (1. - fade);
+    for(int i = 0; i < 3; i++){
+      float s = (float(i) + 1.) / 3.;
+      float ap = smoothstep(4.15 + float(2 - i) * 0.18, 4.6 + float(2 - i) * 0.18, t);
+      float ring = abs(sdBox2(p.xz, vec2(2.35, 1.05) * s)) ;
+      float rd = length(vec2(ring, p.y - 0.0105)) - wr * ap;
+      d = min(d, rd);
+    }
+  }
+  if(fade > 0.) d += fade * 0.02;
+  res.x = d;
+  return res;
+}
+
+// ---------------------------------------------------------------- scene
+vec2 carScene(vec3 p){
+  float bnd = sdBox(p - vec3(0., 0.80, 0.), vec3(2.48, 0.80, 1.12 + uWide * 0.08));
+  if(bnd > 0.12) return vec2(bnd, M_BODY);
+  vec3 pb = vec3(p.x, p.y + uRide, p.z);
+  vec2 res = vec2(1e9, M_BODY);
+  U(res, bodySDF(pb), M_BODY);
+  U(res, carbonParts(pb), M_CARBON);
+  U(res, mirrorSDF(pb), uMirror == 1 ? M_CARBON : M_PAINTONLY);
+  if(pb.x < -2.05 && pb.y < 0.4){ float inn; U(res, exhaustSDF(pb, inn), M_EXH); }
+  vec2 w = wheelSDF(p);
+  if(w.x < res.x) res = w;
+  return res;
+}
+
+vec2 scene(vec3 p){
+  if(gMode == 1) return carScene(p);
+  if(gMode == 2){
+    vec3 pb = vec3(p.x, p.y + uRide, p.z);
+    vec2 res = vec2(bodySDF(pb), M_BODY);
+    U(res, carbonParts(pb), M_CARBON);
+    U(res, mirrorSDF(pb), uMirror == 1 ? M_CARBON : M_PAINTONLY);
+    return res;
+  }
+  if(gMode == 3){
+    vec3 pb = vec3(p.x, p.y + uRide, p.z);
+    vec2 res = wheelSDF(p);
+    U(res, chassisSDF(pb), M_CHASSIS);
+    vec2 e = engineSDF(pb); if(e.x < res.x) res = e;
+    if(pb.x < -2.05 && pb.y < 0.4){ float inn; U(res, exhaustSDF(pb, inn), M_EXH); }
+    return res;
+  }
+  // intro
+  float t = uT;
+  vec2 res = vec2(1e9, M_LIQUID);
+  if(t < 6.0) res = introLiquid(p, t);
+  if(t > 5.25){
+    vec3 pb = vec3(p.x, p.y + uRide, p.z);
+    float c = smoothstep(5.3, 6.5, t);
+    if(t < 8.4){
+      U(res, chassisSDF(pb) + (1. - c) * 0.08, M_CHASSIS);
+      vec2 e = engineSDF(pb); e.x += (1. - smoothstep(5.6, 6.7, t)) * 0.12; if(e.x < res.x) res = e;
+    }
+    vec2 w = wheelSDF(p);
+    w.x += (1. - smoothstep(5.8, 6.9, t)) * 0.35;
+    if(w.x < res.x) res = w;
+    if(t > 6.55){
+      float fill = mix(-0.05, 1.42, smoothstep(6.6, 8.1, t));
+      fill += 0.03 * sin(pb.x * 5. + t * 6.) * sin(pb.z * 4. - t * 5.);
+      float b = max(bodySDF(pb), pb.y - fill);
+      float fm = t > 8.15 ? M_BODY : M_LIQUID;
+      if(res.y == M_CHASSIS || res.y == M_ALU) b = smin(b, res.x, 0.02);
+      U(res, b, fm);
+      float cp = carbonParts(pb) + (1. - smoothstep(7.6, 8.3, t)) * 0.05;
+      U(res, cp, M_CARBON);
+      U(res, mirrorSDF(pb) + (1. - smoothstep(7.8, 8.3, t)) * 0.06, uMirror == 1 ? M_CARBON : M_PAINTONLY);
+      if(pb.x < -2.05 && pb.y < 0.4 && t > 7.6){ float inn; U(res, exhaustSDF(pb, inn), M_EXH); }
+    }
+  }
+  return res;
+}
+
+vec3 calcN(vec3 p, float e){
+  vec3 n = vec3(0.);
+  for(int i = uZero; i < 4; i++){
+    vec3 k = 0.5773 * (2. * vec3((((i + 3) >> 1) & 1), ((i >> 1) & 1), (i & 1)) - 1.);
+    n += k * scene(p + k * e).x;
+  }
+  return normalize(n);
+}
+
+vec2 boxHit(vec3 ro, vec3 rd, vec3 bmin, vec3 bmax){
+  vec3 inv = 1. / rd;
+  vec3 t0 = (bmin - ro) * inv, t1 = (bmax - ro) * inv;
+  vec3 tn = min(t0, t1), tf = max(t0, t1);
+  return vec2(max(max(tn.x, tn.y), tn.z), min(min(tf.x, tf.y), tf.z));
+}
+
+void sceneBox(out vec3 bmin, out vec3 bmax){
+  if(gMode == 0){ bmin = vec3(-5.2, -0.05, -3.0); bmax = vec3(3.0, 1.62, 3.0); }
+  else { bmin = vec3(-2.62, -0.01, -1.22); bmax = vec3(2.62, 1.62, 1.22); }
+}
+
+vec2 march(vec3 ro, vec3 rd, float tmax, int steps){
+  vec3 bmin, bmax; sceneBox(bmin, bmax);
+  vec2 bh = boxHit(ro, rd, bmin, bmax);
+  if(bh.x > bh.y || bh.y < 0.) return vec2(-1., 0.);
+  float t = max(bh.x, 0.0);
+  float t1 = min(bh.y, tmax);
+  float k = gMode == 0 ? 0.8 : 0.92;
+  for(int i = uZero; i < steps; i++){
+    if(t > t1) break;
+    vec2 h = scene(ro + rd * t);
+    if(h.x < 0.0005 + 0.0008 * t) return vec2(t, h.y);
+    t += h.x * k;
+  }
+  return vec2(-1., 0.);
+}
+
+float calcAO(vec3 p, vec3 n){
+  float occ = 0., sc = 1.;
+  for(int i = uZero; i < 4; i++){
+    float h = 0.03 + 0.12 * float(i);
+    float d = scene(p + n * h).x;
+    occ += (h - d) * sc;
+    sc *= 0.75;
+  }
+  return clamp(1. - 1.6 * occ, 0., 1.);
+}
+
+// ---------------------------------------------------------------- environment
+float tubes(vec2 c, float w){
+  float lx = mod(c.x + 1.5, 3.0) - 1.5;
+  float lz = mod(c.y + 1.75, 3.5) - 1.75;
+  float a = 1. - smoothstep(0.045 - w, 0.045 + w, abs(lx));
+  float b = 1. - smoothstep(0.78 - w, 0.78 + w, abs(lz));
+  float norm = 0.06 / (0.06 + w);
+  return (a * b) * norm + exp(-abs(lx) * 7.) * b * 0.05;
+}
+
+vec3 headlightPos(float s){ return vec3(2.27, 0.535 - uRide, 0.66 * s); }
+
+vec3 envCol(vec3 p, vec3 r, float rough){
+  vec3 c;
+  if(r.y > 0.){
+    float t = (CEIL - p.y) / max(r.y, 1e-3);
+    vec2 cp = p.xz + r.xz * t;
+    float w = 0.02 + rough * 0.55 + t * 0.003;
+    c = vec3(0.010) + vec3(1.0, 0.98, 0.95) * tubes(cp, w) * 7.5 * exp(-t * 0.035);
+    c += vec3(0.008) * smoothstep(0.9, 0.2, r.y);
+    c = mix(vec3(0.018), c, smoothstep(0.0, 0.22, r.y));
+  } else {
+    float t = -p.y / min(r.y, -1e-3);
+    vec2 fp = p.xz + r.xz * t;
+    float lx = mod(fp.x + 1.5, 3.0) - 1.5;
+    c = vec3(0.012) * (0.5 + exp(-lx * lx * 0.35));
+    c = mix(vec3(0.018), c, smoothstep(0.0, -0.2, r.y));
+  }
+  // distant aisle glow at the horizon defines side surfaces
+  c += vec3(0.16, 0.16, 0.17) * exp(-abs(r.y) * 38.) * (0.35 + 0.65 * smoothstep(0.3, 1., abs(r.x)));
+  // lit side bays: a soft wall glow the body sides can pick up
+  c += vec3(0.075, 0.075, 0.08) * smoothstep(0.35, 0.95, abs(r.z)) * smoothstep(0.45, 0.0, abs(r.y - 0.05));
+  // configurator bay: tall softboxes either side
+  if(uBay > 0.){
+    float side = smoothstep(0.55, 0.75, abs(r.z)) * smoothstep(0.55, 0.05, abs(r.y - 0.12)) * smoothstep(0.9, 0.3, abs(r.x));
+    c += vec3(0.85, 0.87, 0.9) * side * uBay * 0.6 * (1. - rough * 0.6);
+  }
+  return c;
+}
+
+vec3 headlightPool(vec3 p){
+  vec3 acc = vec3(0.);
+  for(int i = 0; i < 2; i++){
+    vec3 lp = headlightPos(i == 0 ? 1. : -1.);
+    vec3 L = p - lp; float d = length(L); L /= d;
+    float cs = dot(L, normalize(vec3(1., -0.11, (i == 0 ? 0.06 : -0.06))));
+    float spot = smoothstep(0.86, 0.985, cs);
+    acc += spot / (1. + d * d * 0.6);
+  }
+  return acc * vec3(1.0, 0.97, 0.92) * 1.4;
+}
+
+float pillarHit(vec3 ro, vec3 rd, out vec3 n){
+  float best = 1e9; n = vec3(0.);
+  for(int k = uZero; k < 7; k++){
+    float px = -28.5 + 7.5 * float(k);
+    for(int s = 0; s < 2; s++){
+      vec3 c = vec3(px, CEIL * 0.5, s == 0 ? 6.6 : -6.6);
+      vec3 b = vec3(0.32, CEIL * 0.5, 0.32);
+      vec2 h = boxHit(ro, rd, c - b, c + b);
+      if(h.x < h.y && h.x > 0. && h.x < best){
+        best = h.x;
+        vec3 lp = ro + rd * h.x - c;
+        vec3 a = abs(lp) / b;
+        n = a.x > a.z ? vec3(sign(lp.x), 0., 0.) : vec3(0., 0., sign(lp.z));
+      }
+    }
+  }
+  return best;
+}
+
+vec3 shadePillar(vec3 p, vec3 n){
+  float u = p.x + p.z;
+  vec3 alb = vec3(0.24) * (0.8 + 0.3 * fbm(vec2(u, p.y) * 3.));
+  if(p.y < 1.05){
+    float st = step(0.5, fract((p.y + u) * 2.2));
+    alb = mix(vec3(0.02), vec3(0.62, 0.45, 0.03), st);
+  }
+  float lx = mod(p.x + 1.5, 3.0) - 1.5;
+  float E = 0.10 + 0.22 * smoothstep(3.3, 1.0, p.y) * (0.5 + 0.5 * exp(-lx * lx));
+  return alb * E;
+}
+
+
+vec3 shadeObj(vec3 p, vec3 rd, float mat, vec3 n, float ao, float t){
+  vec3 v = -rd;
+  float ndv = max(dot(n, v), 0.);
+  vec3 r = reflect(rd, n);
+  vec3 pb = vec3(p.x, p.y + uRide, p.z);
+  vec3 base = vec3(0.02); float rough = 0.3, metal = 0., coat = 0., gap = 0.;
+  vec3 emis = vec3(0.);
+  float xrayGrid = 0.;
+
+  if(mat == M_BODY || mat == M_PAINTONLY){
+    base = uPaint; rough = uPaintRough; metal = uPaintMetal; coat = 1.;
+    if(mat == M_BODY){
+      float sy = shoulderY(pb.x);
+      float edge = cabinHW(pb) - abs(pb.z);
+      bool upper = pb.y > sy + 0.035;
+      bool roof = pb.y > 1.15 && pb.x > -0.98 && pb.x < 0.16;
+      bool glass = false;
+      if(upper && !roof){
+        if(pb.x < 0.98 && pb.x > 0.15 && n.x > 0.25 && edge > 0.075) glass = true;               // windscreen
+        if(abs(n.z) > 0.55 && pb.x > -0.95 && pb.x < 0.86 && pb.y > sy + 0.035 + max(-0.5 - pb.x, 0.) * 0.28) glass = true; // side
+        if(pb.x < -0.98 && pb.x > -1.50 && n.y > 0.6 && edge > 0.10) glass = true;                // rear
+      }
+      if(glass){
+        base = mix(vec3(0.03, 0.032, 0.035), vec3(0.002), uTint); rough = 0.0; metal = 0.; coat = 0.;
+        base *= 1.0;
+      }
+      if(roof && uRoof == 1){ mat = M_CARBON; }
+      // hood
+      bool hood = pb.x > 1.0 && pb.x < 2.12 && n.y > 0.55 && pb.y > 0.70;
+      if(hood && uHood == 1){
+        mat = M_CARBON;
+        float vz = abs(pb.z);
+        if(vz > 0.22 && vz < 0.56 && pb.x > 1.25 && pb.x < 1.72){
+          float sl = smoothstep(0.35, 0.5, abs(fract(pb.x * 22.) - 0.5));
+          gap = max(gap, 1. - sl);
+        }
+      }
+      // panel gaps
+      if(abs(n.z) > 0.4 && pb.y < sy + 0.01){
+        gap = max(gap, 1. - smoothstep(0.0, 0.006, abs(pb.x - (0.90 - (pb.y - 0.3) * 0.12))));
+        gap = max(gap, 1. - smoothstep(0.0, 0.006, abs(pb.x - (-0.62 + (pb.y - 0.3) * 0.18))));
+        if(pb.x < -0.30 && pb.x > -0.46 && abs(pb.y - 0.79) < 0.012) gap = max(gap, 0.85);
+      }
+      if(n.y > 0.4 && pb.x > 1.0 && pb.x < 2.05) gap = max(gap, 1. - smoothstep(0.0, 0.006, abs(abs(pb.z) - 0.70)));
+      // front end
+      if(pb.x > 1.9 && n.x > 0.15){
+        float az = abs(pb.z);
+        float yc = 0.535 - (az - 0.40) * 0.06;
+        if(az > 0.36 && az < 0.86 && abs(pb.y - yc) < 0.040){
+          base = vec3(0.004); rough = 0.; metal = 0.; coat = 1.; mat = M_TRIM;
+          float strip = (1. - smoothstep(0.003, 0.007, abs(pb.y - (yc + 0.022)))) * step(0.40, az) * step(az, 0.84);
+          float fang = 0.;
+          float proj = 0.;
+          for(int i = 0; i < 2; i++){ float zc = i == 0 ? 0.62 : 0.74; proj = max(proj, 1. - smoothstep(0.014, 0.02, length(vec2(az - zc, pb.y - yc + 0.004)))); }
+          float m = max(strip, fang);
+          emis = uDrl * (m * 9. + proj * 4.) * uLights;
+          base += vec3(0.35) * max(m, proj * 0.6) * (1. - uLights);
+        }
+        if(pb.x > 2.2 && pb.y > 0.18 && pb.y < 0.40){
+          float hc = (az < 0.50 && pb.y < 0.37) ? 1. : ((az > 0.62 && az < 0.84 && pb.y < 0.31) ? 1. : 0.);
+          if(hc > 0.){
+            vec2 hp = vec2(pb.z, pb.y) * 38.; hp.x += mod(floor(hp.y), 2.) * 0.5;
+            float hex = smoothstep(0.25, 0.4, length(fract(hp) - 0.5));
+            base = vec3(0.004 + 0.02 * hex); coat = 0.3; rough = 0.4; mat = M_TRIM;
+          }
+        }
+      }
+      // rear end
+      if(pb.x < -2.12 && n.x < -0.15){
+        float az = abs(pb.z);
+        if(abs(pb.y - 0.795) < 0.016 && az < 0.92){
+          base = vec3(0.06, 0.0, 0.0); coat = 1.; rough = 0.;
+          emis = vec3(1.0, 0.03, 0.02) * (0.25 + 3.2 * uLights) * (1. - smoothstep(0.004, 0.012, abs(pb.y - 0.795)));
+        }
+        if(pb.y < 0.30) { base = vec3(0.006); rough = 0.5; coat = 0.2; }
+      }
+    }
+  }
+  if(mat == M_TIRE){
+    base = vec3(0.016); rough = 0.7;
+    vec3 q = wheelLocal(p);
+    float r = length(q.xy);
+    if(q.z > 0.08 && r > uRimR + 0.03 && r < R - 0.04){ // sidewall lettering band
+      float a = atan(q.y, q.x);
+      float band = step(abs(r - (uRimR + R) * 0.5), 0.01) * step(0.5, fract(a * 9.));
+      base += vec3(0.012) * band;
+    }
+  }
+  if(mat == M_RIM){ base = uRimCol; rough = uRimRough; metal = uRimMetal; coat = uRimMetal < 0.5 ? 1. : 0.; }
+  if(mat == M_ROTOR){
+    vec3 q = wheelLocal(p); float a = atan(q.y, q.x);
+    base = vec3(0.30) * (0.8 + 0.2 * step(0.5, fract(a * 6. + length(q.xy) * 20.))); rough = 0.35; metal = 1.;
+  }
+  if(mat == M_CALIPER){ base = uCaliper; rough = 0.2; coat = 1.; }
+  if(mat == M_CARBON){
+    vec3 an = abs(n);
+    vec2 uv = an.y > 0.6 ? pb.xz : (an.x > 0.6 ? pb.zy : pb.xy);
+    uv *= 55.;
+    vec2 cell = floor(uv);
+    float dir = mod(cell.x + cell.y, 4.) < 2. ? 1. : 0.;
+    float fib = dir > 0.5 ? 0.5 + 0.5 * sin(uv.y * PI * 6.) : 0.5 + 0.5 * sin(uv.x * PI * 6.);
+    float contrast = smoothstep(7.0, 1.5, t);
+    base = vec3(0.022, 0.023, 0.026) * (1. + contrast * (0.9 * dir - 0.45 + 0.35 * fib));
+    rough = 0.12; coat = 1.;
+  }
+  if(mat == M_EXH){
+    float inn; exhaustSDF(pb, inn);
+    float u = clamp((pb.x + 2.36) / 0.18, 0., 1.);
+    if(uExFinish == 1){ base = mix(mix(vec3(0.20, 0.35, 0.80), vec3(0.50, 0.25, 0.62), u), vec3(0.80, 0.58, 0.28), u * u); rough = 0.12; metal = 1.; }
+    else if(uExFinish == 2){ base = vec3(0.035); rough = 0.45; coat = 0.4; }
+    else { base = vec3(0.92); rough = 0.04; metal = 1.; }
+    if(inn < 0.) { base *= 0.15; }
+  }
+  if(mat == M_CHASSIS){ base = vec3(0.014); rough = 0.12; coat = 1.; }
+  if(mat == M_ALU){ base = vec3(0.55, 0.56, 0.58); rough = 0.35; metal = 1.; }
+  if(mat == M_TURBO){ base = vec3(0.62, 0.50, 0.40); rough = 0.25; metal = 1.; }
+  if(mat == M_SEAT){ base = vec3(0.02); rough = 0.6; }
+  if(mat == M_LIQUID){ base = vec3(0.004); rough = 0.0; coat = 1.; }
+
+  float sky = 0.5 + 0.5 * n.y;
+  vec3 diff = base * (1. - metal) * (0.05 + 0.55 * sky * sky) * ao;
+  vec3 F0 = mix(vec3(0.04), base, metal);
+  vec3 F = F0 + (1. - F0) * pow(1. - ndv, 5.) * (1. - rough * 0.7);
+  vec3 spec = envCol(p, r, rough) * F;
+  if(coat > 0.){
+    float fc = 0.04 + 0.96 * pow(1. - ndv, 5.);
+    spec += envCol(p, r, 0.0) * fc * coat * (mat == M_BODY && uPaintRough > 0.3 ? 0.15 : 1.);
+  }
+  // headlight bounce on nearby surfaces
+  vec3 col = diff + spec * mix(1., ao, 0.65);
+  col *= 1. - 0.9 * gap;
+  col += emis;
+  return col;
+}
+
+vec3 shadeFloor(vec3 p, vec3 rd, float t, out float aoOut){
+  float n1 = fbm(p.xz * 1.1), n2 = fbm(p.xz * 6.5);
+  vec3 alb = vec3(0.24, 0.24, 0.25) * (0.72 + 0.30 * n1 + 0.14 * n2);
+  // lane markings
+  float lane = (1. - smoothstep(0.045, 0.06, abs(abs(p.z) - 3.2))) * step(0.45, fract(p.x * 0.22));
+  float bay = (1. - smoothstep(0.045, 0.06, abs(mod(p.x + 1.25, 2.5) - 1.25))) * step(3.3, abs(p.z)) * step(abs(p.z), 6.0);
+  alb = mix(alb, vec3(0.62, 0.62, 0.6), max(lane, bay) * 0.8);
+  float lx = mod(p.x + 1.5, 3.0) - 1.5;
+  float lz = mod(p.z + 1.75, 3.5) - 1.75;
+  float E = 0.05 + 0.20 * exp(-lx * lx * 0.30) * (0.65 + 0.35 * exp(-lz * lz * 0.2));
+  float ao = 1.;
+  if(gMode != 0 || uT > 5.3){
+    float kb = gMode != 0 ? 1. : smoothstep(5.4, 8.0, uT);
+    float fp = sdRBox2(p.xz, vec2(2.30, 0.93 + uWide * 0.07), 0.5);
+    float a1 = mix(0.10, 1., smoothstep(-0.25, 0.9, fp));
+    a1 *= mix(0.25, 1., smoothstep(-0.35, 0.35, fp + 0.3));
+    ao = mix(mix(1., 0.55 + 0.45 * smoothstep(-0.2, 0.5, fp), smoothstep(5.3, 6.4, uT)), a1, kb);
+    float kw = gMode != 0 ? 1. : smoothstep(5.9, 6.9, uT);
+    for(int i = 0; i < 4; i++){
+      vec2 c = vec2(i < 2 ? FX : RX, (i % 2 == 0 ? 1. : -1.) * (0.80 + uWide * 0.05));
+      float dw = sdRBox2(p.xz - c, vec2(0.17, 0.14), 0.08);
+      ao *= mix(1., mix(0.15, 1., smoothstep(-0.05, 0.35, dw)), kw);
+    }
+  } else if(uT > 3.0){
+    float hubR = 0.42 * mix(1., 0.16, smoothstep(3.0, 3.85, uT));
+    ao = mix(0.2, 1., smoothstep(-0.05, 0.6, length(p.xz) - hubR));
+  } else if(abs(p.x) < 5.5 && abs(p.z) < 3.3){
+    float occ = 0.;
+    for(int i = uZero; i < 4; i++){
+      float h = 0.10 + 0.22 * float(i);
+      float d = scene(p + vec3(0., h, 0.)).x;
+      occ += max(h - d, 0.) * (1.0 - 0.18 * float(i));
+    }
+    ao = clamp(1. - 1.3 * occ, 0.05, 1.);
+  }
+  aoOut = ao;
+  vec3 col = alb * E * ao;
+  vec3 r = reflect(rd, vec3(0., 1., 0.));
+  float fr = 0.02 + 0.35 * pow(1. - max(-rd.y, 0.), 5.);
+  col += envCol(p, r, 0.6) * fr * 0.6 * ao;
+  col += headlightPool(p) * uLights * alb * 0.9 * ao;
+  if(uBay > 0.){
+    float e = length(p.xz * vec2(0.60, 1.0)) - 2.05;
+    col += vec3(0.9, 0.92, 0.95) * exp(-e * e * 1800.) * 0.8 * uBay;
+    col *= mix(1., 0.55 + 0.45 * smoothstep(3.6, 1.2, length(p.xz * vec2(0.6, 1.))), uBay);
+  }
+  return col;
+}
+
+vec3 background(vec3 ro, vec3 rd, float tp, vec3 pn, float tFloor, float tCeil){
+  if(tp < min(tFloor, tCeil)) return shadePillar(ro + rd * tp, pn);
+  if(tFloor < tCeil){ float ao; return shadeFloor(ro + rd * tFloor, rd, tFloor, ao); }
+  vec3 p = ro + rd * tCeil;
+  return vec3(0.012) + tubes(p.xz, 0.004 + tCeil * 0.0012) * vec3(1., 0.98, 0.95) * 7.5;
+}
+
+vec3 aces(vec3 x){ return clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), 0., 1.); }
+
+void main(){
+  vec2 uv = (gl_FragCoord.xy / uRes) * 2. - 1.;
+  float aspect = uRes.x / uRes.y;
+  vec2 suv = uv - uShift;
+  vec3 rd = normalize(uCamFwd + uCamRight * suv.x * uTanHalf * aspect + uCamUp * suv.y * uTanHalf);
+  vec3 ro = uCamPos;
+
+  float tFloor = rd.y < 0. ? -ro.y / rd.y : 1e9;
+  float tCeil = rd.y > 0. ? (CEIL - ro.y) / rd.y : 1e9;
+  vec3 pn; float tp = pillarHit(ro, rd, pn);
+  float tb = min(tp, min(tFloor, tCeil));
+  bool floorBg = tFloor <= tCeil && tFloor < tp;
+
+  bool intro = uT < 9.5;
+  bool xray = !intro && uXray > 0.002;
+  gMode = intro ? 0 : (xray ? 3 : 1);
+  vec3 bg = background(ro, rd, tp, pn, tFloor, tCeil);
+  if(xray) bg *= mix(1., 0.35, uXray);
+
+  vec3 col = bg;
+  float tHit = 1e9;
+  vec3 pro = ro, prd = rd; float ptmax = tb; float tOff = 0.;
+  float reflW = 0.;
+  int kind = 0; // 0 primary, 1 shell, 2 reflection
+
+  for(int pass = uZero; pass < 2; pass++){
+    if(pass == 1){
+      if(xray){ gMode = 2; kind = 1; pro = ro; prd = rd; ptmax = min(tHit, tb); }
+      else if(reflW > 0.){ kind = 2; }
+      else break;
+    }
+    vec2 h = march(pro, prd, ptmax, kind == 2 ? 56 : 120);
+    if(h.x > 0.){
+      vec3 p = pro + prd * h.x;
+      vec3 n = calcN(p, 0.0012);
+      float ao = kind == 2 ? 1. : calcAO(p, n);
+      vec3 c = shadeObj(p, prd, h.y, n, ao, h.x + tOff);
+      if(kind == 0){
+        col = c; tHit = h.x;
+        if(xray) col += vec3(0.55, 0.62, 0.75) * pow(1. - max(dot(n, -rd), 0.), 2.) * 0.35 * uXray;
+      } else if(kind == 1){
+        float fr = pow(1. - abs(dot(n, rd)), 2.5);
+        float alpha = mix(1., 0.03 + 0.42 * fr, uXray);
+        c = mix(c, c * 0.45, uXray);
+        vec3 pb = vec3(p.x, p.y + uRide, p.z);
+        float grid = max(1. - smoothstep(0.0, 0.004, abs(fract(pb.x * 6.) - 0.5) - 0.495), 1. - smoothstep(0.0, 0.004, abs(fract(pb.y * 6.) - 0.5) - 0.495));
+        col = mix(col, c, alpha) + vec3(0.62, 0.72, 0.9) * (fr * fr * 0.55 + grid * 0.05) * uXray;
+        tHit = min(tHit, h.x);
+      } else {
+        col = mix(col, c, reflW);
+      }
+    } else if(kind == 0 && !intro && !xray && floorBg && uReflect > 0.){
+      vec3 fp = ro + rd * tFloor;
+      vec3 r = reflect(rd, vec3(0., 1., 0.));
+      float fr = 0.02 + 0.35 * pow(1. - max(-rd.y, 0.), 5.);
+      reflW = uReflect * (0.20 + 0.45 * fr) * (1. - smoothstep(6., 14., tFloor));
+      pro = fp + r * 0.002; prd = r; ptmax = 6.; tOff = tFloor;
+    }
+  }
+
+  // headlight flare
+  if(uLights > 0.01){
+    for(int i = 0; i < 2; i++){
+      vec3 lp = headlightPos(i == 0 ? 1. : -1.);
+      vec3 w = lp - ro;
+      float tc = dot(w, rd);
+      if(tc > 0. && tc < tHit + 0.03){
+        float d = length(w - rd * tc);
+        float facing = smoothstep(-0.2, 0.6, dot(normalize(ro - lp), vec3(1., 0., 0.)));
+        float z = dot(w, uCamFwd);
+        vec2 sp = vec2(dot(w, uCamRight) / (z * uTanHalf * aspect), dot(w, uCamUp) / (z * uTanHalf)) + uShift;
+        float streak = exp(-abs(uv.y - sp.y) * 140.) * exp(-abs(uv.x - sp.x) * 3.2) * 0.35;
+        vec3 fl = uDrl * (exp(-d * d * 2500.) * 3.0 + exp(-d * 18.) * 0.18 + streak);
+        col += fl * facing * uLights;
+      }
+    }
+  }
+
+  float tf = min(tHit, tb);
+  col = mix(col, vec3(0.001, 0.001, 0.0012), 1. - exp(-tf * 0.06));
+  col *= uExposure;
+  col = aces(col);
+  col = pow(col, vec3(1. / 2.2));
+  vec2 q = gl_FragCoord.xy / uRes;
+  col *= 0.55 + 0.45 * pow(16. * q.x * q.y * (1. - q.x) * (1. - q.y), 0.18);
+  col += (hash21(gl_FragCoord.xy + fract(uTime) * 91.) - 0.5) * 0.018;
+  fragColor = vec4(col, 1.);
+}
+
+</script>
+<script>
+(() => {
+'use strict';
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const body = document.body;
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const coarse = matchMedia('(pointer: coarse)').matches;
+
+// ------------------------------------------------------------------ math
+const add = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
+const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+const mul = (a, s) => [a[0] * s, a[1] * s, a[2] * s];
+const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+const len = a => Math.hypot(a[0], a[1], a[2]);
+const norm = a => mul(a, 1 / (len(a) || 1));
+const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+const lerp = (a, b, t) => a + (b - a) * t;
+const lerp3 = (a, b, t) => [lerp(a[0], b[0], t), lerp(a[1], b[1], t), lerp(a[2], b[2], t)];
+const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
+const smooth = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
+const angDiff = (a, b) => { let d = (b - a) % (Math.PI * 2); if (d > Math.PI) d -= Math.PI * 2; if (d < -Math.PI) d += Math.PI * 2; return d; };
+const catmull = (p0, p1, p2, p3, t) => {
+  const t2 = t * t, t3 = t2 * t;
+  return p1.map((_, i) => 0.5 * ((2 * p1[i]) + (-p0[i] + p2[i]) * t + (2 * p0[i] - 5 * p1[i] + 4 * p2[i] - p3[i]) * t2 + (-p0[i] + 3 * p1[i] - 3 * p2[i] + p3[i]) * t3));
+};
+const toOrbit = (pos, target) => { const d = sub(pos, target); const r = len(d); return { target: target.slice(), r, th: Math.atan2(d[2], d[0]), ph: Math.asin(clamp(d[1] / r, -1, 1)) }; };
+const orbitPos = o => { const cp = Math.cos(o.ph); return [o.target[0] + o.r * cp * Math.cos(o.th), o.target[1] + o.r * Math.sin(o.ph), o.target[2] + o.r * cp * Math.sin(o.th)]; };
+
+// ------------------------------------------------------------------ parts catalogue
+const CATS = [
+  { id: 'paint', label: 'Paint', view: 'paint', groups: [
+    { key: 'paint', label: 'Finish', items: [
+      { id: 'gloss', name: 'Gloss black', note: 'Piano-black lacquer under deep clear coat', swatch: '#060606', u: { uPaint: [0.006, 0.006, 0.007], uPaintRough: 0, uPaintMetal: 0 } },
+      { id: 'satin', name: 'Satin black wrap', note: 'Low-sheen vinyl film, paint stays protected', swatch: '#1b1b1c', u: { uPaint: [0.016, 0.016, 0.017], uPaintRough: 0.5, uPaintMetal: 0 } },
+      { id: 'grey', name: 'Track grey', note: 'Flat solid grey in gloss', swatch: '#7b7f85', u: { uPaint: [0.17, 0.175, 0.185], uPaintRough: 0.02, uPaintMetal: 0 } },
+      { id: 'blue', name: 'Midnight blue', note: 'Deep blue that reads black in shade', swatch: '#0d1838', u: { uPaint: [0.008, 0.016, 0.07], uPaintRough: 0.03, uPaintMetal: 0 } },
+      { id: 'silver', name: 'Liquid silver', note: 'High-flake metallic', swatch: '#c9ccd1', u: { uPaint: [0.62, 0.63, 0.65], uPaintRough: 0.2, uPaintMetal: 1 } },
+      { id: 'red', name: 'Redline red', note: 'Solid red in gloss', swatch: '#8e0d08', u: { uPaint: [0.34, 0.012, 0.01], uPaintRough: 0.02, uPaintMetal: 0 } },
+    ] } ] },
+  { id: 'wheels', label: 'Wheels', view: 'wheels', groups: [
+    { key: 'wheel', label: 'Design', card: 'Wheels', items: [
+      { id: 'factory', name: 'Factory six-spoke', note: 'As delivered', mark: 'F', u: { uWheel: 2 } },
+      { id: 'rz5', name: 'RZ-5 split spoke', note: 'Forged, twin-blade spokes', mark: '5', u: { uWheel: 0 } },
+      { id: 'rz10', name: 'RZ-10 mesh', note: 'Ten thin spokes with a mesh ring', mark: '10', u: { uWheel: 1 } },
+      { id: 'aero', name: 'Aero disc', note: 'Closed face with angled cooling slots', mark: 'A', u: { uWheel: 3 } },
+    ] },
+    { key: 'size', label: 'Size', card: 'Wheel size', items: [
+      { id: '19', name: '19 inch', note: 'Factory size, tallest sidewall', mark: '19', u: { uRimR: 0.241 } },
+      { id: '20', name: '20 inch', note: 'Lower profile tyre', mark: '20', u: { uRimR: 0.254 } },
+      { id: '21', name: '21 inch', note: 'Thinnest sidewall, sharpest look', mark: '21', u: { uRimR: 0.267 } },
+    ] },
+    { key: 'rimfin', label: 'Finish', card: 'Wheel finish', items: [
+      { id: 'silver', name: 'Silver', note: 'Factory painted silver', swatch: '#c4c8cd', u: { uRimCol: [0.72, 0.73, 0.75], uRimRough: 0.2, uRimMetal: 1 } },
+      { id: 'black', name: 'Gloss black', note: 'Clear-coated black', swatch: '#0a0a0a', u: { uRimCol: [0.008, 0.008, 0.009], uRimRough: 0.05, uRimMetal: 0 } },
+      { id: 'gun', name: 'Gunmetal', note: 'Dark metallic grey', swatch: '#3a3d42', u: { uRimCol: [0.16, 0.165, 0.18], uRimRough: 0.3, uRimMetal: 1 } },
+      { id: 'bronze', name: 'Satin bronze', note: 'Warm bronze, low sheen', swatch: '#7a5326', u: { uRimCol: [0.46, 0.30, 0.13], uRimRough: 0.35, uRimMetal: 1 } },
+    ] } ] },
+  { id: 'brakes', label: 'Brakes', view: 'brakes', groups: [
+    { key: 'caliper', label: 'Caliper colour', card: 'Calipers', items: [
+      { id: 'black', name: 'Factory black', note: 'As delivered', swatch: '#151515', u: { uCaliper: [0.02, 0.02, 0.022] } },
+      { id: 'red', name: 'Race red', note: 'High-temperature paint', swatch: '#c1160d', u: { uCaliper: [0.55, 0.02, 0.015] } },
+      { id: 'yellow', name: 'Signal yellow', note: 'High-temperature paint', swatch: '#e0a90c', u: { uCaliper: [0.72, 0.45, 0.02] } },
+      { id: 'blue', name: 'Electric blue', note: 'High-temperature paint', swatch: '#1f4fd6', u: { uCaliper: [0.03, 0.12, 0.6] } },
+    ] } ] },
+  { id: 'aero', label: 'Aero', view: 'aero', groups: [
+    { key: 'lip', label: 'Front', card: 'Front', items: [
+      { id: 'factory', name: 'Factory bumper', note: 'As delivered', mark: '—', u: { uLip: 0 } },
+      { id: 'lip', name: 'Carbon lip', note: 'Slim lip under the bumper', mark: 'L', u: { uLip: 1 } },
+      { id: 'splitter', name: 'Race splitter', note: 'Deep splitter with canards', mark: 'S', u: { uLip: 2 } },
+    ] },
+    { key: 'skirts', label: 'Sides', card: 'Sides', items: [
+      { id: 'factory', name: 'Factory sills', note: 'As delivered', mark: '—', u: { uSkirts: 0 } },
+      { id: 'carbon', name: 'Carbon side skirts', note: 'Extends the sill line', mark: 'C', u: { uSkirts: 1 } },
+    ] },
+    { key: 'diffuser', label: 'Rear', card: 'Rear', items: [
+      { id: 'factory', name: 'Factory valance', note: 'As delivered', mark: '—', u: { uDiffuser: 0 } },
+      { id: 'carbon', name: 'Carbon diffuser', note: 'Seven-fin diffuser', mark: 'D', u: { uDiffuser: 1 } },
+    ] },
+    { key: 'spoiler', label: 'Spoiler', card: 'Spoiler', items: [
+      { id: 'none', name: 'No spoiler', note: 'Factory boot lid', mark: '—', u: { uSpoiler: 0 } },
+      { id: 'duck', name: 'Ducktail', note: 'Body-colour kick on the boot lid', mark: 'D', u: { uSpoiler: 1 } },
+      { id: 'lip', name: 'Carbon lip spoiler', note: 'Thin blade on the boot edge', mark: 'L', u: { uSpoiler: 2 } },
+      { id: 'gt', name: 'GT wing', note: 'Carbon wing on twin uprights', mark: 'GT', u: { uSpoiler: 3 } },
+    ] } ] },
+  { id: 'stance', label: 'Stance', view: 'stance', groups: [
+    { key: 'ride', label: 'Ride height', card: 'Ride height', items: [
+      { id: 'factory', name: 'Factory height', note: 'As delivered', mark: '0', u: { uRide: 0 } },
+      { id: 'springs', name: 'Lowering springs', note: 'About 30 mm lower', mark: '30', u: { uRide: 0.03 } },
+      { id: 'coilovers', name: 'Coilovers', note: 'About 55 mm lower, adjustable', mark: '55', u: { uRide: 0.055 } },
+    ] },
+    { key: 'wide', label: 'Body', card: 'Body', items: [
+      { id: 'factory', name: 'Factory width', note: 'As delivered', mark: '—', u: { uWide: 0 } },
+      { id: 'wide', name: 'Widebody kit', note: 'Flared arches, wider track', mark: 'W', u: { uWide: 1 } },
+    ] } ] },
+  { id: 'exhaust', label: 'Exhaust', view: 'exhaust', groups: [
+    { key: 'exhaust', label: 'Layout', card: 'Exhaust', items: [
+      { id: 'dual', name: 'Factory twin', note: 'One tip each side', mark: '2', u: { uExhaust: 0 } },
+      { id: 'quad', name: 'Quad valved', note: 'Two tips each side, valve control', mark: '4', u: { uExhaust: 1 } },
+      { id: 'centre', name: 'Centre twin', note: 'Two tips in the middle of the diffuser', mark: 'C', u: { uExhaust: 2 } },
+    ] },
+    { key: 'exfin', label: 'Tips', card: 'Tips', items: [
+      { id: 'polished', name: 'Polished steel', note: 'As delivered', swatch: '#d9dcdf', u: { uExFinish: 0 } },
+      { id: 'titanium', name: 'Burnt titanium', note: 'Heat-blued finish', swatch: 'linear-gradient(135deg,#3554b8,#7a3f9a 50%,#c99140)', u: { uExFinish: 1 } },
+      { id: 'ceramic', name: 'Black ceramic', note: 'Matte, heat resistant', swatch: '#141414', u: { uExFinish: 2 } },
+    ] } ] },
+  { id: 'lights', label: 'Lights', view: 'lights', groups: [
+    { key: 'drl', label: 'Daytime running lights', card: 'Light colour', items: [
+      { id: 'white', name: 'Factory white', note: 'As delivered', swatch: '#fff6ea', u: { uDrl: [1, 0.97, 0.92] } },
+      { id: 'ice', name: 'Ice blue', note: 'Cool white-blue', swatch: '#a8d0ff', u: { uDrl: [0.62, 0.8, 1] } },
+      { id: 'amber', name: 'Amber', note: 'Warm signature', swatch: '#ffa02e', u: { uDrl: [1, 0.6, 0.16] } },
+    ] },
+    { key: 'tint', label: 'Window tint', card: 'Tint', items: [
+      { id: 'light', name: 'Factory glass', note: 'As delivered', mark: 'F', u: { uTint: 0.2 } },
+      { id: 'medium', name: 'Medium tint', note: 'Hides the cabin in shade', mark: 'M', u: { uTint: 0.6 } },
+      { id: 'dark', name: 'Dark tint', note: 'Rear and side glass', mark: 'D', u: { uTint: 0.95 } },
+    ] } ] },
+  { id: 'carbon', label: 'Carbon', view: 'carbon', groups: [
+    { key: 'hood', label: 'Bonnet', card: 'Bonnet', items: [
+      { id: 'factory', name: 'Factory bonnet', note: 'Body colour', mark: '—', u: { uHood: 0 } },
+      { id: 'vented', name: 'Vented carbon bonnet', note: 'Louvres over the engine', mark: 'V', u: { uHood: 1 } },
+    ] },
+    { key: 'roof', label: 'Roof', card: 'Roof', items: [
+      { id: 'factory', name: 'Body colour', note: 'As delivered', mark: '—', u: { uRoof: 0 } },
+      { id: 'carbon', name: 'Carbon roof', note: 'Exposed twill weave', mark: 'C', u: { uRoof: 1 } },
+    ] },
+    { key: 'mirror', label: 'Mirrors', card: 'Mirrors', items: [
+      { id: 'factory', name: 'Body colour', note: 'As delivered', mark: '—', u: { uMirror: 0 } },
+      { id: 'carbon', name: 'Carbon caps', note: 'Exposed twill weave', mark: 'C', u: { uMirror: 1 } },
+    ] } ] },
+];
+const GROUPS = CATS.flatMap(c => c.groups.map(g => Object.assign(g, { cat: c })));
+const STOCK = Object.fromEntries(GROUPS.map(g => [g.key, g.items[0].id]));
+const SIGNATURE = Object.assign({}, STOCK, {
+  wheel: 'rz5', size: '20', rimfin: 'black', caliper: 'red', lip: 'lip', skirts: 'carbon', diffuser: 'carbon',
+  spoiler: 'duck', ride: 'coilovers', exhaust: 'quad', exfin: 'titanium', tint: 'dark', roof: 'carbon', mirror: 'carbon'
+});
+const item = (key, id) => { const g = GROUPS.find(x => x.key === key); return g.items.find(i => i.id === id) || g.items[0]; };
+const uniformsFor = cfg => { const u = {}; for (const g of GROUPS) Object.assign(u, item(g.key, cfg[g.key]).u); return u; };
+
+let config = Object.assign({}, SIGNATURE);
+const INTS = new Set(['uWheel', 'uSpoiler', 'uLip', 'uSkirts', 'uDiffuser', 'uExhaust', 'uExFinish', 'uHood', 'uRoof', 'uMirror', 'uZero']);
+
+// ------------------------------------------------------------------ cameras
+const HOME_CAMS = {
+  hero:        { pos: [6.6, 1.25, 3.4],  target: [0.1, 0.45, -0.1], fov: 34, shift: [0.34, 0.14], xray: 0 },
+  about:       { pos: [0.5, 0.85, 7.6],  target: [0.0, 0.55, 0.0], fov: 34, shift: [0.26, 0.04],  xray: 0 },
+  services:    { pos: [-5.6, 1.5, 4.0],  target: [-0.2, 0.5, 0.0], fov: 34, shift: [-0.3, 0.04], xray: 0 },
+  engineering: { pos: [3.6, 3.1, 3.9],   target: [0.1, 0.35, 0.0], fov: 34, shift: [0.28, -0.04], xray: 1 },
+  process:     { pos: [2.5, 0.55, 2.7],  target: [1.25, 0.38, 0.7], fov: 34, shift: [-0.38, 0.0], xray: 0 },
+  try:         { pos: [6.2, 0.48, 0.7],  target: [0.0, 0.5, 0.0], fov: 34, shift: [0.3, 0.0],   xray: 0 },
+  contact:     { pos: [-4.2, 3.4, -5.0], target: [0.0, 0.3, 0.0], fov: 34, shift: [-0.36, 0.0], xray: 0 },
+};
+const BUILD_VIEWS = {
+  paint:   { pos: [4.9, 1.45, 3.3],  target: [0.0, 0.55, 0.0] },
+  wheels:  { pos: [2.9, 0.55, 3.2],  target: [1.15, 0.38, 0.8] },
+  brakes:  { pos: [2.35, 0.48, 2.5], target: [1.4, 0.36, 0.85] },
+  aero:    { pos: [-4.5, 1.9, 3.4],  target: [-0.3, 0.6, 0.0] },
+  stance:  { pos: [0.2, 0.34, 5.7],  target: [0.0, 0.45, 0.0] },
+  exhaust: { pos: [-5.4, 0.75, 2.6], target: [-1.6, 0.4, 0.2] },
+  lights:  { pos: [5.1, 0.7, 1.9],   target: [1.4, 0.5, 0.0] },
+  carbon:  { pos: [3.3, 3.6, 3.5],   target: [0.0, 0.7, 0.0] },
+};
+for (const c of Object.values(HOME_CAMS)) c.orbit = toOrbit(c.pos, c.target);
+for (const c of Object.values(BUILD_VIEWS)) c.orbit = toOrbit(c.pos, c.target);
+
+const INTRO_LEN = 9.6;
+const INTRO_KEYS = [
+  { t: 0.0, pos: [3.2, 0.42, 1.9],  tgt: [-0.7, 0.05, 0.45] },
+  { t: 1.8, pos: [2.9, 0.68, 1.6],  tgt: [-0.1, 0.12, 0.1] },
+  { t: 2.9, pos: [2.6, 0.95, 1.3],  tgt: [0.0, 0.22, 0.0] },
+  { t: 3.8, pos: [2.6, 1.8, 1.5],   tgt: [0.0, 0.05, 0.0] },
+  { t: 4.9, pos: [2.3, 3.6, 1.6],   tgt: [0.0, 0.0, 0.0] },
+  { t: 6.0, pos: [4.0, 1.8, 2.5],   tgt: [0.2, 0.35, 0.0] },
+  { t: 7.4, pos: [5.0, 1.15, 1.6],  tgt: [0.1, 0.45, 0.0] },
+  { t: 8.6, pos: [5.8, 0.85, 0.25], tgt: [0.0, 0.5, 0.0] },
+  { t: 9.6, pos: HOME_CAMS.hero.pos, tgt: HOME_CAMS.hero.target },
+];
+function introCam(t) {
+  const k = INTRO_KEYS;
+  let i = 0; while (i < k.length - 2 && t > k[i + 1].t) i++;
+  const a = k[Math.max(0, i - 1)], b = k[i], c = k[i + 1], d = k[Math.min(k.length - 1, i + 2)];
+  const u = smooth(0, 1, clamp((t - b.t) / (c.t - b.t), 0, 1)) * 0.6 + clamp((t - b.t) / (c.t - b.t), 0, 1) * 0.4;
+  return { pos: catmull(a.pos, b.pos, c.pos, d.pos, u), tgt: catmull(a.tgt, b.tgt, c.tgt, d.tgt, u) };
+}
+function introLights(t) {
+  if (t < 8.2) return 0;
+  const k = t - 8.2;
+  if (k < 0.07) return 1; if (k < 0.16) return 0.05; if (k < 0.24) return 0.85; if (k < 0.38) return 0.12;
+  return Math.min(1, 0.55 + (k - 0.38) * 1.5);
+}
+
+// ------------------------------------------------------------------ WebGL
+const canvas = $('#stage');
+const loadingEl = $('#loading');
+let gl = null, prog = null, ready = false, glFailed = false;
+const locs = {};
+const VERT = '#version 300 es\nvoid main(){ vec2 p = vec2((gl_VertexID<<1)&2, gl_VertexID&2); gl_Position = vec4(p*2.-1.,0.,1.); }';
+
+function failGL(msg) {
+  glFailed = true;
+  if (msg) console.error('[rzer] 3D view unavailable:', msg);
+  body.classList.add('nogl-bg');
+  $('#nogl').hidden = false;
+  loadingEl.classList.add('gone');
+  finishIntro();
+}
+
+function initGL() {
+  try {
+    gl = canvas.getContext('webgl2', { antialias: false, depth: false, stencil: false, alpha: false, premultipliedAlpha: false, powerPreference: 'high-performance', preserveDrawingBuffer: false });
+  } catch (e) { gl = null; }
+  if (!gl) return failGL('WebGL2 not available');
+  const ext = gl.getExtension('KHR_parallel_shader_compile');
+  const mk = (type, src) => { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); return s; };
+  const vs = mk(gl.VERTEX_SHADER, VERT);
+  const fs = mk(gl.FRAGMENT_SHADER, $('#frag').textContent.trim());
+  prog = gl.createProgram();
+  gl.attachShader(prog, vs); gl.attachShader(prog, fs);
+  gl.linkProgram(prog);
+  const finish = () => {
+    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
+      return failGL((gl.getShaderInfoLog(fs) || '') + (gl.getProgramInfoLog(prog) || ''));
+    }
+    gl.useProgram(prog);
+    ready = true;
+    loadingEl.classList.add('gone');
+    introClockStart = performance.now();
+  };
+  if (ext) {
+    const poll = () => { if (gl.getProgramParameter(prog, ext.COMPLETION_STATUS_KHR)) finish(); else setTimeout(poll, 50); };
+    poll();
+  } else finish();
+  canvas.addEventListener('webglcontextlost', e => { e.preventDefault(); ready = false; });
+  canvas.addEventListener('webglcontextrestored', () => initGL());
+}
+
+function setU(name, v) {
+  let l = locs[name];
+  if (l === undefined) l = locs[name] = gl.getUniformLocation(prog, name);
+  if (!l) return;
+  if (INTS.has(name)) gl.uniform1i(l, v);
+  else if (Array.isArray(v)) { if (v.length === 2) gl.uniform2f(l, v[0], v[1]); else gl.uniform3f(l, v[0], v[1], v[2]); }
+  else gl.uniform1f(l, v);
+}
+
+// ------------------------------------------------------------------ quality
+const quality = { scale: (coarse || innerWidth < 820) ? 0.45 : 0.6, max: 0.9, min: 0.34, ema: 0.016, frames: 0, reflect: 1 };
+function sizeCanvas() {
+  const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+  const w = Math.max(2, Math.round(innerWidth * dpr * quality.scale));
+  const h = Math.max(2, Math.round(innerHeight * dpr * quality.scale));
+  if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+}
+function adapt(dt) {
+  quality.frames++;
+  if (quality.frames < 40) return;
+  quality.ema = quality.ema * 0.92 + dt * 0.08;
+  if (quality.frames % 30 !== 0) return;
+  if (quality.ema > 0.034 && quality.scale > quality.min) {
+    quality.scale = Math.max(quality.min, quality.scale * 0.86);
+    if (quality.scale < 0.5) quality.reflect = 0;
+    sizeCanvas();
+  } else if (quality.ema < 0.0185 && quality.scale < quality.max) {
+    quality.scale = Math.min(quality.max, quality.scale * 1.05);
+    sizeCanvas();
+  }
+}
+
+// ------------------------------------------------------------------ state
+const intro = { t: 0, speed: 1, done: false, revealed: false };
+let introClockStart = 0;
+const cam = { orbit: Object.assign({}, HOME_CAMS.hero.orbit, { target: HOME_CAMS.hero.target.slice() }), fov: 34, shift: [0, 0], pos: [0, 0, 0], tgt: [0, 0, 0] };
+let mode = 'home'; // home | build
+const live = {}; // smoothed uniforms
+let xray = 0, lights = 0, bay = 0, exposure = 0, reflect = 1;
+let lightsOn = true, compare = false;
+let orbitGoal = null; // build mode target orbit
+let userOrbit = null;
+let lastInteract = 0;
+
+function finishIntro() {
+  if (intro.done) return;
+  intro.done = true; intro.t = 99;
+  body.classList.remove('is-intro'); body.classList.add('intro-done');
+  $('#wordmark').classList.add('revealed');
+  cam.orbit = toOrbit(cam.pos[0] || cam.pos[1] ? cam.pos : HOME_CAMS.hero.pos, cam.tgt[0] || cam.tgt[1] ? cam.tgt : HOME_CAMS.hero.target);
+}
+function fastForward() { if (!intro.done) intro.speed = 7; }
+$('#skip').addEventListener('click', fastForward);
+addEventListener('keydown', e => { if (e.key === 'Escape') fastForward(); });
+addEventListener('wheel', () => { if (!intro.done && mode === 'home') fastForward(); }, { passive: true });
+addEventListener('touchmove', () => { if (!intro.done && mode === 'home') fastForward(); }, { passive: true });
+
+// ------------------------------------------------------------------ scroll mapping
+let sections = [];
+function measure() {
+  sections = $$('main [data-cam]').map(el => ({ el, key: el.dataset.cam, top: el.offsetTop }));
+}
+function homeGoal() {
+  const y = scrollY;
+  let i = 0;
+  while (i < sections.length - 1 && y >= sections[i + 1].top) i++;
+  const a = sections[i], b = sections[Math.min(i + 1, sections.length - 1)];
+  const local = b === a ? 0 : clamp((y - a.top) / (b.top - a.top), 0, 1);
+  const e = smooth(0.3, 1.0, local);
+  const ca = HOME_CAMS[a.key], cb = HOME_CAMS[b.key];
+  const oa = ca.orbit, ob = cb.orbit;
+  const portrait = innerWidth / innerHeight < 0.9;
+  const o = {
+    target: lerp3(oa.target, ob.target, e),
+    r: lerp(oa.r, ob.r, e),
+    th: oa.th + angDiff(oa.th, ob.th) * e,
+    ph: lerp(oa.ph, ob.ph, e),
+  };
+  const shift = portrait ? [0, 0.3] : [lerp(ca.shift[0], cb.shift[0], e), lerp(ca.shift[1], cb.shift[1], e)];
+  return { orbit: o, fov: lerp(ca.fov, cb.fov, e), shift, xray: lerp(ca.xray, cb.xray, e) };
+}
+
+const tachNeedle = $('#tach-needle');
+function onScroll() {
+  const max = Math.max(1, document.documentElement.scrollHeight - innerHeight);
+  const p = clamp(scrollY / max, 0, 1);
+  document.documentElement.style.setProperty('--sheen', (p * 260 - 40).toFixed(1) + '%');
+  tachNeedle.style.top = ((1 - p) * 100).toFixed(2) + '%';
+  tachNeedle.classList.toggle('hot', p > 0.86);
+}
+addEventListener('scroll', onScroll, { passive: true });
+(function buildTach() {
+  const s = $('#tach-scale');
+  for (let i = 0; i <= 16; i++) {
+    const t = document.createElement('i');
+    const n = i / 2;
+    t.style.top = (100 - (i / 16) * 100) + '%';
+    if (i % 2 === 0) { t.className = 'major'; t.dataset.n = String(n); }
+    if (n >= 7) t.classList.add('red');
+    s.appendChild(t);
+  }
+})();
+
+// ------------------------------------------------------------------ routing
+let savedScroll = 0;
+function route() {
+  const h = location.hash.slice(1);
+  if (h === 'build') openBuilder();
+  else closeBuilder(h);
+}
+function openBuilder() {
+  if (mode === 'build') return;
+  savedScroll = scrollY;
+  finishIntro();
+  mode = 'build';
+  body.classList.add('in-builder');
+  $('#builder').hidden = false;
+  $('#home').setAttribute('inert', '');
+  canvas.tabIndex = 0;
+  setCategory(activeCat || 'paint', true);
+  layoutBuilder();
+  lastInteract = performance.now();
+}
+function closeBuilder(h) {
+  if (mode !== 'build') {
+    return;
+  }
+  mode = 'home';
+  body.classList.remove('in-builder');
+  $('#builder').hidden = true;
+  $('#home').removeAttribute('inert');
+  canvas.removeAttribute('tabindex');
+  measure();
+  const el = h && h !== 'top' ? document.getElementById(h) : null;
+  requestAnimationFrame(() => {
+    if (el) el.scrollIntoView({ behavior: 'instant', block: 'start' });
+    else if (h === 'top') scrollTo({ top: 0, behavior: 'instant' });
+    else scrollTo({ top: savedScroll, behavior: 'instant' });
+    onScroll();
+  });
+}
+addEventListener('hashchange', route);
+
+// ------------------------------------------------------------------ configurator UI
+const tabsEl = $('#b-tabs'), optsEl = $('#b-options');
+let activeCat = null;
+const TICK = '<svg class="tick" viewBox="0 0 18 18" aria-hidden="true"><path d="M4 9.5l3.2 3L14 5.5" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>';
+tabsEl.innerHTML = CATS.map(c => `<button class="b-tab" role="tab" type="button" id="tab-${c.id}" data-cat="${c.id}" aria-selected="false" aria-controls="b-options">${c.label}</button>`).join('');
+tabsEl.addEventListener('click', e => { const b = e.target.closest('.b-tab'); if (b) setCategory(b.dataset.cat); });
+tabsEl.addEventListener('keydown', e => {
+  if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+  const i = CATS.findIndex(c => c.id === activeCat);
+  const n = CATS[(i + (e.key === 'ArrowRight' ? 1 : CATS.length - 1)) % CATS.length];
+  setCategory(n.id); $('#tab-' + n.id).focus(); e.preventDefault();
+});
+
+function setCategory(id, jump) {
+  activeCat = id;
+  const cat = CATS.find(c => c.id === id);
+  $$('.b-tab', tabsEl).forEach(b => b.setAttribute('aria-selected', String(b.dataset.cat === id)));
+  optsEl.setAttribute('aria-labelledby', 'tab-' + id);
+  optsEl.innerHTML = cat.groups.map(g => `<fieldset class="og"><legend>${g.label}</legend><div class="og-items">${g.items.map((it, idx) => {
+    const lead = it.swatch ? `<span class="sw" style="--sw:${it.swatch}"></span>` : `<span class="mark">${it.mark || ''}</span>`;
+    const tag = idx === 0 ? '<span class="stock-tag">stock</span>' : '';
+    return `<button class="opt" type="button" data-key="${g.key}" data-id="${it.id}" aria-pressed="${config[g.key] === it.id}">${lead}<span class="opt-name">${it.name}${tag}</span><span class="opt-note">${it.note}</span>${TICK}</button>`;
+  }).join('')}</div></fieldset>`).join('');
+  optsEl.scrollTop = 0;
+  const v = BUILD_VIEWS[cat.view];
+  orbitGoal = Object.assign({}, v.orbit, { target: v.orbit.target.slice() });
+  if (jump && !userOrbit) cam.orbit = Object.assign({}, cam.orbit);
+}
+optsEl.addEventListener('click', e => {
+  const b = e.target.closest('.opt'); if (!b) return;
+  config[b.dataset.key] = b.dataset.id;
+  $$(`.opt[data-key="${b.dataset.key}"]`, optsEl).forEach(o => o.setAttribute('aria-pressed', String(o.dataset.id === b.dataset.id)));
+  renderCard();
+  const v = BUILD_VIEWS[CATS.find(c => c.id === activeCat).view];
+  orbitGoal = Object.assign({}, v.orbit, { target: v.orbit.target.slice() });
+});
+
+function buildCode(cfg) {
+  let v = 0n;
+  for (const g of GROUPS) { v = v * BigInt(g.items.length) + BigInt(Math.max(0, g.items.findIndex(i => i.id === cfg[g.key]))); }
+  return 'RZ-' + v.toString(36).toUpperCase().padStart(6, '0');
+}
+function renderCard() {
+  const changed = GROUPS.filter(g => config[g.key] !== STOCK[g.key]);
+  $('#card-count').textContent = String(changed.length);
+  $('#jc-code').textContent = buildCode(config);
+  $('#jc-sub').textContent = changed.length ? `${changed.length} ${changed.length === 1 ? 'change' : 'changes'} from stock` : 'Stock car';
+  $('#jc-list').innerHTML = changed.length
+    ? changed.map(g => `<li><span>${g.card || g.label}</span><span>${item(g.key, config[g.key]).name}</span></li>`).join('')
+    : '<li class="jc-empty">Nothing changed yet. Pick parts on the left to start a job card.</li>';
+}
+function buildText() {
+  const lines = ['RZER build request', 'Build code: ' + buildCode(config), 'My car: (make, model, year)', ''];
+  for (const c of CATS) for (const g of c.groups) {
+    const stock = config[g.key] === STOCK[g.key];
+    lines.push(`${g.card || g.label}: ${item(g.key, config[g.key]).name}${stock ? ' (stock)' : ''}`);
+  }
+  return lines.join('\n');
+}
+async function copyText(text) {
+  try { await navigator.clipboard.writeText(text); return true; }
+  catch (e) {
+    const ta = $('#jc-copy'); ta.value = text; ta.select();
+    try { return document.execCommand('copy'); } catch (e2) { return false; }
+  }
+}
+$('#copy-build').addEventListener('click', async () => {
+  const ok = await copyText(buildText());
+  const note = $('#jc-note');
+  note.textContent = ok ? 'Copied. Paste it into a message to @rzerperformance.sg on Instagram.' : 'Copy was blocked by the browser. Select the job card text and copy it manually.';
+});
+const cardToggle = $('#card-toggle');
+cardToggle.addEventListener('click', () => {
+  const card = $('#jobcard'); card.hidden = !card.hidden;
+  cardToggle.setAttribute('aria-expanded', String(!card.hidden));
+  body.classList.toggle('card-open', !card.hidden);
+  layoutBuilder();
+});
+$('#preset').addEventListener('click', () => { config = Object.assign({}, SIGNATURE); setCategory(activeCat); renderCard(); });
+$('#reset').addEventListener('click', () => { config = Object.assign({}, STOCK); setCategory(activeCat); renderCard(); });
+const lightsBtn = $('#lights');
+lightsBtn.addEventListener('click', () => { lightsOn = !lightsOn; lightsBtn.setAttribute('aria-pressed', String(lightsOn)); });
+const hold = $('#hold');
+const setCompare = on => { compare = on; hold.classList.toggle('is-down', on); $('#stock-badge').hidden = !on; };
+hold.addEventListener('pointerdown', e => { hold.setPointerCapture(e.pointerId); setCompare(true); });
+['pointerup', 'pointercancel', 'lostpointercapture'].forEach(ev => hold.addEventListener(ev, () => setCompare(false)));
+hold.addEventListener('keydown', e => { if ((e.key === ' ' || e.key === 'Enter') && !e.repeat) { e.preventDefault(); setCompare(true); } });
+hold.addEventListener('keyup', e => { if (e.key === ' ' || e.key === 'Enter') setCompare(false); });
+hold.addEventListener('blur', () => setCompare(false));
+
+function layoutBuilder() {
+  if (mode !== 'build') return;
+  const narrow = innerWidth <= 900;
+  if (!narrow && innerWidth < 1240 && !$('#jobcard').dataset.init) { $('#jobcard').hidden = true; cardToggle.setAttribute('aria-expanded', 'false'); }
+  if (narrow && !$('#jobcard').dataset.init) { $('#jobcard').hidden = true; cardToggle.setAttribute('aria-expanded', 'false'); }
+  $('#jobcard').dataset.init = '1';
+}
+function buildShift() {
+  if (innerWidth <= 900) return [0, 0.36];
+  const left = $('.b-panel').getBoundingClientRect().right;
+  const card = $('#jobcard');
+  const right = card.hidden ? innerWidth : card.getBoundingClientRect().left;
+  const cx = (left + right) / 2;
+  return [(cx / innerWidth) * 2 - 1, -0.04];
+}
+
+// orbit controls
+const pointers = new Map();
+let pinchDist = 0;
+canvas.addEventListener('pointerdown', e => {
+  if (mode !== 'build') return;
+  canvas.setPointerCapture(e.pointerId);
+  pointers.set(e.pointerId, [e.clientX, e.clientY]);
+  if (!userOrbit) userOrbit = Object.assign({}, cam.orbit, { target: cam.orbit.target.slice() });
+  orbitGoal = null;
+  if (pointers.size === 2) { const [a, b] = [...pointers.values()]; pinchDist = Math.hypot(a[0] - b[0], a[1] - b[1]); }
+  touched();
+});
+canvas.addEventListener('pointermove', e => {
+  if (mode !== 'build' || !pointers.has(e.pointerId)) return;
+  const prev = pointers.get(e.pointerId);
+  pointers.set(e.pointerId, [e.clientX, e.clientY]);
+  if (pointers.size === 1) {
+    userOrbit.th += (e.clientX - prev[0]) * 0.007;
+    userOrbit.ph = clamp(userOrbit.ph + (e.clientY - prev[1]) * 0.005, -0.02, 1.25);
+  } else if (pointers.size === 2) {
+    const [a, b] = [...pointers.values()];
+    const d = Math.hypot(a[0] - b[0], a[1] - b[1]);
+    if (pinchDist) userOrbit.r = clamp(userOrbit.r * pinchDist / d, 2.0, 8.5);
+    pinchDist = d;
+  }
+  touched();
+});
+['pointerup', 'pointercancel'].forEach(ev => canvas.addEventListener(ev, e => { pointers.delete(e.pointerId); pinchDist = 0; }));
+canvas.addEventListener('wheel', e => {
+  if (mode !== 'build') return;
+  e.preventDefault();
+  if (!userOrbit) userOrbit = Object.assign({}, cam.orbit, { target: cam.orbit.target.slice() });
+  orbitGoal = null;
+  userOrbit.r = clamp(userOrbit.r * Math.exp(e.deltaY * 0.0012), 2.0, 8.5);
+  touched();
+}, { passive: false });
+canvas.addEventListener('keydown', e => {
+  if (mode !== 'build') return;
+  const k = { ArrowLeft: [-0.12, 0], ArrowRight: [0.12, 0], ArrowUp: [0, 0.08], ArrowDown: [0, -0.08] }[e.key];
+  if (!k) return;
+  e.preventDefault();
+  if (!userOrbit) userOrbit = Object.assign({}, cam.orbit, { target: cam.orbit.target.slice() });
+  orbitGoal = null;
+  userOrbit.th += k[0]; userOrbit.ph = clamp(userOrbit.ph + k[1], -0.02, 1.25);
+  touched();
+});
+function touched() { lastInteract = performance.now(); $('#b-hint').classList.add('gone'); }
+// category change hands control back to the preset view
+tabsEl.addEventListener('click', () => { userOrbit = null; });
+optsEl.addEventListener('click', () => { userOrbit = null; });
+
+// ------------------------------------------------------------------ contact form
+$('#contact-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  const f = e.currentTarget, st = $('#form-status');
+  const name = f.name.value.trim(), car = f.car.value.trim();
+  if (!name || !car) {
+    st.className = 'form-status error';
+    st.textContent = !name ? 'Add your name so Rzer knows who is asking.' : 'Add your car so Rzer can check parts for it.';
+    (!name ? f.name : f.car).focus();
+    return;
+  }
+  const work = $$('input[name="work"]:checked', f).map(i => i.value);
+  const text = [`Hi Rzer, I'm ${name}.`, `Car: ${car}`, work.length ? `Interested in: ${work.join(', ')}` : '', f.notes.value.trim() ? `Notes: ${f.notes.value.trim()}` : ''].filter(Boolean).join('\n');
+  const ok = await copyText(text);
+  st.className = 'form-status' + (ok ? '' : ' error');
+  st.textContent = ok ? 'Copied. Open Instagram and paste it into a message to @rzerperformance.sg.' : 'Copy was blocked by the browser. Please type your request into an Instagram message instead.';
+});
+
+// ------------------------------------------------------------------ hotspots
+const hotspots = $$('.hotspot').map(el => ({ el, p: el.dataset.pos.split(',').map(Number) }));
+function project(p) {
+  const f = norm(sub(cam.tgt, cam.pos)), r = norm(cross(f, [0, 1, 0])), u = cross(r, f);
+  const v = sub(p, cam.pos); const z = dot(v, f);
+  if (z <= 0.01) return null;
+  const tanH = Math.tan(cam.fov * Math.PI / 360), asp = innerWidth / innerHeight;
+  const x = dot(v, r) / (z * tanH * asp) + cam.shift[0];
+  const y = dot(v, u) / (z * tanH) + cam.shift[1];
+  return [(x * 0.5 + 0.5) * innerWidth, (0.5 - y * 0.5) * innerHeight];
+}
+
+// ------------------------------------------------------------------ frame loop
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(0.1, Math.max(0.001, (now - last) / 1000));
+  last = now;
+  update(dt, now / 1000);
+  if (ready) draw(now / 1000);
+  if (ready) adapt(dt);
+  requestAnimationFrame(frame);
+}
+
+let settle = false;
+function update(dt, time) {
+  const k = settle ? 1 : 1 - Math.exp(-dt * 3.2);
+  // intro
+  if (!intro.done && ready) {
+    intro.t += dt * intro.speed;
+    $('#intro-bar').style.width = (clamp(intro.t / INTRO_LEN, 0, 1) * 100).toFixed(1) + '%';
+    if (intro.t > 8.7 && !intro.revealed) { intro.revealed = true; $('#wordmark').classList.add('revealed'); }
+    const c = introCam(Math.min(intro.t, INTRO_LEN));
+    cam.pos = c.pos; cam.tgt = c.tgt;
+    cam.fov = 38 + (34 - 38) * smooth(8.0, 9.6, intro.t);
+    const hs = HOME_CAMS.hero.shift;
+    cam.shift = [hs[0] * smooth(8.4, 9.6, intro.t), hs[1] * smooth(8.4, 9.6, intro.t)];
+    lights = introLights(intro.t);
+    exposure = 1.35 * smooth(0, 0.8, intro.t);
+    xray = 0; bay = 0;
+    if (intro.t >= INTRO_LEN) finishIntro();
+    return;
+  }
+  if (!intro.done) return;
+
+  let goal;
+  if (mode === 'home') {
+    goal = homeGoal();
+    if (!reduceMotion && scrollY < innerHeight * 0.5) { goal.orbit.th += Math.sin(time * 0.13) * 0.06; goal.orbit.ph += Math.sin(time * 0.17) * 0.015; }
+    xray += (goal.xray - xray) * k;
+    bay += (0 - bay) * k;
+    lights += (1 - lights) * k;
+    reflect = quality.reflect;
+  } else {
+    let o = userOrbit || orbitGoal || cam.orbit;
+    if (userOrbit && !reduceMotion && performance.now() - lastInteract > 9000) userOrbit.th += dt * 0.12;
+    goal = { orbit: o, fov: 34, shift: buildShift() };
+    xray += (0 - xray) * k;
+    bay += (1 - bay) * k;
+    lights += ((lightsOn ? 1 : 0) - lights) * k * 2;
+    reflect = quality.reflect;
+  }
+  exposure += (1.35 - exposure) * k;
+  const ko = settle ? 1 : (userOrbit && mode === 'build' ? 1 - Math.exp(-dt * 14) : k);
+  const o = cam.orbit, g = goal.orbit;
+  o.target = lerp3(o.target, g.target, ko);
+  o.r = lerp(o.r, g.r, ko);
+  o.th = o.th + angDiff(o.th, g.th) * ko;
+  o.ph = lerp(o.ph, g.ph, ko);
+  // keep the camera above the floor and below the ceiling
+  const p = orbitPos(o);
+  if (p[1] < 0.12) o.ph = Math.asin(clamp((0.12 - o.target[1]) / o.r, -1, 1));
+  if (p[1] > 3.1) o.ph = Math.asin(clamp((3.1 - o.target[1]) / o.r, -1, 1));
+  const asp = innerWidth / innerHeight;
+  const fit = asp < 1 ? 1 + clamp((1 - asp) / 0.55, 0, 1) * (mode === 'build' ? 0.75 : 0.45) : 1;
+  cam.pos = orbitPos(Object.assign({}, o, { r: o.r * fit })); cam.tgt = o.target;
+  cam.fov = lerp(cam.fov, goal.fov, k);
+  cam.shift = [lerp(cam.shift[0], goal.shift[0], k), lerp(cam.shift[1], goal.shift[1], k)];
+
+  // hotspots
+  const show = mode === 'home' ? smooth(0.6, 0.95, xray) : 0;
+  for (const h of hotspots) {
+    const s = show > 0.01 ? project(add(h.p, [0, -(live.uRide || 0), 0])) : null;
+    if (!s) { h.el.style.opacity = '0'; continue; }
+    h.el.style.opacity = show.toFixed(2);
+    h.el.style.transform = `translate(${s[0].toFixed(1)}px, ${s[1].toFixed(1)}px) translateY(-50%)`;
+  }
+}
+
+function draw(time) {
+  sizeCanvas();
+  gl.viewport(0, 0, canvas.width, canvas.height);
+  const target = uniformsFor(mode === 'build' && compare ? STOCK : config);
+  const ks = 0.18;
+  for (const [n, v] of Object.entries(target)) {
+    if (INTS.has(n) || live[n] === undefined) live[n] = Array.isArray(v) ? v.slice() : v;
+    else if (Array.isArray(v)) live[n] = live[n].map((x, i) => x + (v[i] - x) * ks);
+    else live[n] = live[n] + (v - live[n]) * ks;
+  }
+  for (const [n, v] of Object.entries(live)) setU(n, v);
+  const f = norm(sub(cam.tgt, cam.pos)), r = norm(cross(f, [0, 1, 0])), u = cross(r, f);
+  setU('uCamPos', cam.pos); setU('uCamFwd', f); setU('uCamRight', r); setU('uCamUp', u);
+  setU('uTanHalf', Math.tan(cam.fov * Math.PI / 360));
+  setU('uShift', cam.shift);
+  setU('uRes', [canvas.width, canvas.height]);
+  setU('uTime', time % 1000);
+  setU('uZero', 0);
+  setU('uT', intro.done ? 99 : intro.t);
+  setU('uXray', xray < 0.003 ? 0 : xray);
+  setU('uLights', lights);
+  setU('uBay', bay < 0.003 ? 0 : bay);
+  setU('uReflect', reflect);
+  setU('uExposure', exposure);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+}
+
+// ------------------------------------------------------------------ boot
+addEventListener('resize', () => { measure(); sizeCanvas(); onScroll(); layoutBuilder(); });
+addEventListener('load', measure);
+document.fonts && document.fonts.ready.then(measure);
+measure(); onScroll(); renderCard();
+if (reduceMotion) finishIntro();
+initGL();
+route();
+if (location.hash && location.hash !== '#build' && location.hash !== '#top') finishIntro();
+requestAnimationFrame(frame);
+
+// test hook
+window.RZ = {
+  state: () => ({ intro: intro.t, done: intro.done, mode, scale: quality.scale, ready, glFailed, xray, cam: { pos: cam.pos, tgt: cam.tgt } }),
+  setIntro: t => { intro.t = t; },
+  setConfig: c => { Object.assign(config, c); renderCard(); if (activeCat) setCategory(activeCat); },
+  quality,
+  settle: v => { settle = v; },
+};
+})();
+
+</script>
+</body>
+</html>

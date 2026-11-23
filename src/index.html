@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en-SG">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RZER Performance</title>
+<meta name="description" content="Rzer is a Singapore workshop for ECU tuning, exhaust, suspension, aero and wheels. Try parts on a live 3D car before we fit them.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&amp;display=swap" rel="stylesheet">
+<style>
+/*__CSS__*/
+</style>
+</head>
+<body class="is-intro">
+<canvas id="stage" aria-label="3D view of the Rzer demo coupe in an underground car park"></canvas>
+<p class="loading" id="loading">Loading the 3D scene</p>
+<p class="nogl-note" id="nogl" hidden>This browser could not start the 3D view, so the page is showing without it. Try a current version of Chrome, Safari, Edge or Firefox to see the car.</p>
+
+<header class="nav">
+  <a class="brand" href="#top" aria-label="Rzer, back to top">RZER</a>
+  <nav class="nav-links" aria-label="Sections">
+    <a href="#services">Services</a>
+    <a href="#engineering">Engineering</a>
+    <a href="#process">Process</a>
+    <a href="#contact">Contact</a>
+  </nav>
+  <a class="btn btn-chrome btn-small" href="#build">Build yours</a>
+</header>
+
+<main id="home">
+  <section class="hero" id="top" data-cam="hero" aria-label="Introduction">
+    <div class="hero-copy">
+      <h1 class="wordmark display chrome" id="wordmark">RZER</h1>
+      <p class="hero-line">Performance tuning, fitment and builds in Singapore.</p>
+      <div class="hero-actions">
+        <a class="btn btn-chrome" href="#build">Build yours</a>
+        <a class="btn btn-ghost" href="#services">See what we do</a>
+      </div>
+    </div>
+    <div class="intro-ui" id="intro-ui">
+      <div class="intro-bar" aria-hidden="true"><span id="intro-bar"></span></div>
+      <button class="skip" id="skip" type="button">Skip intro</button>
+    </div>
+    <div class="scroll-cue" aria-hidden="true">Scroll</div>
+  </section>
+
+  <section class="panel" id="about" data-cam="about">
+    <div class="panel-inner">
+      <h2 class="display chrome">Built around how you drive</h2>
+      <p class="lede">Rzer tunes and modifies road cars for owners who want them sharper, faster and unmistakably theirs. Every build starts with how the car is used day to day, then gets planned part by part before anything is unbolted.</p>
+    </div>
+  </section>
+
+  <section class="panel right" id="services" data-cam="services">
+    <div class="panel-inner">
+      <h2 class="display chrome">What goes on the lift</h2>
+      <ul class="services">
+        <li><h3>ECU remaps</h3><p>Stage 1 and Stage 2 software, matched to your hardware and fuel.</p></li>
+        <li><h3>Intake and exhaust</h3><p>Downpipes, cat-backs and valved systems, fitted and mapped together.</p></li>
+        <li><h3>Suspension</h3><p>Coilovers, lowering springs and alignment set up for Singapore roads.</p></li>
+        <li><h3>Aero and body</h3><p>Lips, skirts, diffusers, wings and widebody kits, test-fitted before paint.</p></li>
+        <li><h3>Wheels and brakes</h3><p>Fitment checked for offset and clearance. Big-brake kits and caliper colours.</p></li>
+        <li><h3>Wraps and carbon</h3><p>Gloss, satin and colour-change film, carbon trim and window tint.</p></li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="panel" id="engineering" data-cam="engineering">
+    <div class="panel-inner">
+      <h2 class="display chrome">See what changes under the skin</h2>
+      <p class="lede">Power, chassis, brakes and exhaust are planned as one system. Upgrade the turbo and the brakes, cooling and suspension have to keep up, so we spec them together.</p>
+    </div>
+  </section>
+
+  <section class="panel right" id="process" data-cam="process">
+    <div class="panel-inner">
+      <h2 class="display chrome">How a build runs</h2>
+      <ol class="steps">
+        <li><span class="n">01</span><h3>Consult</h3><p>Tell us the car, how you use it and what you want from it.</p></li>
+        <li><span class="n">02</span><h3>Plan</h3><p>We spec parts that work together and quote before any work starts.</p></li>
+        <li><span class="n">03</span><h3>Fit</h3><p>Parts go on in our workshop, test-fitted, torqued and aligned.</p></li>
+        <li><span class="n">04</span><h3>Tune</h3><p>Software is mapped to the new hardware and checked on the road.</p></li>
+        <li><span class="n">05</span><h3>Hand-over</h3><p>You collect the car with a job sheet listing everything that was done.</p></li>
+      </ol>
+    </div>
+  </section>
+
+  <section class="panel" id="try" data-cam="try">
+    <div class="panel-inner">
+      <h2 class="display chrome">Try the parts before we fit them</h2>
+      <p class="lede">Change paint, wheels, aero, stance and exhaust on a live 3D car, then send the build to us for a quote.</p>
+      <ul class="cta-list" aria-label="What you can change">
+        <li>6 paint finishes</li><li>4 wheel designs</li><li>3 ride heights</li><li>Widebody kit</li><li>GT wing</li><li>Exhaust tips</li>
+      </ul>
+      <div><a class="btn btn-chrome" href="#build">Open the configurator</a></div>
+    </div>
+  </section>
+
+  <section class="panel right" id="contact" data-cam="contact">
+    <div class="panel-inner">
+      <h2 class="display chrome">Book a bay</h2>
+      <p class="lede">Send your car and what you have in mind. Rzer takes bookings by message on Instagram at <span class="handle">@rzerperformance.sg</span>.</p>
+      <form class="contact-form" id="contact-form" novalidate>
+        <div class="field"><label for="cf-name">Your name</label><input id="cf-name" name="name" autocomplete="name" required></div>
+        <div class="field"><label for="cf-car">Car (make, model, year)</label><input id="cf-car" name="car" placeholder="e.g. Golf R Mk8, 2022" required></div>
+        <fieldset class="field">
+          <legend>Work you're interested in</legend>
+          <div class="chips">
+            <label class="chip"><input type="checkbox" name="work" value="ECU tuning" id="cf-w1"><span>ECU tuning</span></label>
+            <label class="chip"><input type="checkbox" name="work" value="Exhaust" id="cf-w2"><span>Exhaust</span></label>
+            <label class="chip"><input type="checkbox" name="work" value="Suspension" id="cf-w3"><span>Suspension</span></label>
+            <label class="chip"><input type="checkbox" name="work" value="Aero and body" id="cf-w4"><span>Aero and body</span></label>
+            <label class="chip"><input type="checkbox" name="work" value="Wheels and brakes" id="cf-w5"><span>Wheels and brakes</span></label>
+            <label class="chip"><input type="checkbox" name="work" value="Wrap and carbon" id="cf-w6"><span>Wrap and carbon</span></label>
+          </div>
+        </fieldset>
+        <div class="field"><label for="cf-notes">Anything else</label><textarea id="cf-notes" name="notes" placeholder="Current mods, budget, timing"></textarea></div>
+        <div class="form-row">
+          <button class="btn btn-chrome" type="submit">Copy my request</button>
+          <a class="btn btn-ghost" href="https://www.instagram.com/rzerperformance.sg/" target="_blank" rel="noopener">Open Instagram</a>
+        </div>
+        <p class="form-status" id="form-status" role="status" aria-live="polite"></p>
+      </form>
+    </div>
+  </section>
+</main>
+
+<footer class="footer">
+  <span>RZER Performance, Singapore</span>
+  <a href="https://www.instagram.com/rzerperformance.sg/" target="_blank" rel="noopener">@rzerperformance.sg on Instagram</a>
+</footer>
+
+<div class="tach" aria-hidden="true">
+  <div class="tach-scale" id="tach-scale"><div class="tach-needle" id="tach-needle"></div></div>
+  <span class="tach-unit">×1000 r/min</span>
+</div>
+
+<div class="hotspots" aria-hidden="true">
+  <div class="hotspot" data-pos="1.76,0.50,0.30"><span>Turbo and ECU map</span></div>
+  <div class="hotspot" data-pos="1.40,0.62,0.62"><span>Coilovers</span></div>
+  <div class="hotspot" data-pos="1.40,0.40,0.92"><span>Big-brake kit</span></div>
+  <div class="hotspot" data-pos="-2.34,0.21,0.56"><span>Valved exhaust</span></div>
+</div>
+
+<div class="builder" id="builder" hidden>
+  <div class="b-top">
+    <a class="btn btn-ghost btn-small" href="#top"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10 3 5 8l5 5" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>Back to site</a>
+    <div class="b-title"><strong>RZER</strong><span>Build yours on the demo coupe</span></div>
+    <button class="btn btn-ghost btn-small b-card-toggle" id="card-toggle" type="button" aria-controls="jobcard" aria-expanded="true">Job card <span class="count" id="card-count">0</span></button>
+  </div>
+
+  <aside class="b-panel glass" aria-label="Parts">
+    <div class="b-tabs" role="tablist" id="b-tabs"></div>
+    <div class="b-options" id="b-options" role="tabpanel"></div>
+  </aside>
+
+  <aside class="b-card glass" id="jobcard" aria-label="Job card">
+    <div class="jc-head">
+      <h2>Job card <span class="jc-code" id="jc-code">RZ-0</span></h2>
+      <p class="jc-sub" id="jc-sub">Stock car</p>
+    </div>
+    <ul class="jc-list" id="jc-list"></ul>
+    <div class="jc-actions">
+      <button class="btn btn-chrome" id="copy-build" type="button">Copy build</button>
+      <a class="btn btn-ghost" href="https://www.instagram.com/rzerperformance.sg/" target="_blank" rel="noopener">Send it on Instagram</a>
+      <p class="jc-note" id="jc-note">Paste the copied build into a message. Rzer confirms fitment and price for your exact car.</p>
+    </div>
+    <textarea class="jc-copy" id="jc-copy" aria-hidden="true" tabindex="-1"></textarea>
+  </aside>
+
+  <p class="b-stock-badge" id="stock-badge" hidden>Showing stock</p>
+  <p class="b-hint" id="b-hint">Drag to turn the car. Scroll or pinch to zoom.</p>
+
+  <div class="b-dock glass">
+    <button class="btn btn-ghost" id="hold" type="button">Hold to compare stock</button>
+    <button class="btn btn-ghost" id="lights" type="button" aria-pressed="true">Headlights</button>
+    <button class="btn btn-ghost" id="preset" type="button">Rzer signature build</button>
+    <button class="btn btn-ghost" id="reset" type="button">Reset to stock</button>
+  </div>
+</div>
+
+<script type="x-shader/x-fragment" id="frag">
+/*__FRAG__*/
+</script>
+<script>
+/*__JS__*/
+</script>
+</body>
+</html>

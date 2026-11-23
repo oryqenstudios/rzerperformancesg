@@ -1,0 +1,16 @@
+{
+  "name": "rzer-site",
+  "version": "0.1.0",
+  "private": true,
+  "description": "RZER Performance website: gloss-black 3D garage, liquid-to-car hero intro, scroll scenes and a parts configurator. Single self-contained HTML page.",
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "dev": "node build.mjs --watch",
+    "shot": "node tools/shot.mjs",
+    "check": "node tools/page.mjs"
+  },
+  "devDependencies": {
+    "playwright": "^1.50.0"
+  }
+}
