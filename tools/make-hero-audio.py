@@ -5,10 +5,10 @@ film (assets/site/hero-intro.mp4, 24 fps):
 
    0      faint car-park room tone (ventilation rumble, strip-light hum); no engine while the car is being built
    8.85   the starter turns the engine over: rur-rur-rur
-   9.375  the engine fires as the headlights snap on (frame 225) and flares
-   9.68   a full rev to 7,000 rpm, the turbo spooling
-  10.06   throttle shut: the blow-off valve vents (pssh), on its own
-  10.40   pops and bangs as the revs fall: bang, pop, pop, bang; the last at 10.80, just before the logo (10.94)
+   9.375  the engine fires as the headlights snap on (frame 225): a big flare, vroom, then a fast idle
+   9.75   a full rev to 7,000 rpm, the turbo spooling
+  10.10   throttle shut: a loud blow-off valve (psssh), on its own
+  10.47   pops and bangs as the revs fall: bang, pop, pop, bang; the last at 10.82, just before the logo (10.94)
   10.9    settling to idle, fading out under the logo by the end of the film (12.54)
 
 The logo time is the film's length minus LOGO_LEAD in src/app.js; keep the two in step.
@@ -36,9 +36,9 @@ rng = np.random.default_rng(1729)
 T_CRANK = 8.85    # starter engages
 T_HEAD = 9.375    # headlights snap on: the engine fires
 T_CATCH = T_HEAD
-T_REV = 9.68      # foot down
-T_LIFT = 10.06    # throttle shut: blow-off valve
-POPS = [(10.40, 0.9), (10.53, 0.45), (10.64, 0.4), (10.80, 1.0)]   # (time, size): bang, pop, pop, bang
+T_REV = 9.75      # foot down
+T_LIFT = 10.10    # throttle shut: blow-off valve
+POPS = [(10.47, 0.9), (10.58, 0.45), (10.67, 0.4), (10.82, 1.0)]   # (time, size): bang, pop, pop, bang
 T_LOGO = 10.94    # the logo starts drawing (film length 12.54 - LOGO_LEAD 1.6 in app.js)
 T_FADE = 11.2     # idle starts fading out under the logo
 T_END = 12.54     # film ends
@@ -122,8 +122,8 @@ def place(bus, sig, t):
 # ------------------------------------------------------------------------------------------------ the drive
 running = T >= T_CATCH
 rpm = automation([
-    (T_CATCH, 9.53, 350, 2800, 'out'),        # fires and flares
-    (9.53, T_REV, 2800, 1500, 'out'),
+    (T_CATCH, 9.57, 350, 3300, 'out'),        # fires and flares: vroom
+    (9.57, T_REV, 3300, 1450, 'out'),
     (T_REV, T_LIFT, 1500, REDLINE, 'in'),     # full rev
     (T_LIFT, 10.95, REDLINE, 1150, 'out'),    # overrun: blow-off, then pops and bangs
     (10.95, 11.40, 1150, IDLE, 'inout'),
@@ -132,8 +132,8 @@ rpm += 35 * np.sin(2 * np.pi * 0.8 * T) * (rpm < 1300)          # idle lope
 rpm = smooth(rpm, 0.025)
 
 load = automation([
-    (T_CATCH, 9.50, 0.9, 0.9, 'lin'),
-    (9.50, T_REV - 0.01, 0.18, 0.18, 'lin'),     # running at a fast idle before the rev
+    (T_CATCH, 9.55, 1.0, 1.0, 'lin'),
+    (9.55, T_REV - 0.01, 0.2, 0.2, 'lin'),     # running at a fast idle before the rev
     (T_REV - 0.01, T_LIFT, 1.0, 1.0, 'lin'),
     (T_LIFT, 10.90, 0.0, 0.0, 'lin'),
 ], 0.12)
@@ -219,7 +219,7 @@ turbo = (np.sin(2 * np.pi * pw) + 0.25 * np.sin(4 * np.pi * pw + 0.7)) * 0.03 * 
 
 def blow_off():
     """The blow-off valve venting boost: a hiss whose pitch falls as the pressure drops."""
-    n = int(0.5 * SR)
+    n = int(0.45 * SR)
     t = np.arange(n) / SR
     win = int(0.02 * SR)
     hop = win // 2
@@ -230,8 +230,9 @@ def blow_off():
         fc = 5200 * np.exp(-(s0 / SR) / 0.3) + 1800
         out[s0:s0 + win] += filt(src[s0:s0 + win] * w, lambda f: band(f, fc * 0.45, fc * 1.6))
     out = unit(out[:n])
-    out = 1.8 * np.tanh(out / 1.8)          # round off the hiss's random peaks
-    return 0.3 * out * (1 - np.exp(-t / 0.008)) * np.exp(-t / 0.13)
+    out = 1.5 * np.tanh(out / 1.5)          # round off the hiss's random peaks, so it can be loud without clipping
+    tail = np.clip((t[-1] - t) / 0.1, 0, 1)   # dies away fully before the first bang
+    return 0.78 * out * (1 - np.exp(-t / 0.006)) * np.exp(-t / 0.12) * tail
 
 
 bov = np.zeros(N)
@@ -276,7 +277,7 @@ m = 0.5 - 0.5 * np.cos(2 * np.pi * pc)                    # 1 at each compressio
 whirr = unit(filt(noise(b - a), lambda f: band(f, 500, 4000) * peak(f, 1400, 2.0, 2.0)))
 grind = unit(filt(noise(b - a), lambda f: band(f, 70, 500)))
 env = np.clip(t / 0.02, 0, 1) * np.clip((T_CATCH + 0.04 - T[a:b]) / 0.04, 0, 1)
-starter[a:b] = env * ((0.25 + 0.75 * (1 - m)) * 0.010 * whirr + (0.3 + 0.7 * m) * 0.035 * grind)
+starter[a:b] = env * ((0.25 + 0.75 * (1 - m)) * 0.016 * whirr + (0.3 + 0.7 * m) * 0.035 * grind)
 nc = int(0.12 * SR)
 tn = np.arange(nc) / SR
 for i in np.flatnonzero(np.diff(np.floor(pc)) > 0):
@@ -311,8 +312,8 @@ def car_park_ir():
 
 
 engine_bus = (eng + intake) * fade
-dry = 0.55 * engine_bus + turbo * fade + bov + 0.55 * pops + 0.55 * starter
-send = 0.55 * engine_bus * 0.2 + bov * 0.2 + 0.55 * pops * 0.35 + 0.55 * starter * 0.2
+dry = 0.55 * engine_bus + turbo * fade + bov + 0.55 * pops + starter
+send = 0.55 * engine_bus * 0.2 + bov * 0.25 + 0.55 * pops * 0.35 + starter * 0.2
 wet = [conv(send, car_park_ir()) for _ in range(2)]
 mix = np.stack([dry + 0.5 * wet[0], dry + 0.5 * wet[1]], axis=1) + amb[:, None]
 mix = np.stack([filt(mix[:, ch], lambda f: band(f, 28, 16000, 2)) for ch in range(2)], axis=1)
@@ -357,8 +358,8 @@ with wave.open(out, 'wb') as w:
     w.setframerate(SR)
     w.writeframes(pcm.astype('<i2').tobytes())
 print('wrote', out)
-for name, (t0, t1) in {'room tone': (1, 8.5), 'cranking': (8.9, 9.37), 'fires': (T_CATCH, 9.53),
-                       'full rev': (T_REV, T_LIFT), 'blow-off': (T_LIFT + 0.01, 10.3), 'pops': (10.38, 10.95),
+for name, (t0, t1) in {'room tone': (1, 8.5), 'cranking': (8.9, 9.37), 'fires': (T_CATCH, 9.6),
+                       'full rev': (T_REV, T_LIFT), 'blow-off': (T_LIFT + 0.02, 10.4), 'pops': (10.40, 10.95),
                        'idle under logo': (11.3, 11.8)}.items():
     print(f'  {name:16s} {rms_db(mix, t0, t1):6.1f} dBFS RMS')
 print(f'  peak {20 * np.log10(np.max(np.abs(mix))):.1f} dBFS, deepest limiting {reduction:.1f} dB at {reduction_at:.2f} s')
