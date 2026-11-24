@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Synthesise the hero film's sound: the Evo starting as its headlights snap on, one big rev, the blow-off valve,
 then pops and bangs on the overrun, in the tuning workshop. Each moment stands on its own, timed to the film
-(assets/site/hero-intro.mp4, 24 fps, 15.792 s):
+(assets/site/hero-intro.mp4, 60 fps, 15.783 s):
 
    0      faint workshop room tone (ventilation rumble, light hum); no engine while the car is being built
   10.475  the starter turns the engine over as the car's front sets: rur-rur-rur
@@ -9,8 +9,8 @@ then pops and bangs on the overrun, in the tuning workshop. Each moment stands o
   12.44   a full rev to 7,000 rpm, the turbo spooling
   12.79   throttle shut as the light streak bursts out at the bumper: a loud blow-off valve (psssh)
   13.16   backfires as the revs fall and the streak runs round the car: BANG, pap-pap, BANG, BANG
-  14.77   one last BANG as the carbon finishes setting, just before the logo (14.867)
-  14.9    settling to idle, fading out under the logo by the end of the film (15.792)
+  14.77   one last BANG as the carbon finishes setting, just before the logo (14.858)
+  14.9    settling to idle, fading out under the logo by the end of the film (15.783)
 
 The logo time is the film's length minus LOGO_LEAD in src/app.js; keep the two in step.
 
@@ -41,8 +41,8 @@ T_REV = 12.44     # foot down
 T_LIFT = 12.79    # throttle shut: blow-off valve, as the light streak bursts out
 POPS = [(13.16, 1.0), (13.27, 0.5), (13.335, 0.5), (13.42, 0.85), (13.54, 1.0),   # (time, size): BANG, pap-pap, BANG, BANG
         (14.77, 1.0)]                                                              # ...and the last BANG before the logo
-T_END = 379 / 24  # film ends (15.792 s)
-T_LOGO = T_END - 0.925   # the logo starts drawing (LOGO_LEAD 0.925 in app.js): 14.867 s
+T_END = 947 / 60  # film ends (15.783 s)
+T_LOGO = T_END - 0.925   # the logo starts drawing (LOGO_LEAD 0.925 in app.js): 14.858 s
 T_FADE = T_LOGO + 0.1    # idle starts fading out under the logo
 IDLE = 1000.0
 REDLINE = 7000.0

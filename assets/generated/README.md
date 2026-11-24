@@ -6,13 +6,13 @@ The hero opens on a realistic 15.8 s film made with Higgsfield (`api.higgsfield.
 
 | File in `assets/site/` | Made from |
 |---|---|
-| `hero-intro.mp4` / `.webm` | `tools/finish-garage-film.sh`: the build-up (`build-plan.json`, 10.75 s), then a hard cut to the carbon cure clip. 1920×1080, 24 fps, 379 frames (15.79 s). H.264 CRF 24 (capped at 2.8 Mbit/s) with faststart; VP9 CRF 35. Sound: the synthesised engine start, rev, blow-off, pops and bangs (AAC 160k / Opus 128k), see "Sound". |
+| `hero-intro.mp4` / `.webm` | `tools/finish-garage-film.sh`: the build-up (`build-plan.json`, 10.75 s), then a hard cut to the carbon cure clip. 1920×1080, **60 fps**, 947 frames (15.78 s), with a light unsharp mask (Kling's frames are about 4× softer than its keyframe stills). H.264 CRF 22 capped at 5 Mbit/s with faststart, about 9.5 MB (at the old 2.8 Mbit/s cap the fast motion smeared); VP9 CRF 36 capped at 4.5 Mbit/s, about 7.5 MB. Sound: the synthesised engine start, rev, blow-off, pops and bangs (AAC 160k / Opus 128k), see "Sound". |
 | `hero-final.jpg` | `carbon-final.jpg` (the end frame the cure clip was generated to land on) at 2048×1152, JPEG quality 88 |
 | `hero-poster.jpg` | The film's first frame, shown until it starts |
 
 ## The build-up
 
-Each beat of the reference is one keyframe still in the garage, and each step between two keyframes is one Kling O3 first-last-frame clip (`tools/higgsfield-flf.sh`, 5 s, pro, no sound), so consecutive clips share a frame and join without blending. `tools/assemble-build.py` lays them onto the reference's timeline (`build-plan.json`: each clip's slot in seconds, and where its action is paced differently from the reference, anchors that speed up or slow down part of it).
+Each beat of the reference is one keyframe still in the garage, and each step between two keyframes is one Kling O3 first-last-frame clip (`tools/higgsfield-flf.sh`, 5 s, pro, no sound), so consecutive clips share a frame and join without blending. `tools/assemble-build.py` lays them onto the reference's timeline (`build-plan.json`: each clip's slot in seconds, and where its action is paced differently from the reference, anchors that speed up or slow down part of it, joined by a smooth curve). The clips play 2–5× faster than generated, so the film is 60 fps: at 24 fps, 2–4 of every 5 generated frames were skipped and the build-up looked choppy (the reference is 60 fps too). The carbon cure clip plays at its own speed, its 24 fps frames repeated 3:2.
 
 The keyframes (`build/`) are Kling Image 4.0 edits (`tools/higgsfield-edit.sh kling`, two images). For the first five, image 1 is a frame of the reference video (for the camera and the subject's shape and place) and image 2 is `garage-cut.jpg` (for the garage); the prompt says to keep the first's camera and subject and swap its surroundings for the garage. Those reference frames are not in the repo: they are another company's film. The last two keyframes are made from the finished car so that the build ends exactly on it.
 
@@ -29,7 +29,7 @@ The keyframes (`build/`) are Kling Image 4.0 edits (`tools/higgsfield-edit.sh kl
 `7-front-open` is `garage-cut.jpg` with its front taken away (`rolling-ref.jpg`, an earlier rolling-chassis still, shows the parts underneath); `6-cabin-frame` is that with the cabin's sides taken away. Building the body this way, front last and from a closed cabin, is what kept the doors shut: every clip that formed the whole body at once, in O3 and Kling Omni, forward and generated in reverse, swung the doors open and shut halfway (six takes).
 
 ```bash
-# one clip, e.g. the last:
+# one clip, e.g. the last (QUALITY=4k asks Kling for 4K, sharper; it was unavailable when these were made):
 tools/higgsfield-flf.sh assets/generated/build/7-front-open.jpg assets/generated/garage-cut.jpg assets/generated/prompts/build-clip-7.txt 5 build-clip-7
 ```
 
@@ -103,12 +103,12 @@ tools/mux-hero-audio.sh
 |---|---|
 | 0–10.4 s | faint workshop room tone only, while the car is being built |
 | 10.475 s | the starter turns the engine over as the front sets: five chugs, rur-rur-rur |
-| 11.0 s | the engine fires as the headlights snap on (frame 264): a big flare to 3,300 rpm, then a fast idle |
+| 11.0 s | the engine fires as the headlights snap on: a big flare to 3,300 rpm, then a fast idle |
 | 12.44 s | one full rev to 7,000 rpm, the turbo spooling |
 | 12.79 s | throttle shut as the light streak bursts out at the bumper: a loud blow-off valve, a full whoosh kept mostly below 3 kHz so it isn't sharp, on its own, dying away before the first bang |
 | 13.16–13.54 s | backfires as the revs fall and the streak runs round the car: BANG, pap-pap, BANG, BANG, each with its own deep boom |
 | 14.77 s | one last BANG as the carbon finishes setting |
-| 14.867 s | the logo starts drawing (`LOGO_LEAD` 0.925 s in `src/app.js`); the idle fades out under it by the end (15.792 s) |
+| 14.858 s | the logo starts drawing (`LOGO_LEAD` 0.925 s in `src/app.js`); the idle fades out under it by the end (15.783 s) |
 
 Each moment has its own slot so the sound stays clean: the reverb is short, nothing overlaps the blow-off, and the bangs are mixed so the limiter leaves them alone; it only touches the first few milliseconds of the blow-off. It aims at the sound of a 4G63 Evo IX through a 3-inch turbo-back exhaust. The reverb is a short, hard-walled room. The engine is a pulse train at the 4-cylinder firing rate (rpm / 30 per second): sharp pressure spikes ringing a set of exhaust resonances (lowest at 66 Hz), with per-cylinder imbalance at idle, a lopsided saturation for growl, and a harder, raspier tone above about 5,000 rpm where MIVEC changes over. The turbo adds a whoosh of air as it spools, with a quiet whistle on top. The treble is kept low throughout (about 6% of the energy above 3 kHz; the bangs' crack is rounded, the turbo whistle is low and quiet, the mix rolls off from 10 kHz). Levels: cranking about −18 dBFS RMS, full rev −13, blow-off −11, bangs peak at −1. `python3 tools/make-hero-audio.py out.wav spectrogram.png` also draws a spectrogram with the beats marked. To use a real recording instead, pass it to `tools/mux-hero-audio.sh recording.wav`.
 

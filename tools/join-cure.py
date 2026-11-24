@@ -12,14 +12,18 @@ back. A dissolve between the two shows a doubled car, so instead:
     so no edges show
   - the cure clip's first frames, before it settles, are warped onto the settled framing, and its first BLEND frames
     fade in from its first frame (Kling redraws the fine detail of the frame it was given over its next few frames)
-  - a sudden jump in the garage film's own camera move in those frames (the restyle has one, at frame 192) is eased
-    out over the next POP_EASE frames: the camera carries on from where it was, then catches up
+  - with EASE_JUMPS=1, a sudden jump in the first film's own camera move in those frames (the old garage restyle had
+    one) is eased out over the next POP_EASE frames: the camera carries on from where it was, then catches up. Off by
+    default: liquid spreading over the floor can look like a jump to the measurement
 
   python3 tools/join-cure.py <garage.mp4> <cure.mp4> <start> <cut> <out.mp4>
 
-Uses garage frames start..cut-1, then every cure frame. Writes a high-quality H.264 master (no sound).
+Uses garage frames start..cut-1, then every cure frame. The output keeps the first film's frame rate (24 or 60 fps):
+the 24 fps cure clip is shown at it by repeating frames (3:2 at 60 fps, as any 24 fps film on a 60 Hz screen).
+Writes a high-quality H.264 master (no sound).
 Needs numpy and OpenCV (pip install opencv-python-headless).
 """
+import os
 import subprocess
 import sys
 
@@ -28,11 +32,15 @@ import numpy as np
 
 garage, cure, START, CUT, out = sys.argv[1], sys.argv[2], int(sys.argv[3]), int(sys.argv[4]), sys.argv[5]
 W, H = 1920, 1080
-RAMP = 24    # frames of the garage film that are steered onto the cure clip's framing (1 s)
+num, den = subprocess.run(['ffprobe', '-v', 'error', '-select_streams', 'v', '-show_entries', 'stream=r_frame_rate',
+                           '-of', 'csv=p=0', garage], capture_output=True, text=True, check=True).stdout.strip().split('/')
+FPS = round(int(num) / int(den))   # the first film's frame rate, kept for the output
+CURE_FPS = 24
+RAMP = FPS   # frames of the garage film that are steered onto the cure clip's framing (1 s)
 REF = 12     # a cure frame after it has settled
-POP = 6.0      # px: a frame whose camera move differs this much from the previous frame's is a jump
-POP_EASE = 8   # frames over which a jump is eased out
-BLEND = 4      # frames
+POP = 6.0 * 24 / FPS        # px per frame: a frame whose camera move differs this much from the previous one's is a jump
+POP_EASE = round(8 * FPS / 24)   # frames over which a jump is eased out
+BLEND = 4      # cure frames
 SETTLED = 1.0  # px: from the first cure frame within this of REF's framing (at the frame corners), frames are left alone
 
 
@@ -95,7 +103,7 @@ D = np.eye(2, 3) - first_pose
 # lags behind the film, so the edge it uncovers is at the bottom, which the page fades to black)
 ease = {k: np.zeros((2, 3)) for k in range(k0, CUT)}
 pops = []
-for k in range(k0 + 2, CUT):                         # along the path as smoothed so far
+for k in (range(k0 + 2, CUT) if os.environ.get('EASE_JUMPS') == '1' else []):   # along the path as smoothed so far
     expected = 2 * (poses[k - 1] - ease[k - 1]) - (poses[k - 2] - ease[k - 2])
     gap = poses[k] - ease[k] - expected
     if np.hypot(*gap[:, 2]) > POP:
@@ -109,7 +117,7 @@ for k in range(k0, CUT):
     P = poses[k] - ease[k] + D * (3 * u * u - 2 * u ** 3)
     steer[k] = (m3(poses[k]) @ np.linalg.inv(m3(P)))[:2]   # output -> this frame's pixels
 
-enc = subprocess.Popen(['ffmpeg', '-v', 'error', '-y', '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-s', f'{W}x{H}', '-r', '24',
+enc = subprocess.Popen(['ffmpeg', '-v', 'error', '-y', '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-s', f'{W}x{H}', '-r', str(FPS),
                         '-i', '-', '-c:v', 'libx264', '-crf', '12', '-preset', 'slow', '-pix_fmt', 'yuv420p', out],
                        stdin=subprocess.PIPE)
 for first in range(START, k0, 48):                   # the untouched part of the garage film, in chunks
@@ -130,8 +138,9 @@ for n, f in enumerate(cure_frames):
     elif n <= BLEND:
         w = n / (BLEND + 1)
         f = np.clip(f.astype(np.float32) * w + first * (1 - w) + 0.5, 0, 255).astype(np.uint8)
-    enc.stdin.write(f.tobytes())
+    for _ in range((n + 1) * FPS // CURE_FPS - n * FPS // CURE_FPS):
+        enc.stdin.write(f.tobytes())
 enc.stdin.close()
 enc.wait()
 print(f'steered frames {k0}-{CUT - 1} (jumps eased at {pops}); cure clip settled from its frame {settled_at}; '
-      f'{CUT - START + len(cure_frames)} frames')
+      f'{CUT - START + len(cure_frames) * FPS // CURE_FPS} frames at {FPS} fps')
