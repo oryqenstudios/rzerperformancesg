@@ -8,7 +8,7 @@ film (assets/site/hero-intro.mp4, 24 fps):
    9.375  the engine fires as the headlights snap on (frame 225): a big flare, vroom, then a fast idle
    9.75   a full rev to 7,000 rpm, the turbo spooling
   10.10   throttle shut: a loud blow-off valve (psssh), on its own
-  10.47   pops and bangs as the revs fall: bang, pop, pop, bang; the last at 10.82, just before the logo (10.94)
+  10.47   backfires as the revs fall: BANG, pap-pap, BANG, BANG; the last at 10.85, just before the logo (10.94)
   10.9    settling to idle, fading out under the logo by the end of the film (12.54)
 
 The logo time is the film's length minus LOGO_LEAD in src/app.js; keep the two in step.
@@ -38,7 +38,7 @@ T_HEAD = 9.375    # headlights snap on: the engine fires
 T_CATCH = T_HEAD
 T_REV = 9.75      # foot down
 T_LIFT = 10.10    # throttle shut: blow-off valve
-POPS = [(10.47, 0.9), (10.58, 0.45), (10.67, 0.4), (10.82, 1.0)]   # (time, size): bang, pop, pop, bang
+POPS = [(10.47, 1.0), (10.58, 0.5), (10.645, 0.5), (10.73, 0.85), (10.85, 1.0)]   # (time, size): BANG, pap-pap, BANG, BANG
 T_LOGO = 10.94    # the logo starts drawing (film length 12.54 - LOGO_LEAD 1.6 in app.js)
 T_FADE = 11.2     # idle starts fading out under the logo
 T_END = 12.54     # film ends
@@ -149,8 +149,8 @@ fade = fade * fade * (3 - 2 * fade)
 KL = int(0.09 * SR)
 kt = np.arange(KL) / SR
 # exhaust resonances (Hz, decay s, level): a 3-inch turbo-back system with a straight-through silencer
-MODES = [(78, .022, 1.0), (151, .016, .85), (236, .012, .65), (334, .009, .5), (468, .007, .38),
-         (690, .005, .28), (985, .004, .2), (1440, .003, .13), (2150, .002, .08), (3300, .0015, .05)]
+MODES = [(66, .024, 1.0), (138, .017, .85), (224, .012, .65), (330, .009, .55), (470, .007, .45),
+         (690, .005, .3), (985, .004, .2), (1440, .003, .13), (2150, .002, .08), (3300, .0015, .05)]
 NOISE_DARK = unit(filt(noise(SR * 2), lambda f: band(f, 60, 2200) * peak(f, 320, 1.5, 2.0)))
 NOISE_BRIGHT = unit(filt(noise(SR * 2), lambda f: band(f, 90, 7000) * peak(f, 1600, 1.0, 2.0)))
 
@@ -191,12 +191,15 @@ for k, i in enumerate(events, start=1):
     amp = loud / np.sqrt(r / 30 / 240) * gain * rng.lognormal(0, 0.06 if ld > 0.5 else 0.18)
     if overrun[i]:
         amp *= rng.uniform(0.75, 1.1)
-    b = float(np.clip(ld ** 0.8 * (0.4 + 0.6 * r / REDLINE), 0, 1))
+    mivec = float(np.clip((r - 4800) / 800, 0, 1))
+    b = float(np.clip(ld ** 0.8 * (0.3 + 0.45 * r / REDLINE + 0.25 * mivec), 0, 1))
     eng[j:j + KL] += amp * ((1 - b) * DARK[rng.integers(20)] + b * BRIGHT[rng.integers(20)])
 eng = eng[:N]
 eng /= np.percentile(np.abs(eng), 99.9)
-drive = 1 + 1.5 * load * np.minimum(rpm / REDLINE, 1)          # rasp under load
-eng = np.tanh(drive * eng * 0.5) / (drive * 0.5)
+mivec = np.clip((rpm - 4800) / 800, 0, 1)
+drive = 1 + (1.3 + 1.0 * mivec) * load * np.minimum(rpm / REDLINE, 1)   # rasp under load, harder past the MIVEC changeover
+x = drive * eng * 0.5
+eng = np.tanh(x + 0.18 * x * x) / (drive * 0.5)                 # lopsided: exhaust pulses push harder than they pull, a growl
 
 # induction roar, pulsing with the firing
 intake = unit(filt(noise(N), lambda f: band(f, 150, 2500) * peak(f, 420, 1.2, 2.5)))
@@ -214,7 +217,9 @@ for n_, tg in enumerate(target):
 spd = np.interp(T, tc, spd_c)
 fw = 1300 + 4200 * spd + 40 * np.sin(2 * np.pi * 5.3 * T)
 pw = np.cumsum(fw) / SR
-turbo = (np.sin(2 * np.pi * pw) + 0.25 * np.sin(4 * np.pi * pw + 0.7)) * 0.018 * spd ** 2 * (0.35 + 0.65 * load)
+turbo = (np.sin(2 * np.pi * pw) + 0.25 * np.sin(4 * np.pi * pw + 0.7)) * 0.012 * spd ** 2 * (0.35 + 0.65 * load)
+whoosh = unit(filt(noise(N), lambda f: band(f, 700, 2600, 2) * peak(f, 1500, 1.2, 1.8)))
+turbo += whoosh * 0.03 * spd ** 2 * load
 
 
 def blow_off():
@@ -256,12 +261,12 @@ def pop(size):
         return src[s0:s0 + n]
 
     crack = slice_of(CRACK) * np.exp(-t / rng.uniform(0.0015, 0.004))
-    body = slice_of(BODY) * np.exp(-t / (0.008 + 0.02 * size))
-    f0 = rng.uniform(55, 85) * (1 + 0.3 * np.exp(-t / 0.02))
-    thump = np.sin(2 * np.pi * np.cumsum(f0) / SR) * np.exp(-t / (0.03 + 0.05 * size))
+    body = slice_of(BODY) * np.exp(-t / (0.008 + 0.022 * size))
+    f0 = rng.uniform(45, 65) * (1 + 0.35 * np.exp(-t / 0.025))
+    thump = np.sin(2 * np.pi * np.cumsum(f0) / SR) * np.exp(-t / (0.028 + 0.045 * size))
     rattle = slice_of(RATTLE) * np.exp(-t / 0.03) * (t > 0.004)
-    p = (1 - np.exp(-t / 0.0004)) * (0.55 * crack + 0.8 * body + 1.6 * size * thump) + 0.05 * rattle
-    return size * np.tanh(1.5 * p)
+    p = (1 - np.exp(-t / 0.0004)) * (0.55 * crack + 0.9 * body + 1.6 * size * thump) + 0.05 * rattle
+    return size * np.tanh(1.1 * p)     # a little punch, without squashing the boom into a drone
 
 
 pops = np.zeros(N)
@@ -274,7 +279,7 @@ for t, size in POPS:
 starter = np.zeros(N)
 a, b = at(T_CRANK), at(T_CATCH + 0.04)
 t = T[a:b] - T_CRANK
-pc = np.cumsum(8.0 + 4.0 * t) / SR                       # compression strokes per second, quickening
+pc = np.cumsum(9.5 + 5.0 * t) / SR                       # compression strokes per second, quickening
 m = 0.5 - 0.5 * np.cos(2 * np.pi * pc)                    # 1 at each compression stroke
 whirr = unit(filt(noise(b - a), lambda f: band(f, 300, 2500) * peak(f, 1000, 2.0, 2.0)))
 grind = unit(filt(noise(b - a), lambda f: band(f, 70, 500)))
@@ -315,7 +320,7 @@ def car_park_ir():
 
 engine_bus = (eng + intake) * fade
 dry = 0.55 * engine_bus + turbo * fade + bov + 0.55 * pops + starter
-send = 0.55 * engine_bus * 0.2 + bov * 0.25 + 0.55 * pops * 0.35 + starter * 0.2
+send = 0.55 * engine_bus * 0.2 + bov * 0.25 + 0.55 * pops * 0.33 + starter * 0.2
 wet = [conv(send, car_park_ir()) for _ in range(2)]
 mix = np.stack([dry + 0.5 * wet[0], dry + 0.5 * wet[1]], axis=1) + amb[:, None]
 mix = np.stack([filt(mix[:, ch], lambda f: band(f, 28, 10000, 1)) for ch in range(2)], axis=1)
