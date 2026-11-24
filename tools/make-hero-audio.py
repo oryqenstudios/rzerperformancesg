@@ -212,13 +212,14 @@ for n_, tg in enumerate(target):
     s += (tg - s) * (1 - np.exp(-1 / (CR * (0.18 if tg > s else 0.7))))   # spools up fast, winds down slowly
     spd_c[n_] = s
 spd = np.interp(T, tc, spd_c)
-fw = 1700 + 6800 * spd + 60 * np.sin(2 * np.pi * 5.3 * T)
+fw = 1300 + 4200 * spd + 40 * np.sin(2 * np.pi * 5.3 * T)
 pw = np.cumsum(fw) / SR
-turbo = (np.sin(2 * np.pi * pw) + 0.25 * np.sin(4 * np.pi * pw + 0.7)) * 0.03 * spd ** 2 * (0.35 + 0.65 * load)
+turbo = (np.sin(2 * np.pi * pw) + 0.25 * np.sin(4 * np.pi * pw + 0.7)) * 0.018 * spd ** 2 * (0.35 + 0.65 * load)
 
 
 def blow_off():
-    """The blow-off valve venting boost: a hiss whose pitch falls as the pressure drops."""
+    """The blow-off valve venting boost: a full, breathy whoosh whose pitch falls as the pressure drops. Kept mostly
+    below 3 kHz, with a low rush of air under it, so it is loud without sounding thin or sharp."""
     n = int(0.45 * SR)
     t = np.arange(n) / SR
     win = int(0.02 * SR)
@@ -227,19 +228,20 @@ def blow_off():
     src = noise(n + win)
     out = np.zeros(n + win)
     for s0 in range(0, n, hop):
-        fc = 5200 * np.exp(-(s0 / SR) / 0.3) + 1800
-        out[s0:s0 + win] += filt(src[s0:s0 + win] * w, lambda f: band(f, fc * 0.45, fc * 1.6))
-    out = unit(out[:n])
+        fc = 1900 * np.exp(-(s0 / SR) / 0.25) + 700
+        out[s0:s0 + win] += filt(src[s0:s0 + win] * w, lambda f: band(f, fc * 0.4, fc * 1.5, 3))
+    rush = unit(filt(noise(n), lambda f: band(f, 250, 1200, 3)))
+    out = unit(0.8 * unit(out[:n]) + 0.6 * rush)
     out = 1.5 * np.tanh(out / 1.5)          # round off the hiss's random peaks, so it can be loud without clipping
     tail = np.clip((t[-1] - t) / 0.1, 0, 1)   # dies away fully before the first bang
-    return 0.78 * out * (1 - np.exp(-t / 0.006)) * np.exp(-t / 0.12) * tail
+    return 0.9 * out * (1 - np.exp(-t / 0.006)) * np.exp(-t / 0.12) * tail
 
 
 bov = np.zeros(N)
 place(bov, blow_off(), T_LIFT + 0.025)
 
 # ------------------------------------------------------------------------------------------------ pops and bangs
-CRACK = unit(filt(noise(SR), lambda f: band(f, 700, 12000)))
+CRACK = unit(filt(noise(SR), lambda f: band(f, 500, 5000)))
 BODY = unit(filt(noise(SR), lambda f: band(f, 120, 2400) * peak(f, 420, 1.3, 2.5)))
 RATTLE = unit(filt(noise(SR), lambda f: band(f, 1500, 5000, 3)))
 
@@ -258,7 +260,7 @@ def pop(size):
     f0 = rng.uniform(55, 85) * (1 + 0.3 * np.exp(-t / 0.02))
     thump = np.sin(2 * np.pi * np.cumsum(f0) / SR) * np.exp(-t / (0.03 + 0.05 * size))
     rattle = slice_of(RATTLE) * np.exp(-t / 0.03) * (t > 0.004)
-    p = (1 - np.exp(-t / 0.00015)) * (0.9 * crack + 0.8 * body + 1.6 * size * thump) + 0.05 * rattle
+    p = (1 - np.exp(-t / 0.0004)) * (0.55 * crack + 0.8 * body + 1.6 * size * thump) + 0.05 * rattle
     return size * np.tanh(1.5 * p)
 
 
@@ -274,7 +276,7 @@ a, b = at(T_CRANK), at(T_CATCH + 0.04)
 t = T[a:b] - T_CRANK
 pc = np.cumsum(8.0 + 4.0 * t) / SR                       # compression strokes per second, quickening
 m = 0.5 - 0.5 * np.cos(2 * np.pi * pc)                    # 1 at each compression stroke
-whirr = unit(filt(noise(b - a), lambda f: band(f, 500, 4000) * peak(f, 1400, 2.0, 2.0)))
+whirr = unit(filt(noise(b - a), lambda f: band(f, 300, 2500) * peak(f, 1000, 2.0, 2.0)))
 grind = unit(filt(noise(b - a), lambda f: band(f, 70, 500)))
 env = np.clip(t / 0.02, 0, 1) * np.clip((T_CATCH + 0.04 - T[a:b]) / 0.04, 0, 1)
 starter[a:b] = env * ((0.25 + 0.75 * (1 - m)) * 0.016 * whirr + (0.3 + 0.7 * m) * 0.035 * grind)
@@ -300,7 +302,7 @@ def car_park_ir():
     for ms, g in [(3.1, .32), (9.4, .28), (16.8, .22), (23.5, .2), (31.0, .17), (38.2, .15),
                   (47.5, .12), (59.0, .1), (71.3, .09), (86.0, .07)]:
         ir[int(ms * SR / 1000 * rng.uniform(0.92, 1.08))] += g * rng.choice([-1, 1])
-    ir = filt(ir, lambda f: band(f, None, 6000, 1))
+    ir = filt(ir, lambda f: band(f, None, 4000, 1))
     tail = np.zeros(n)
     for lo, hi, rt in [(20, 250, 1.3), (250, 2000, 1.4), (2000, 9000, 0.9), (9000, 20000, 0.4)]:
         tail += filt(noise(n), lambda f, lo=lo, hi=hi: band(f, lo, hi, 3)) * np.exp(-6.91 * t / rt)
@@ -316,7 +318,7 @@ dry = 0.55 * engine_bus + turbo * fade + bov + 0.55 * pops + starter
 send = 0.55 * engine_bus * 0.2 + bov * 0.25 + 0.55 * pops * 0.35 + starter * 0.2
 wet = [conv(send, car_park_ir()) for _ in range(2)]
 mix = np.stack([dry + 0.5 * wet[0], dry + 0.5 * wet[1]], axis=1) + amb[:, None]
-mix = np.stack([filt(mix[:, ch], lambda f: band(f, 28, 16000, 2)) for ch in range(2)], axis=1)
+mix = np.stack([filt(mix[:, ch], lambda f: band(f, 28, 10000, 1)) for ch in range(2)], axis=1)
 
 
 # ------------------------------------------------------------------------------------------------ master
