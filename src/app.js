@@ -262,9 +262,9 @@ let lastInteract = 0;
 
 // ------------------------------------------------------------------ hero intro: realistic film -> final still -> logo
 const heroMedia = $('#hero-media'), heroVideo = $('#hero-video'), introBar = $('#intro-bar');
-// the logo starts drawing this many seconds before the film ends, just after the last bang of the sound
-// (tools/make-hero-audio.py times the pops to it, so change both together)
-const LOGO_LEAD = 1.6;
+// the logo starts drawing this many seconds before the film ends: once the carbon has set, just after the last bang
+// of the sound (tools/make-hero-audio.py times the pops to it, so change both together)
+const LOGO_LEAD = 0.925;
 let heroDone = false, logoShown = false;
 const LOGO_SWEEP = 1.7;   // s: the beam's delay and sweep across the logo (style.css --sweep); the slogan follows it
 let logoStart = 0;

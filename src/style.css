@@ -111,25 +111,32 @@ main { position: relative; z-index: 1; }
 /* fade from the hero's black into the 3D stage behind the next section */
 .hero::after { content: ""; position: absolute; left: 0; right: 0; top: 100%; height: 26vh; background: linear-gradient(var(--black), rgba(0, 0, 0, 0)); pointer-events: none; }
 .hero-media { position: absolute; inset: 0; z-index: 0; overflow: hidden; background: var(--black); }
-.hero-media video, .hero-media img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 60% 50%; }
+.hero-media video, .hero-media img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 50%; }
 .hero-still { opacity: 0; transition: opacity 0.7s ease; }
 .hero-media.is-final .hero-still { opacity: 1; }
-/* the photoreal three.js Evo takes over from the film's last frame once it has loaded */
-/* keep the copy legible on the left and melt the bottom edge into the 3D stage below */
+/* melt the bottom edge into the 3D stage below */
 .hero-media::after {
   content: ""; position: absolute; inset: 0; pointer-events: none;
-  background: linear-gradient(90deg, rgba(0, 0, 0, 0.5) 0%, rgba(0, 0, 0, 0) 46%), linear-gradient(180deg, rgba(0, 0, 0, 0) 72%, var(--black) 100%);
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0) 72%, var(--black) 100%);
 }
 .hero-copy, .intro-ui, .scroll-cue { z-index: 1; }
-/* portrait screens: the car fills the top of the screen and the copy sits on black below it */
-@media (max-aspect-ratio: 9/10) {
-  .hero-media { bottom: auto; height: 72svh; }
-  .hero-media video, .hero-media img { object-position: 68% 45%; }
-  .hero-media::after { background: linear-gradient(180deg, rgba(0, 0, 0, 0.35) 0%, rgba(0, 0, 0, 0) 22%, rgba(0, 0, 0, 0) 58%, var(--black) 100%); }
-}
+/* The film ends on the car head-on in the middle of the frame. The logo then draws in at the centre of the screen,
+   over the car, with the slogan and buttons centred below it. */
 .hero-copy {
-  position: absolute; left: var(--gutter); bottom: clamp(64px, 11vh, 128px);
-  display: grid; gap: 22px; max-width: min(92vw, 980px);
+  --logo-y: 46%;
+  position: absolute; inset: 0; pointer-events: none;
+  display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 22px;
+  padding: 0 var(--gutter) clamp(64px, 11vh, 128px); text-align: center;
+}
+.hero-copy > * { pointer-events: auto; }
+/* portrait screens: the film fills the top of the screen (no taller than 125vw, so the whole car fits across), the
+   logo sits over the car and the slogan and buttons sit on black below */
+@media (max-aspect-ratio: 9/10) {
+  .hero { --media-h: min(72svh, 125vw); }
+  .hero-media { bottom: auto; height: var(--media-h); }
+  .hero-media::after { background: linear-gradient(180deg, rgba(0, 0, 0, 0.35) 0%, rgba(0, 0, 0, 0) 22%, rgba(0, 0, 0, 0) 58%, var(--black) 100%); }
+  .hero-copy { --logo-y: calc(var(--media-h) * 0.46); padding-top: var(--media-h); justify-content: center; }
+  .logo { width: clamp(240px, calc(var(--media-h) * 0.5), 520px); }
 }
 /* RZER Performance logo. Reveal (on .revealed, which starts just after the last bang of the film's sound):
    a soft volumetric beam, slanted like the logo, sweeps across left to right. Behind it the mark turns from dark
@@ -137,8 +144,9 @@ main { position: relative; z-index: 1; }
    beam passes. Then the slogan fades in with a shimmer, and everything holds. The base and glint masks and the
    beam share one timing, so they move together: the edge sits at -15% of the logo's width at the start and +115%
    at the end (mask-position 82.5% -> 17.5% on a 300%-wide gradient; the beam is 30% wide, translateX -100% -> 333%). */
-.logo { --sweep: 1.5s cubic-bezier(0.45, 0, 0.2, 1) 0.2s both; position: relative; margin: 0; width: clamp(260px, 31vw, 520px); line-height: 0; }
+.logo { --sweep: 1.5s cubic-bezier(0.45, 0, 0.2, 1) 0.2s both; position: absolute; left: 50%; top: var(--logo-y); transform: translate(-50%, -50%); margin: 0; width: clamp(260px, 31vw, 520px); line-height: 0; }
 .logo-svg { display: block; width: 100%; height: auto; overflow: visible; }
+.logo-base { filter: drop-shadow(0 2px 10px rgba(0, 0, 0, 0.7)); }   /* lifts the outlined lettering off the bonnet */
 .logo-line { fill: none; stroke: #fff; stroke-width: 3.2; stroke-linecap: round; stroke-linejoin: round; }
 .logo-base .logo-line { filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.35)); }
 .logo-rzer { fill: #fff; font-family: var(--font); font-weight: 900; font-stretch: 125%; font-size: 84px; transform: skewX(-12deg); transform-origin: 30px 212px; }
@@ -168,17 +176,20 @@ main { position: relative; z-index: 1; }
 @keyframes logo-sweep { from { -webkit-mask-position: 82.5% 0; mask-position: 82.5% 0; } to { -webkit-mask-position: 17.5% 0; mask-position: 17.5% 0; } }
 @keyframes logo-glint { 0% { opacity: 0; } 12% { opacity: 1; } 85% { opacity: 1; } 100% { opacity: 0; } }
 @keyframes logo-beam { 0% { opacity: 0; transform: translateX(-100%) skewX(-12deg); } 15% { opacity: 1; } 80% { opacity: 1; } 100% { opacity: 0; transform: translateX(333.3%) skewX(-12deg); } }
-/* a deep matte darkening behind the logo and slogan, so the beam reads */
+/* once the film has landed, the frame darkens to a deep matte black behind the logo, so the beam reads, and along
+   the bottom behind the slogan and buttons */
 .hero-copy::before {
-  content: ''; position: absolute; z-index: -1; inset: -25% -15% -20% calc(-1 * var(--gutter)); pointer-events: none;
-  background: radial-gradient(60% 55% at 35% 45%, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0) 72%); opacity: 0; transition: opacity 1.2s ease;
+  content: ''; position: absolute; z-index: -1; inset: 0; pointer-events: none;
+  background: radial-gradient(clamp(220px, 30vw, 520px) clamp(130px, 17vw, 300px) at 50% var(--logo-y), rgba(0, 0, 0, 0.72), rgba(0, 0, 0, 0.34) 62%, rgba(0, 0, 0, 0) 100%),
+    linear-gradient(0deg, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0) 34%);
+  opacity: 0; transition: opacity 1.2s ease;
 }
 .hero-copy.brand-on::before { opacity: 1; }
 /* the slogan fades in once the beam has crossed (--slogan-delay on .hero-copy, set in app.js), with one crisp
    shimmer; the buttons follow it */
 .hero-actions { transition: opacity 0.8s ease calc(var(--slogan-delay, 0s) + 0.6s); }
 .is-intro .hero-line, .is-intro .hero-actions { opacity: 0; pointer-events: none; }
-.hero-line { font-size: clamp(1rem, 1.4vw, 1.25rem); color: var(--chrome); max-width: 24em; }
+.hero-line { margin: 0; font-size: clamp(1rem, 1.4vw, 1.25rem); color: var(--chrome); max-width: 24em; }
 @supports ((-webkit-background-clip: text) or (background-clip: text)) {
   /* the shimmer brightens the slogan as it passes, ending on --chrome */
   .hero-line { background: linear-gradient(100deg, var(--chrome) 44%, #fff 50%, #8d939a 56%) 0 0 / 300% 100% no-repeat; -webkit-background-clip: text; background-clip: text; color: transparent; }
@@ -186,7 +197,7 @@ main { position: relative; z-index: 1; }
 .intro-done .hero-line { animation: slogan-in 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) var(--slogan-delay, 0s) both, slogan-shimmer 1.4s ease-in-out calc(var(--slogan-delay, 0s) + 0.35s) both; }
 @keyframes slogan-in { from { opacity: 0; transform: translateY(8px); filter: blur(5px); } to { opacity: 1; transform: none; filter: none; } }
 @keyframes slogan-shimmer { from { background-position: 100% 0; } to { background-position: 0 0; } }
-.hero-actions { display: flex; flex-wrap: wrap; gap: 12px; }
+.hero-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; }
 
 .intro-ui {
   position: absolute; right: var(--gutter); bottom: clamp(64px, 11vh, 128px);
@@ -414,7 +425,7 @@ body:not(.in-builder) .loading { display: none; }
   .panel-inner::before { inset: -14% -14%; background: radial-gradient(closest-side, rgba(0, 0, 0, 0.85), rgba(0, 0, 0, 0.6) 60%, transparent); }
   .services li { grid-template-columns: 1fr; }
   .intro-ui { left: var(--gutter); right: auto; bottom: 26px; }
-  .hero-copy { bottom: 88px; }
+  .hero-copy { padding-bottom: 88px; }
   .scroll-cue { display: none; }
 
   .b-panel { left: 0; right: 0; bottom: 0; top: auto; width: auto; height: 44vh; border-radius: 10px 10px 0 0; }

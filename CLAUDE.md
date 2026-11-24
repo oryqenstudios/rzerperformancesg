@@ -2,13 +2,13 @@
 
 Website for **Rzer (RZER Performance)**, a Singapore car tuning and performance workshop (Instagram: `@rzerperformance.sg`). Built by a web designer for this client. Theme: **gloss black**. One page with three parts:
 
-1. **Hero:** a realistic 12.5 s film that follows reference video 1 beat for beat from its 3 s mark, including its camera moves (the client cut the opening, where the liquid flows in):
-   - a glossy black dome on the spotlit floor shrinks to a drop
+1. **Hero:** a realistic 13.9 s film set in a dark, professional tuning garage (glossy black epoxy floor, a hexagonal LED ceiling, red neon, a wheel wall; the client's reference for its colours and look). Up to the headlights it follows reference video 1 beat for beat from its 3 s mark, including its camera moves (the client cut the opening, where the liquid flows in):
+   - a glossy black dome on the floor shrinks to a drop
    - the drop bursts into radiating rods and a rectangle, and the frame and chassis rise from it
    - the body pours over as the camera comes down to a head-on view
-   - the headlights snap on, the paint cures to silver, and the camera orbits to the front three-quarter
+   - the headlights snap on, then a streak of light runs round the car and the black liquid sets into bare carbon fibre. The film ends on the client's chosen look: a full-carbon Evo IX, head-on and **centred in the frame**, with **no number plate**
 
-   It has **sound**, each moment on its own: the starter cranking, the engine firing as the headlights snap on, one full rev, the blow-off valve, then pops and bangs, the last just before the logo. As it ends, the **RZER Performance logo** draws in and the hero rests on the film's final frame (`hero-final.jpg`). A photoreal three.js Evo IX used to take over from the film here; the client asked for it to be removed from the hero, and it now lives only in the showroom preview (`src/showroom/`). The film was generated with Higgsfield in five chained segments; see `assets/generated/README.md`.
+   It has **sound**, each moment on its own: the starter cranking, the engine firing as the headlights snap on, one full rev, the blow-off valve as the light streak bursts out, pops and bangs as it runs round the car, and one last bang just before the logo. As the carbon finishes setting, the **RZER Performance logo** draws in **at the centre of the screen, over the car**, and the hero rests on the film's final frame (`hero-final.jpg`) with the slogan and buttons centred below. A photoreal three.js Evo IX used to take over from the film here; the client asked for it to be removed from the hero, and it now lives only in the showroom preview (`src/showroom/`). The film was generated with Higgsfield; see `assets/generated/README.md`.
 2. **Scroll sections** in the style of reference video 2: the real-time 3D Evo IX (the CC BY model, three.js), presented like a product asset: neutral, even studio light on a plain solid charcoal background, no text on the car. The camera moves around it per section (side profile, rear three-quarter, x-ray with tracked hotspots, wheel close-up, headlights-on front view, contact).
 3. **Configurator** (`#build`): orbit the same 3D Evo and swap parts live (paint, wheel finish, calipers, aero, ride height, exhaust, lights/tint, carbon) with a job card, build code, hold-to-compare-stock and copy-build.
 
@@ -29,7 +29,7 @@ npm run dev          # rebuild on every change in src/; refresh dist/index.html 
 ## Stack and constraints
 
 - **The 3D view has no libraries and no 3D assets.** Raw WebGL2 with one fragment shader that raymarches signed distance fields (SDFs). The car and garage are modelled in GLSL. This was chosen because the original build environment had no CDN access, and because SDFs let an earlier 3D liquid intro morph straight into the car (since replaced by the hero film and removed from the shader). Moving to Three.js later would be a new renderer, not a port.
-- **The hero is a film.** The film files are `assets/site/hero-intro.mp4` (plus a `.webm` fallback), `hero-poster.jpg` and `hero-final.jpg`, about 7.8 MB in total. The films carry the synthesised engine sound (`tools/make-hero-audio.py`, muxed by `tools/mux-hero-audio.sh`).
+- **The hero is a film.** The film files are `assets/site/hero-intro.mp4` (plus a `.webm` fallback), `hero-poster.jpg` and `hero-final.jpg`, about 9.3 MB in total. The films carry the synthesised engine sound (`tools/make-hero-audio.py`, muxed by `tools/mux-hero-audio.sh`).
 - **The 3D car is three.js** for the scroll sections, the configurator and the preview (`dist/showroom/`):
   - `src/showroom/showroom.js` is an ES module that uses **three.js r170, vendored in `vendor/three/`** (MIT; no CDN). The page reaches it through an import map and a module script at the end of `index.html`.
   - The car is `assets/site/models/lancer-evolution-rzer.glb`: the CC BY 4.0 model by 3DCars4U (`assets/source/lancer-evolution.glb`) with its body split into named parts by `tools/split-model.py`. See `assets/site/models/CREDITS.md`.
@@ -53,29 +53,34 @@ npm run dev          # rebuild on every change in src/; refresh dist/index.html 
 | `assets/source/` | The model as downloaded, input to `tools/split-model.py` (not shipped) |
 | `assets/generated/` | Higgsfield stills, the segment prompts (`prompts/`), `film-plan.json`, and how the shipped files were made |
 | `tools/higgsfield-i2v.sh` | Generate one film segment (image-to-video) and pull its last frame |
-| `tools/assemble-film.py` | Reverse, retime and join the segments per `film-plan.json`; encode the web files (without sound) |
-| `tools/make-hero-audio.py` | Synthesise the hero film's sound (engine start, revs, pops and bangs, car-park reverb), timed to the film's frames |
-| `tools/mux-hero-audio.sh` | Put that sound (or any WAV) into `hero-intro.mp4` and `.webm`. Run it after every `assemble-film.py` |
+| `tools/assemble-film.py` | Reverse, retime and join the segments per `film-plan.json` (the original car-park film) |
+| `tools/higgsfield-v2v.sh` | Restyle a whole film with Seedance video-edit (how the film moved into the tuning garage) |
+| `tools/higgsfield-edit.sh` | Edit a still from one or more reference images (Kling or Seedream image edit) |
+| `tools/higgsfield-flf.sh` | Generate a clip between a given first and last frame (Kling O3) |
+| `tools/finish-garage-film.sh` | Join the garage film and the carbon cure clip; encode the web files (without sound), the poster and the final still |
+| `tools/make-hero-audio.py` | Synthesise the hero film's sound (engine start, revs, pops and bangs, workshop reverb), timed to the film's frames |
+| `tools/mux-hero-audio.sh` | Put that sound (or any WAV) into `hero-intro.mp4` and `.webm`. Run it after every `finish-garage-film.sh` |
 | `tools/shot.mjs` | Render the shader alone with any uniforms → `tools/shots/*.png` |
 | `tools/split-model.py` | Split the model's merged body into named part nodes (shell, bonnet, roof, mirrors, lip, wing, tip, interior) |
 | `tools/page.mjs` | Drive the built page through states (intro time, scroll, `#build`, clicks) → screenshots + page errors. `RZ_URL=http://…` tests the 3D car |
 
 ## Hero (`#hero-media` in `src/index.html`, controller in `src/app.js`)
 
-- The film plays inline once. `LOGO_LEAD` (1.6 s) before it ends, just after the last bang of the sound, `revealLogo()` adds `.revealed` to the logo, so the logo comes in over the final orbit. On `ended`, `finishIntro()` adds `.is-final` (fading in `hero-final.jpg`) and swaps `is-intro` for `intro-done`, which brings in the tagline and buttons.
+- The film plays inline once. `LOGO_LEAD` (0.925 s) before it ends, once the carbon has set and just after the last bang of the sound, `revealLogo()` adds `.revealed` to the logo, so the logo comes in as the film settles on its final frame. On `ended`, `finishIntro()` adds `.is-final` (fading in `hero-final.jpg`) and swaps `is-intro` for `intro-done`, which brings in the tagline and buttons.
+- **Layout:** the film ends with the car head-on in the middle of the frame (`object-position: 50% 50%`). `.hero-copy` covers the hero: the logo is centred at `--logo-y` (46% of the height, over the base of the windscreen, whose dark glass keeps it legible), and the slogan and buttons are centred along the bottom.
 - **Sound, with no sound button (the client asked for none):**
   - `startHero()` first plays the film with sound. Browsers allow that only for sites the visitor already trusts (Chrome's media engagement, a per-site sound setting).
   - Refused, it plays muted, and the first click, tap or key press (`GESTURES`, not Esc) unmutes it in sync.
   - Speeding up mutes it (4× audio sounds broken). Skip stops it, which also covers the accessibility rule that automatic sound must be stoppable.
 - **Skip** cuts straight to the final frame. Esc, the wheel or a swipe set `playbackRate = 4`. `prefers-reduced-motion` and in-page hash links go straight to the still.
-- **Fallbacks:** if autoplay is refused, the last `<source>` errors, or nothing has played after 7 s, it shows the still. The film's last frame and the still differ by about 1.2% per pixel, so the crossfade is invisible.
+- **Fallbacks:** if autoplay is refused, the last `<source>` errors, or nothing has played after 7 s, it shows the still. The still is the 2K end frame the film was generated to land on; once both are blurred a little they differ by about 1.3% per pixel (the still is just sharper), so the crossfade doesn't show.
 - While the film covers the stage (home page, `scrollY < 2`), the old shader view draws only every 30th frame.
-- **Portrait screens** (`max-aspect-ratio: 9/10`): the media takes the top 72svh and the copy sits on black below. The hero's own black background hides the 3D stage behind it, and `.hero::after` fades it into the next section.
+- **Portrait screens** (`max-aspect-ratio: 9/10`): the media takes the top of the screen, `--media-h` = 72svh but no taller than 125vw, so the whole car fits across a phone. The logo sits over the car (46% of `--media-h`, sized to half of it) and the slogan and buttons are centred on black below. The hero's own black background hides the 3D stage behind it, and `.hero::after` fades it into the next section.
 - **Logo:** inline SVG, white, no background, redrawn from the client's logo. The words are bold slanted RZER and outlined PERFORMANCE, in Archivo at 125% width, skewed −12°. The reveal follows the client's brief (a light beam over bevelled glass, then the slogan with a shimmer). It runs on `.revealed`, about 1.7 s, in vector so the mark never changes shape:
   1. The mark appears as faint dark glass (`.logo-base` under a mask at 12%).
   2. `.logo-beam`, a soft, slanted volumetric beam with a haze around it, sweeps left to right. Behind it the mark turns solid white (the base mask slides with it).
   3. `.logo-glint`, a copy of the mark through the `#logo-glass` SVG filter (specular lighting on a blurred outline, lit from both sides), shows only in a narrow band at the beam, so the bevelled glass edges catch the light as it passes.
-  4. `.hero-copy::before` darkens the area behind the logo and slogan to a deep matte black.
+  4. `.hero-copy::before` darkens the frame to a deep matte black behind the logo, and along the bottom behind the slogan and buttons. A soft dark drop shadow on `.logo-base` lifts the outlined lettering off the carbon bonnet.
   5. Once the beam has crossed (`LOGO_SWEEP` in `app.js` sets `--slogan-delay`), the slogan fades in and one shimmer brightens it from grey to `--chrome`; the buttons follow. Then everything holds.
 
   The masks and the beam share one timing (`--sweep` on `.logo`); the CSS comment above the logo rules gives the geometry that keeps them together.
@@ -210,7 +215,7 @@ Gloss and metallic paint only read through these reflections, so **any change to
   3. If the uniform is an int, add it to `INTS`.
   4. If it needs its own camera angle, add a `BUILD_VIEWS` entry.
 - **Cameras:**
-  - `HOME_CAMS` per section (`data-cam`). The camera is interpolated in orbit space (target, r, θ, φ) from scroll position so it never passes through the car. The hero camera looks at the front three-quarter from the car's left, like the film's final frame.
+  - `HOME_CAMS` per section (`data-cam`). The camera is interpolated in orbit space (target, r, θ, φ) from scroll position so it never passes through the car. The hero camera looks at the front three-quarter from the car's left (the film covers it).
   - `shift` is a lens shift in NDC that places the car beside the copy.
   - `BUILD_VIEWS` holds one camera per configurator category.
   - On portrait screens the camera distance is scaled up by `fit`.
@@ -241,7 +246,7 @@ Gloss and metallic paint only read through these reflections, so **any change to
 
 - **All copy is a placeholder.** It was written from the brief "car tuning and performance" because the client's Instagram couldn't be read. Confirm the services, process and tagline.
 - **No address, phone or opening hours.** Bookings point to an Instagram DM.
-- **The hero film and still are AI-generated** (Higgsfield). They show an Evo with an older Evo V/VI-style front and a Mitsubishi grille badge. The number plate was blanked by hand. A real photo of the client's car as a reference image would make it an accurate Evo IX.
+- **The hero film and still are AI-generated** (Higgsfield). The ending was generated to look like a full-carbon Evo IX photo the client sent (only as a reference: that photo is not in the repo or on the site, and its plate and branding are not reproduced). The car has no number plate at the end; the liquid car before the cure has a blank plate that melts away as the carbon sets. Before the cure the liquid car has an older Evo V/VI-style front and a red badge; the finished car keeps a Mitsubishi grille badge. Confirm with the client that the badge is fine.
 - **3D cars:**
   - The scroll sections, configurator and preview use the CC BY 4.0 Evo IX by 3DCars4U (split into parts for the site, which the licence allows with credit). Its credit is in the footer (`#model-credit`) and on the preview; keep it.
   - The older primitive-built car in the shader is only the file:// and no-WebGL2 fallback.

@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
 """Synthesise the hero film's sound: the Evo starting as its headlights snap on, one big rev, the blow-off valve,
-then a few pops and bangs on the overrun, in an underground car park. Each moment stands on its own, timed to the
-film (assets/site/hero-intro.mp4, 24 fps):
+then pops and bangs on the overrun, in the tuning workshop. Each moment stands on its own, timed to the film
+(assets/site/hero-intro.mp4, 24 fps, 13.875 s):
 
-   0      faint car-park room tone (ventilation rumble, strip-light hum); no engine while the car is being built
-   8.85   the starter turns the engine over: rur-rur-rur
-   9.375  the engine fires as the headlights snap on (frame 225): a big flare, vroom, then a fast idle
-   9.75   a full rev to 7,000 rpm, the turbo spooling
-  10.10   throttle shut: a loud blow-off valve (psssh), on its own
-  10.47   backfires as the revs fall: BANG, pap-pap, BANG, BANG; the last at 10.85, just before the logo (10.94)
-  10.9    settling to idle, fading out under the logo by the end of the film (12.54)
+   0      faint workshop room tone (ventilation rumble, light hum); no engine while the car is being built
+   8.52   the starter turns the engine over: rur-rur-rur
+   9.04   the engine fires as the headlights snap on (frame 217): a big flare, vroom, then a fast idle
+  10.48   a full rev to 7,000 rpm, the turbo spooling
+  10.83   throttle shut as the light streak bursts out at the bumper (frame 260): a loud blow-off valve (psssh)
+  11.2    backfires as the revs fall and the streak runs round the car: BANG, pap-pap, BANG, BANG
+  12.85   one last BANG as the carbon finishes setting, just before the logo (12.95)
+  12.9    settling to idle, fading out under the logo by the end of the film (13.875)
 
 The logo time is the film's length minus LOGO_LEAD in src/app.js; keep the two in step.
 
@@ -27,21 +28,22 @@ import wave
 import numpy as np
 
 SR = 48000
-DUR = 12.56
+DUR = 13.9
 N = int(SR * DUR)
 T = np.arange(N) / SR
 rng = np.random.default_rng(1729)
 
 # ------------------------------------------------------------------------------------------------ film beats (s)
-T_CRANK = 8.85    # starter engages
-T_HEAD = 9.375    # headlights snap on: the engine fires
+T_CRANK = 8.52    # starter engages
+T_HEAD = 9.04     # headlights snap on: the engine fires
 T_CATCH = T_HEAD
-T_REV = 9.75      # foot down
-T_LIFT = 10.10    # throttle shut: blow-off valve
-POPS = [(10.47, 1.0), (10.58, 0.5), (10.645, 0.5), (10.73, 0.85), (10.85, 1.0)]   # (time, size): BANG, pap-pap, BANG, BANG
-T_LOGO = 10.94    # the logo starts drawing (film length 12.54 - LOGO_LEAD 1.6 in app.js)
-T_FADE = 11.2     # idle starts fading out under the logo
-T_END = 12.54     # film ends
+T_REV = 10.48     # foot down
+T_LIFT = 10.83    # throttle shut: blow-off valve, as the light streak bursts out
+POPS = [(11.20, 1.0), (11.31, 0.5), (11.375, 0.5), (11.46, 0.85), (11.58, 1.0),   # (time, size): BANG, pap-pap, BANG, BANG
+        (12.85, 1.0)]                                                              # ...and the last BANG before the logo
+T_LOGO = 12.95    # the logo starts drawing (film length 13.875 - LOGO_LEAD 0.925 in app.js)
+T_FADE = 13.05    # idle starts fading out under the logo
+T_END = 13.875    # film ends
 IDLE = 1000.0
 REDLINE = 7000.0
 
@@ -122,27 +124,29 @@ def place(bus, sig, t):
 # ------------------------------------------------------------------------------------------------ the drive
 running = T >= T_CATCH
 rpm = automation([
-    (T_CATCH, 9.57, 350, 3300, 'out'),        # fires and flares: vroom
-    (9.57, T_REV, 3300, 1450, 'out'),
-    (T_REV, T_LIFT, 1500, REDLINE, 'in'),     # full rev
-    (T_LIFT, 10.95, REDLINE, 1150, 'out'),    # overrun: blow-off, then pops and bangs
-    (10.95, 11.40, 1150, IDLE, 'inout'),
+    (T_CATCH, T_CATCH + 0.195, 350, 3300, 'out'),   # fires and flares: vroom
+    (T_CATCH + 0.195, 9.9, 3300, 1450, 'out'),
+    (9.9, T_REV, 1450, 1300, 'inout'),               # fast idle, slowly settling
+    (T_REV, T_LIFT, 1500, REDLINE, 'in'),            # full rev
+    (T_LIFT, 11.70, REDLINE, 2100, 'out'),           # overrun: blow-off, then pops and bangs
+    (11.70, 12.95, 2100, 1150, 'out'),               # revs still falling for the last bang
+    (12.95, 13.40, 1150, IDLE, 'inout'),
 ], IDLE)
 rpm += 35 * np.sin(2 * np.pi * 0.8 * T) * (rpm < 1300)          # idle lope
 rpm = smooth(rpm, 0.025)
 
 load = automation([
-    (T_CATCH, 9.55, 1.0, 1.0, 'lin'),
-    (9.55, T_REV - 0.01, 0.2, 0.2, 'lin'),     # running at a fast idle before the rev
+    (T_CATCH, T_CATCH + 0.175, 1.0, 1.0, 'lin'),
+    (T_CATCH + 0.175, T_REV - 0.01, 0.2, 0.2, 'lin'),   # running at a fast idle before the rev
     (T_REV - 0.01, T_LIFT, 1.0, 1.0, 'lin'),
-    (T_LIFT, 10.90, 0.0, 0.0, 'lin'),
+    (T_LIFT, 12.95, 0.0, 0.0, 'lin'),
 ], 0.12)
 load[~running] = 0
 load = smooth(load, 0.012)
 overrun = (load < 0.05) & (rpm > 1500) & running
 
 # idle fades out under the logo; the film ends in silence
-fade = np.clip(1 - (T - T_FADE) / (12.42 - T_FADE), 0, 1)
+fade = np.clip(1 - (T - T_FADE) / (T_END - 0.12 - T_FADE), 0, 1)
 fade = fade * fade * (3 - 2 * fade)
 
 # ------------------------------------------------------------------------------------------------ engine
@@ -292,15 +296,15 @@ for i in np.flatnonzero(np.diff(np.floor(pc)) > 0):
     place(starter, chug * (1 - np.exp(-tn / 0.003)), T_CRANK + t[i] + 0.03)
 place(starter, 0.25 * pop(0.1), T_CRANK)                  # the pinion engaging
 
-# ------------------------------------------------------------------------------------------------ the car park
+# ------------------------------------------------------------------------------------------------ the workshop
 amb = 0.004 * unit(filt(noise(N), lambda f: band(f, 25, 400)))
 amb += 0.0012 * np.sin(2 * np.pi * 100 * T) + 0.0005 * np.sin(2 * np.pi * 200 * T + 1)   # strip-light hum
 amb *= np.clip(T / 0.4, 0, 1)
 
 
 def car_park_ir():
-    """Concrete underground car park: slaps off the floor, ceiling and pillars, then a tail in which the highs
-    die away first. Kept short and low so the moments stay separate."""
+    """A hard-walled workshop: slaps off the epoxy floor, ceiling and walls, then a tail in which the highs die
+    away first. Kept short and low so the moments stay separate."""
     n = int(2.0 * SR)
     t = np.arange(n) / SR
     ir = np.zeros(n)
@@ -365,9 +369,11 @@ with wave.open(out, 'wb') as w:
     w.setframerate(SR)
     w.writeframes(pcm.astype('<i2').tobytes())
 print('wrote', out)
-for name, (t0, t1) in {'room tone': (1, 8.5), 'cranking': (8.9, 9.37), 'fires': (T_CATCH, 9.6),
-                       'full rev': (T_REV, T_LIFT), 'blow-off': (T_LIFT + 0.02, 10.4), 'pops': (10.40, 10.95),
-                       'idle under logo': (11.3, 11.8)}.items():
+for name, (t0, t1) in {'room tone': (1, 8.4), 'cranking': (T_CRANK + 0.05, T_CATCH - 0.01),
+                       'fires': (T_CATCH, T_CATCH + 0.22), 'fast idle': (9.6, T_REV), 'full rev': (T_REV, T_LIFT),
+                       'blow-off': (T_LIFT + 0.02, T_LIFT + 0.3), 'pops': (POPS[0][0] - 0.02, POPS[4][0] + 0.12),
+                       'last bang': (POPS[-1][0] - 0.02, POPS[-1][0] + 0.12),
+                       'idle under logo': (T_LOGO + 0.1, T_LOGO + 0.5)}.items():
     print(f'  {name:16s} {rms_db(mix, t0, t1):6.1f} dBFS RMS')
 print(f'  peak {20 * np.log10(np.max(np.abs(mix))):.1f} dBFS, deepest limiting {reduction:.1f} dB at {reduction_at:.2f} s')
 
@@ -394,7 +400,7 @@ def spectrogram(x, path):
     im = Image.fromarray((np.concatenate([top, rgb]) * 255).astype(np.uint8))
     d = ImageDraw.Draw(im)
     for t, label in [(T_CRANK, 'crank'), (T_HEAD, 'headlights: fires'), (T_REV, 'rev'), (T_LIFT, 'blow-off'),
-                     (POPS[0][0], 'pops'), (T_LOGO, 'logo'), (T_END, 'end')]:
+                     (POPS[0][0], 'pops'), (POPS[-1][0], 'bang'), (T_LOGO, 'logo'), (T_END, 'end')]:
         xpos = int(t * SR / hop)
         d.line([(xpos, 0), (xpos, im.height)], fill=(80, 200, 255))
         d.text((xpos + 3, 2), label, fill=(255, 255, 255))

@@ -1,14 +1,41 @@
 # Generated hero media
 
-The hero opens on a realistic 12.5 s film made with Higgsfield (`api.higgsfield.ai`). It follows reference video 1 beat for beat, including its camera moves, and ends on the final still. This folder keeps the stills, the prompts and the plan for rebuilding the film. The files the site ships are in `assets/site/` (`build.mjs` copies them to `dist/assets/`).
+The hero opens on a realistic 13.9 s film made with Higgsfield (`api.higgsfield.ai`), set in a dark, professional tuning garage. Up to the headlights it follows reference video 1 beat for beat, including its camera moves. Then a streak of light runs round the car and sets the black liquid into bare carbon fibre, and the film lands on a full-carbon Evo IX, head-on and centred, with no number plate. This folder keeps the stills, the prompts and the plans for rebuilding the film. The files the site ships are in `assets/site/` (`build.mjs` copies them to `dist/assets/`).
 
 ## What ships
 
 | File in `assets/site/` | Made from |
 |---|---|
-| `hero-final.jpg` | `hero-final.png` at JPEG quality 88. It is `hero-v2a-1.png` with the garbled number-plate lettering painted out to a blank black plate. |
-| `hero-intro.mp4` / `.webm` | The five segments in `film-plan.json`, joined by `tools/assemble-film.py`. 1920×1080, 24 fps. H.264 CRF 24 (capped at 2.8 Mbit/s) with faststart is about 4.2 MB; VP9 CRF 35 is about 3.1 MB. Sound: the synthesised engine start, revs, pops and bangs (AAC 160k / Opus 128k), see below. |
-| `hero-poster.jpg` | The film's first frame, shown until it starts. |
+| `hero-intro.mp4` / `.webm` | `tools/finish-garage-film.sh`: the garage film up to frame 212 (8.83 s), then a 6-frame dissolve into the carbon cure clip (see "The garage and the carbon ending" below). 1920×1080, 24 fps, 333 frames. H.264 CRF 24 (capped at 2.8 Mbit/s) with faststart is about 4.7 MB; VP9 CRF 35 about 4.0 MB. Sound: the synthesised engine start, rev, blow-off, pops and bangs (AAC 160k / Opus 128k), see "Sound". |
+| `hero-final.jpg` | `carbon-final.jpg` (the end frame the cure clip was generated to land on) at 2048×1152, JPEG quality 88 |
+| `hero-poster.jpg` | The film's first frame, shown until it starts |
+
+## The garage and the carbon ending
+
+The client sent a reference for the garage's colours and look (black, white and red: a glossy black floor, a hexagonal LED ceiling, red neon, a wheel wall) and a photo of a full-carbon Evo IX for the ending, with the plate removed. Their photo is only a reference: it is not in the repo (`carbon-evo-reference.png` is ignored) or on the site, and its plate and branding are not reproduced. The chain:
+
+| Step | Tool, model | Inputs | Output |
+|---|---|---|---|
+| 1. The garage | `tools/higgsfield-edit.sh kling`, Kling Image 4.0 edit | `hero-final.png` (the old final still), `prompts/garage-final.txt` | `garage-final.jpg`: the silver Evo moved into the garage |
+| 2. The carbon look | Kling Image 4.0 edit, two images | `garage-final.jpg` (setting), the client's photo (car), `prompts/carbon-look.txt` | `carbon-look.jpg`: the carbon Evo in the garage, right of centre, no plate |
+| 3. The film in the garage | `tools/higgsfield-v2v.sh`, Seedance 2.5 video-edit (1080p, no audio) | the original film (sound stripped), `garage-final.jpg`, `prompts/garage-film.txt` | `shots/garage-film.mp4` (12.4 s): the same film, motion and timing, in the garage |
+| 4. The end frame | `tools/higgsfield-edit.sh kling` with two images (take b of two) | `garage-cut.jpg` (frame 212 of the garage film: the liquid car head-on, centred, headlights off) for the camera, `carbon-look.jpg` for the car, `prompts/carbon-final.txt` | `carbon-final.jpg`: the carbon Evo, head-on and centred, headlights on, no plate |
+| 5. The cure | `tools/higgsfield-flf.sh`, Kling O3 first-last-frame (5 s, pro, no sound) | `garage-cut.jpg` to `carbon-final.jpg`, `prompts/carbon-cure.txt` | `shots/carbon-cure.mp4`: locked camera; headlights snap on at 0.25 s, a light streak bursts out at the bumper at 2 s and runs round the car, the liquid sets into carbon and the plate melts away; it settles from about 4.3 s |
+| 6. The web files | `tools/finish-garage-film.sh`, then `tools/mux-hero-audio.sh` | steps 3 and 5 | `assets/site/hero-*` |
+
+The stills here are JPEG quality 95 (the tools upload JPEGs anyway; they save their own output as PNG in `shots/`).
+
+Kling's first generated frames jolt a little (about 6 px sideways and a softer image), so the clip is laid over the garage film's frames 212–217 with a 6-frame dissolve instead of a hard cut. The garage film is cut where its car stands head-on and centred, before its own headlights come on (frame 221).
+
+```bash
+# rebuild the ending (from the repo root):
+tools/higgsfield-edit.sh kling assets/generated/garage-cut.jpg,assets/generated/carbon-look.jpg assets/generated/prompts/carbon-final.txt carbon-final
+tools/higgsfield-flf.sh assets/generated/garage-cut.jpg assets/generated/carbon-final.jpg assets/generated/prompts/carbon-cure.txt 5 carbon-cure
+tools/finish-garage-film.sh   # needs shots/garage-film.mp4 and shots/carbon-cure.mp4
+tools/mux-hero-audio.sh
+```
+
+The sections below describe the original film, which the garage film restyles: its phases, its timing and how its segments were made.
 
 ## The film, phase by phase
 
@@ -29,7 +56,7 @@ No Higgsfield video model takes an end frame, so the film is generated **backwar
 1. `seg-d` starts from the final still, with the camera orbiting to head-on and the paint turning to black liquid.
 2. Each earlier segment starts from the **last frame** of the one after it, so every join is the same image.
 3. `tools/assemble-film.py` reverses each clip, trims it, retimes it to its phase of the reference (`film-plan.json`), joins them and encodes the web files (without sound).
-4. `tools/mux-hero-audio.sh` synthesises the sound (`tools/make-hero-audio.py`) and adds it to both web files. Run it again after every `assemble-film.py`.
+4. `tools/mux-hero-audio.sh` synthesises the sound (`tools/make-hero-audio.py`) and adds it to both web files. Run it again after every `assemble-film.py` or `finish-garage-film.sh`.
 
 ```bash
 # regenerate a segment (from the repo root), e.g. the last one:
@@ -48,15 +75,16 @@ tools/mux-hero-audio.sh
 
 | Film time | Sound |
 |---|---|
-| 0–8.85 s | faint car-park room tone only, while the car is being built |
-| 8.85 s | the starter turns the engine over: five chugs, rur-rur-rur |
-| 9.375 s | the engine fires as the headlights snap on (frame 225): a big flare to 3,300 rpm, then a fast idle |
-| 9.75 s | one full rev to 7,000 rpm, the turbo spooling |
-| 10.10 s | throttle shut: a loud blow-off valve, a full whoosh kept mostly below 3 kHz so it isn't sharp, on its own, dying away before the first bang |
-| 10.47–10.85 s | backfires as the revs fall: BANG, pap-pap, BANG, BANG, each with its own deep boom |
-| 10.94 s | the logo starts drawing (`LOGO_LEAD` 1.6 s in `src/app.js`); the idle fades out under it |
+| 0–8.5 s | faint workshop room tone only, while the car is being built |
+| 8.52 s | the starter turns the engine over: five chugs, rur-rur-rur |
+| 9.04 s | the engine fires as the headlights snap on (frame 217): a big flare to 3,300 rpm, then a fast idle |
+| 10.48 s | one full rev to 7,000 rpm, the turbo spooling |
+| 10.83 s | throttle shut as the light streak bursts out at the bumper: a loud blow-off valve, a full whoosh kept mostly below 3 kHz so it isn't sharp, on its own, dying away before the first bang |
+| 11.20–11.58 s | backfires as the revs fall and the streak runs round the car: BANG, pap-pap, BANG, BANG, each with its own deep boom |
+| 12.85 s | one last BANG as the carbon finishes setting |
+| 12.95 s | the logo starts drawing (`LOGO_LEAD` 0.925 s in `src/app.js`); the idle fades out under it by the end (13.875 s) |
 
-Each moment has its own slot so the sound stays clean: the reverb is short, nothing overlaps the blow-off, and the bangs are mixed so the limiter leaves them alone; it only touches the first few milliseconds of the blow-off. It aims at the sound of a 4G63 Evo IX through a 3-inch turbo-back exhaust. The engine is a pulse train at the 4-cylinder firing rate (rpm / 30 per second): sharp pressure spikes ringing a set of exhaust resonances (lowest at 66 Hz), with per-cylinder imbalance at idle, a lopsided saturation for growl, and a harder, raspier tone above about 5,000 rpm where MIVEC changes over. The turbo adds a whoosh of air as it spools, with a quiet whistle on top. The treble is kept low throughout (about 6% of the energy above 3 kHz; the bangs' crack is rounded, the turbo whistle is low and quiet, the mix rolls off from 10 kHz). Levels: cranking about −19 dBFS RMS, full rev −13, blow-off −10 at its start, bangs peak at −1. `python3 tools/make-hero-audio.py out.wav spectrogram.png` also draws a spectrogram with the beats marked. To use a real recording instead, pass it to `tools/mux-hero-audio.sh recording.wav`.
+Each moment has its own slot so the sound stays clean: the reverb is short, nothing overlaps the blow-off, and the bangs are mixed so the limiter leaves them alone; it only touches the first few milliseconds of the blow-off. It aims at the sound of a 4G63 Evo IX through a 3-inch turbo-back exhaust. The reverb is a short, hard-walled room. The engine is a pulse train at the 4-cylinder firing rate (rpm / 30 per second): sharp pressure spikes ringing a set of exhaust resonances (lowest at 66 Hz), with per-cylinder imbalance at idle, a lopsided saturation for growl, and a harder, raspier tone above about 5,000 rpm where MIVEC changes over. The turbo adds a whoosh of air as it spools, with a quiet whistle on top. The treble is kept low throughout (about 6% of the energy above 3 kHz; the bangs' crack is rounded, the turbo whistle is low and quiet, the mix rolls off from 10 kHz). Levels: cranking about −18 dBFS RMS, full rev −13, blow-off −11, bangs peak at −1. `python3 tools/make-hero-audio.py out.wav spectrogram.png` also draws a spectrogram with the beats marked. To use a real recording instead, pass it to `tools/mux-hero-audio.sh recording.wav`.
 
 Each prompt in `prompts/` describes its phase **in reverse** (what happens from the start frame). The chain is:
 
