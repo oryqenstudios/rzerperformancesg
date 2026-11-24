@@ -7,7 +7,7 @@ The hero opens on a realistic 12.5 s film made with Higgsfield (`api.higgsfield.
 | File in `assets/site/` | Made from |
 |---|---|
 | `hero-final.jpg` | `hero-final.png` at JPEG quality 88. It is `hero-v2a-1.png` with the garbled number-plate lettering painted out to a blank black plate. |
-| `hero-intro.mp4` / `.webm` | The five segments in `film-plan.json`, joined by `tools/assemble-film.py`. 1920×1080, 24 fps. H.264 CRF 24 (capped at 2.8 Mbit/s) with faststart is about 4 MB; VP9 CRF 35 is about 3.1 MB. No audio. |
+| `hero-intro.mp4` / `.webm` | The five segments in `film-plan.json`, joined by `tools/assemble-film.py`. 1920×1080, 24 fps. H.264 CRF 24 (capped at 2.8 Mbit/s) with faststart is about 4.2 MB; VP9 CRF 35 is about 3.1 MB. Sound: the synthesised engine start, revs, pops and bangs (AAC 160k / Opus 128k), see below. |
 | `hero-poster.jpg` | The film's first frame, shown until it starts. |
 
 ## The film, phase by phase
@@ -28,7 +28,8 @@ No Higgsfield video model takes an end frame, so the film is generated **backwar
 
 1. `seg-d` starts from the final still, with the camera orbiting to head-on and the paint turning to black liquid.
 2. Each earlier segment starts from the **last frame** of the one after it, so every join is the same image.
-3. `tools/assemble-film.py` reverses each clip, trims it, retimes it to its phase of the reference (`film-plan.json`), joins them and encodes the web files.
+3. `tools/assemble-film.py` reverses each clip, trims it, retimes it to its phase of the reference (`film-plan.json`), joins them and encodes the web files (without sound).
+4. `tools/mux-hero-audio.sh` synthesises the sound (`tools/make-hero-audio.py`) and adds it to both web files. Run it again after every `assemble-film.py`.
 
 ```bash
 # regenerate a segment (from the repo root), e.g. the last one:
@@ -37,7 +38,27 @@ tools/higgsfield-i2v.sh kling assets/generated/hero-final.png assets/generated/p
 tools/higgsfield-i2v.sh kling assets/generated/shots/seg-d-kling-last.png assets/generated/prompts/4-body-and-camera-descent.txt 5 seg-c-kling
 # rebuild the film from the plan:
 python3 tools/assemble-film.py assets/generated/film-plan.json assets/site
+# ...and put the sound back in:
+tools/mux-hero-audio.sh
 ```
+
+### Sound
+
+`tools/make-hero-audio.py` synthesises it with numpy (no samples, no licences; a fixed seed, so it renders the same every time). The timings at the top of the script are frames of the film, so retime them if the film changes:
+
+| Film time | Sound |
+|---|---|
+| 0–6.7 s | faint car-park room tone |
+| 6.68 s | ignition relay click as the parking lights glow amber |
+| 6.82 s | starter cranks |
+| 7.42 s | engine catches, flares and settles to a lumpy idle |
+| 8.15 s | a blip to 4,800 rpm, a few pops |
+| 8.90 s | full rev to 7,300 rpm with turbo spool |
+| 9.35 s | lift-off: blow-off valve; the first bang lands with the headlights (9.375 s, frame 225) |
+| 9.4–10.27 s | pops, crackle and bangs as the revs fall; the last bang is just before the logo (10.34 s) |
+| 10.3–12.4 s | idle, fading out under the logo |
+
+The engine is a pulse train at the 4-cylinder firing rate (rpm / 30 per second) ringing a set of exhaust resonances, with per-cylinder imbalance at idle and brighter pulses under load. Pops are noise cracks with a low thump, all in a car-park reverb. Levels: idle about −25 dBFS RMS, full rev −13, bangs peak at −1. `python3 tools/make-hero-audio.py out.wav spectrogram.png` also draws a spectrogram with the beats marked. To use a real recording instead, pass it to `tools/mux-hero-audio.sh recording.wav`.
 
 Each prompt in `prompts/` describes its phase **in reverse** (what happens from the start frame). The chain is:
 

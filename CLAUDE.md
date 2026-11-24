@@ -8,7 +8,7 @@ Website for **Rzer (RZER Performance)**, a Singapore car tuning and performance 
    - the body pours over as the camera comes down to a head-on view
    - the headlights snap on, the paint cures to silver, and the camera orbits to the front three-quarter
 
-   As it ends, the **RZER Performance logo** draws in and the hero rests on the film's final frame (`hero-final.jpg`). A photoreal three.js Evo IX used to take over from the film here; the client asked for it to be removed from the hero, and it now lives only in the showroom preview (`src/showroom/`). The film was generated with Higgsfield in five chained segments; see `assets/generated/README.md`.
+   It has **sound**: the engine starting as the lights come on, a blip, a full rev, then pops and bangs on the overrun, the first bang with the headlights and the last just before the logo. As it ends, the **RZER Performance logo** draws in and the hero rests on the film's final frame (`hero-final.jpg`). A photoreal three.js Evo IX used to take over from the film here; the client asked for it to be removed from the hero, and it now lives only in the showroom preview (`src/showroom/`). The film was generated with Higgsfield in five chained segments; see `assets/generated/README.md`.
 2. **Scroll sections** in the style of reference video 2: a real-time 3D Evo IX-style car under a showroom spotlight. The camera moves around it per section (side profile, rear three-quarter, x-ray with tracked hotspots, wheel close-up, headlights-on front view, contact).
 3. **Configurator** (`#build`): orbit the car and swap parts live (paint, wheels, calipers, aero, stance, exhaust, lights/tint, carbon) with a job card, build code, hold-to-compare-stock and copy-build.
 
@@ -27,7 +27,7 @@ npm run dev          # rebuild on every change in src/; refresh dist/index.html 
 ## Stack and constraints
 
 - **The 3D view has no libraries and no 3D assets.** Raw WebGL2 with one fragment shader that raymarches signed distance fields (SDFs). The car and garage are modelled in GLSL. This was chosen because the original build environment had no CDN access, and because SDFs let an earlier 3D liquid intro morph straight into the car (since replaced by the hero film and removed from the shader). Moving to Three.js later would be a new renderer, not a port.
-- **The hero is a film.** The film files are `assets/site/hero-intro.mp4` (plus a `.webm` fallback), `hero-poster.jpg` and `hero-final.jpg`, about 7.5 MB in total.
+- **The hero is a film.** The film files are `assets/site/hero-intro.mp4` (plus a `.webm` fallback), `hero-poster.jpg` and `hero-final.jpg`, about 7.8 MB in total. The films carry the synthesised engine sound (`tools/make-hero-audio.py`, muxed by `tools/mux-hero-audio.sh`).
 - **three.js is only in the showroom preview** (`dist/showroom/`), not on the main page:
   - `src/showroom/showroom.js` is an ES module that uses **three.js r170, vendored in `vendor/three/`** (MIT; no CDN). The preview page reaches it through an import map.
   - The car is `assets/site/models/lancer-evolution.glb` (CC BY 4.0 by 3DCars4U; see `assets/site/models/CREDITS.md`).
@@ -50,13 +50,19 @@ npm run dev          # rebuild on every change in src/; refresh dist/index.html 
 | `assets/site/models/` | The 3D car and its credits |
 | `assets/generated/` | Higgsfield stills, the segment prompts (`prompts/`), `film-plan.json`, and how the shipped files were made |
 | `tools/higgsfield-i2v.sh` | Generate one film segment (image-to-video) and pull its last frame |
-| `tools/assemble-film.py` | Reverse, retime and join the segments per `film-plan.json`; encode the web files |
+| `tools/assemble-film.py` | Reverse, retime and join the segments per `film-plan.json`; encode the web files (without sound) |
+| `tools/make-hero-audio.py` | Synthesise the hero film's sound (engine start, revs, pops and bangs, car-park reverb), timed to the film's frames |
+| `tools/mux-hero-audio.sh` | Put that sound (or any WAV) into `hero-intro.mp4` and `.webm`. Run it after every `assemble-film.py` |
 | `tools/shot.mjs` | Render the shader alone with any uniforms → `tools/shots/*.png` |
 | `tools/page.mjs` | Drive the built page through states (intro time, scroll, `#build`, clicks) → screenshots + page errors |
 
 ## Hero (`#hero-media` in `src/index.html`, controller in `src/app.js`)
 
-- The film plays muted and inline once. `LOGO_LEAD` (2.2 s) before it ends, `revealLogo()` adds `.revealed` to the logo, so the logo comes in over the final orbit. On `ended`, `finishIntro()` adds `.is-final` (fading in `hero-final.jpg`) and swaps `is-intro` for `intro-done`, which brings in the tagline and buttons.
+- The film plays inline once.
+- **Sound, with no sound button (the client asked for none):**
+  - `startHero()` first plays the film with sound. Browsers allow that only for sites the visitor already trusts (Chrome's media engagement, a per-site sound setting).
+  - Refused, it plays muted, and the first click, tap or key press (`GESTURES`, not Esc) unmutes it in sync.
+  - Speeding up mutes it (4× audio sounds broken). Skip stops it, which also covers the accessibility rule that automatic sound must be stoppable. `LOGO_LEAD` (2.2 s) before it ends, `revealLogo()` adds `.revealed` to the logo, so the logo comes in over the final orbit. On `ended`, `finishIntro()` adds `.is-final` (fading in `hero-final.jpg`) and swaps `is-intro` for `intro-done`, which brings in the tagline and buttons.
 - **Skip** cuts straight to the final frame. Esc, the wheel or a swipe set `playbackRate = 4`. `prefers-reduced-motion` and in-page hash links go straight to the still.
 - **Fallbacks:** if autoplay is refused, the last `<source>` errors, or nothing has played after 7 s, it shows the still. The film's last frame and the still differ by about 1.2% per pixel, so the crossfade is invisible.
 - While the film covers the stage (home page, `scrollY < 2`), the old shader view draws only every 30th frame.

@@ -261,6 +261,7 @@ function finishIntro() {
   heroDone = true;
   heroMedia.classList.add('is-final');
   try { heroVideo.pause(); } catch (e) { /* never started */ }
+  stopListening();
   introBar.style.width = '100%';
   body.classList.remove('is-intro'); body.classList.add('intro-done');
   revealLogo();
@@ -268,8 +269,20 @@ function finishIntro() {
 // Esc, wheel or a swipe speed the film up; the skip button cuts straight to the final frame
 function fastForward() {
   if (heroDone) return;
-  if (!heroVideo.paused && heroVideo.readyState >= 2) heroVideo.playbackRate = 4; else finishIntro();
+  if (!heroVideo.paused && heroVideo.readyState >= 2) { heroVideo.playbackRate = 4; heroVideo.muted = true; } else finishIntro();
 }
+// Sound: the film carries the engine starting, the revs and the pops and bangs (tools/make-hero-audio.py), and the
+// client wants it on without a sound button. Browsers only let a page play sound before the visitor interacts when
+// they already trust the site, so the film tries with sound first and, if that's refused, plays muted and brings
+// the sound in, in sync, on the first click, tap or key press. Speeding up mutes it; Skip stops it.
+const GESTURES = ['pointerdown', 'pointerup', 'touchend', 'keydown', 'click'];
+function onGesture(e) {
+  if (heroDone || (e.type === 'keydown' && e.key === 'Escape') || heroVideo.playbackRate > 1) return;
+  heroVideo.muted = false;
+  stopListening();
+}
+function listenForSound() { GESTURES.forEach(g => addEventListener(g, onGesture, true)); }
+function stopListening() { GESTURES.forEach(g => removeEventListener(g, onGesture, true)); }
 $('#skip').addEventListener('click', finishIntro);
 addEventListener('keydown', e => { if (e.key === 'Escape') fastForward(); });
 addEventListener('wheel', () => { if (!heroDone && mode === 'home') fastForward(); }, { passive: true });
@@ -287,9 +300,15 @@ const heroSources = $$('source', heroVideo);
 if (heroSources.length) heroSources[heroSources.length - 1].addEventListener('error', finishIntro);
 function startHero() {
   if (heroDone) return;
-  heroVideo.muted = true;
+  heroVideo.muted = false;
   const p = heroVideo.play();
-  if (p && p.catch) p.catch(finishIntro);   // autoplay refused: show the still
+  if (p && p.catch) p.catch(() => {
+    if (heroDone) return;
+    heroVideo.muted = true;                  // sound refused before any interaction: play muted for now
+    listenForSound();
+    const q = heroVideo.play();
+    if (q && q.catch) q.catch(finishIntro);  // autoplay refused altogether: show the still
+  });
   // a film that has not started after 7 s (slow connection) should not hold the page
   setTimeout(() => { if (!heroDone && heroVideo.currentTime < 0.1) finishIntro(); }, 7000);
 }
