@@ -9,7 +9,7 @@ Website for **Rzer (RZER Performance)**, a Singapore car tuning and performance 
    - the headlights snap on, the paint cures to silver, and the camera orbits to the front three-quarter
 
    It has **sound**, each moment on its own: the starter cranking, the engine firing as the headlights snap on, one full rev, the blow-off valve, then pops and bangs, the last just before the logo. As it ends, the **RZER Performance logo** draws in and the hero rests on the film's final frame (`hero-final.jpg`). A photoreal three.js Evo IX used to take over from the film here; the client asked for it to be removed from the hero, and it now lives only in the showroom preview (`src/showroom/`). The film was generated with Higgsfield in five chained segments; see `assets/generated/README.md`.
-2. **Scroll sections** in the style of reference video 2: the real-time 3D Evo IX (the CC BY model, three.js) under a showroom spotlight. The camera moves around it per section (side profile, rear three-quarter, x-ray with tracked hotspots, wheel close-up, headlights-on front view, contact).
+2. **Scroll sections** in the style of reference video 2: the real-time 3D Evo IX (the CC BY model, three.js), presented like a product asset: neutral, even studio light on a plain solid charcoal background, no text on the car. The camera moves around it per section (side profile, rear three-quarter, x-ray with tracked hotspots, wheel close-up, headlights-on front view, contact).
 3. **Configurator** (`#build`): orbit the same 3D Evo and swap parts live (paint, wheel finish, calipers, aero, ride height, exhaust, lights/tint, carbon) with a job card, build code, hold-to-compare-stock and copy-build.
 
 Parts 2 and 3 need the page served over http(s). Opened from disk (file://) they fall back to the older shader car (`scene.frag`), which is also the fallback if the 3D car can't start.
@@ -99,37 +99,37 @@ npm run dev          # rebuild on every change in src/; refresh dist/index.html 
 - add-ons (`buildAddons`, fitted to the model): a splitter following the front lip's outline with canards on the bumper corners, skirts swept along the sills, a seven-fin diffuser, a lip spoiler on the boot's trailing edge, a GT wing (inverted airfoil, end plates, gurney flap, uprights on the boot); the factory wing hides for any other wing option
 - exhaust: `rz_tip` for the factory single tip; twin, quad and centre layouts are added tips in polished, burnt titanium (vertex-colour heat tint) or black ceramic
 - **x-ray**: exterior materials dissolve through a screen-space dither (`addDissolve`, no transparency sorting or recompiles), a ghost copy of each exterior mesh glows with fresnel edges and a 12.5 cm grid, and `buildInternals` shows the 4G63 with its red cam cover, the turbo, intercooler pipes, coilovers at each corner, the exhaust and the driveline. The interior, wheels and brakes stay solid.
-- `bay` (the configurator) brings up three soft studio lights. The shadow map only redraws when the car changes shape.
+- `bay` (the configurator) lifts the key light by 12%. The shadow map only redraws when the car changes shape.
+- **Measuring parts:** the split model's parts share one vertex list per original piece (each part only has its own index list), so `geometry.boundingBox` and `Box3.setFromObject` measure the whole original piece. Use `worldPoints()` / `partBox()` from `parts.js`, which only count the vertices a part's triangles use.
 - Options the model can't show are `sdfOnly` in CATS and hidden while the 3D car is in use: wheel designs, wheel sizes, the widebody kit.
 
-- **Car config `CAR`:** the model URL, real length (4.49 m) and the tail-light material.
+- **Car config `CAR`:** the model URL, real length (4.49 m) and width (1.77 m), and the tail-light material.
   - The model is scaled to its real length, centred and set on the floor. It is turned so its front faces +x, away from the tail lights.
-- **Details (`details.js`, `dressCar()`):** the model has no textures, so realism is added at runtime and the file stays untouched.
+  - It comes out about 5% too wide, so it is narrowed to the real width, measured across the wheel arches below the mirrors. The track ends up at about 1.52 m, as on the real car.
+- **Details (`details.js`, `dressCar()`):** the model has no UVs or textures, so every PBR channel (colour, roughness, metalness, relief) is computed per pixel from the surface position by `micro()`: bump mapping from screen-space derivatives (no UVs or tangents), sizes in metres, and each pattern fades out with `rzVis()` once it is smaller than a pixel. In effect texture maps of unlimited resolution.
   - **Telling parts apart:** the model shares materials between parts, so `dressCar()` goes by the node each part hangs under. Those nodes are `car_body` (GLTFLoader turns spaces in node names into underscores) with its `rz_*` part nodes, `w1`–`w4` and `b1`–`b4`.
   - **Paint:** `MeshPhysicalMaterial` with a rough metallic base (0.36) under a mirror clear coat.
     - Metallic flake tilts the base normal per 1.5 mm cell, and fades out by `fwidth` once a flake is under a pixel, so it doesn't alias into noise.
     - The clear coat gets a faint 1.5 cm orange-peel ripple.
     - Both are in model units, converted using the body mesh's world scale.
   - **Wheels:**
-    - tyres: sidewall lettering from a canvas strip on the outer face only (`uOutward` per tyre), a rim-protector ring, tread grooves and sipes, all in the tyre's local cylinder (axis = local y)
+    - tyres: plain moulded sidewalls (no lettering) with a rim-protector ring and fine ribs by the bead on the outer face (`uOutward` per tyre), tread grooves and sipes, rubber grain; all in the tyre's local cylinder (axis = local y)
     - gloss black clear-coated rims (`wire_007007007`)
-    - machined cast-iron discs with a dark hat (`wire_154154154`)
-    - red calipers (everything under `b1`–`b4`)
+    - machined cast-iron discs with a dark hat and two staggered rings of 24 cross-drilled holes (`wire_154154154`; friction ring about 4.3–6.7 local units)
+    - red calipers with a faint cast grain (everything under `b1`–`b4`)
     - a chrome centre cap
-  - **Body:** satin black trim, tinted windows, and glossy deep-red tail-light lenses with a faint glow.
-  - **Headlights:** the lens triangles are split out of the window glass by position (within 0.62 m of the nose, 0.45–0.8 m high, more than 0.3 m off centre) into a clear-glass mesh. Behind each lens sit two emissive projectors with halo rings, plus a `SpotLight` beam onto the floor ahead.
-  - **Number plates:** both get planar UVs computed in world space and an "RZER" canvas plate.
-- **Lighting:**
-  - One `SpotLight` overhead (110 cd, 0.78 rad) with PCF soft shadows, a dim hemisphere fill, and an additive cone mesh for the visible beam.
-  - A PMREM map of a small HDR car park (spotlight lens and halo, dimmed tube rows, lit floor pool) gives the car its reflections.
-  - That map is set **per car material**, never as `scene.environment`. In r170, `scene.environment` ignores each material's `envMapIntensity` and lit the whole car park evenly.
-- **Floor:**
-  - A canvas-made concrete texture under a `MeshStandardMaterial`, patched in `onBeforeCompile` to add the `Reflector`'s planar reflection with a 13-tap blur and fresnel.
-  - The `Reflector` mesh itself draws nothing (`colorWrite: false`); it only renders the mirror texture.
-  - The set: hazard-striped pillars, dimmed tube rows, bay lines, fog.
-- **Post:** `EffectComposer` → `UnrealBloomPass` → `OutputPass` (ACES) → a vignette and grain pass.
+  - **Body:** satin black trim with a moulded stipple, tinted glass, and deep-red tail-lamp lenses with fine optic ridges and a faint glow.
+  - **Interior** (`rz_interior`): grained leather with sheen, with perforated inserts inside the seats' box (front seats and rear bench); brushed aluminium, piano-black trim and red accents.
+  - **Headlights:** the lens triangles are split out of the window glass by position (within 0.62 m of the nose, 0.45–0.8 m high, more than 0.3 m off centre) into a clear-glass mesh. Behind each lens sit two emissive projectors with halo rings.
+  - **No text anywhere** (the client's brief): both number plates are blank black plates in a thin silver frame, on planar UVs computed in world space.
+- **Studio (the client's brief: neutral even studio lighting, isolated on a plain solid background):**
+  - Background: plain solid charcoal `#101113`. Dark, because the page's copy is white and sits over the car.
+  - Reflections: a PMREM map of a neutral studio (a long soft box overhead, strip lights either side, front and rear fill panels, a dim floor). It is set **per car material**, never as `scene.environment`, which ignores each material's `envMapIntensity`.
+  - Direct light: a soft key (`DirectionalLight` with PCF soft shadows), fill, rim and top lights, and a neutral hemisphere fill.
+  - Floor: none visible. A `ShadowMaterial` shadow catcher and a soft contact-shadow plane keep the car on the ground.
+- **Post:** `EffectComposer` → a NaN scrub → a little `UnrealBloomPass` (only the lit headlights pass its threshold) → `OutputPass` with `NeutralToneMapping` at exposure 0.9, so paint colours stay true and silver stays below white. The scrub matters: one NaN pixel from any shader (for example a zero-length normal where a triangle is smaller than a pixel) gets blurred over the whole frame by the bloom and the view goes black. `rzBump()` guards against that too.
 - **Shader compile:** `renderer.compileAsync()` compiles every shader before `onReady`. It runs in the background where `KHR_parallel_shader_compile` exists, so the page and the film don't stall.
-- **Cost:** the model is about 500,000 triangles and 17 MB uncompressed. The `Reflector` renders the scene twice (it switches off below 70% pixel scale, see `quality3d` in `app.js`), and the scene isn't drawn at all while the hero film covers it. Compressing the GLB would cut the download several times over.
+- **Cost:** the model is about 500,000 triangles and 17 MB uncompressed. The scene is drawn once per frame plus the shadow map when the car changes, and not at all while the hero film covers it. Compressing the GLB would cut the download several times over.
 
 ## Shader (`src/scene.frag`)
 

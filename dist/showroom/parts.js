@@ -86,16 +86,22 @@ export function ghostMaterial() {
 }
 
 // ---------------------------------------------------------------- measuring the model
-function worldPoints(root) {
+// The part's own vertices in world space. The split model's parts share one vertex list per original piece (each
+// part only has its own index list), so only the vertices a part's triangles use count; geometry.boundingBox and
+// Box3.setFromObject would measure the whole original piece.
+export function worldPoints(root) {
   const out = [], v = new THREE.Vector3();
   root.updateMatrixWorld(true);
   root.traverse(o => {
     if (!o.isMesh) return;
-    const p = o.geometry.attributes.position;
-    for (let i = 0; i < p.count; i += 1) out.push(v.fromBufferAttribute(p, i).applyMatrix4(o.matrixWorld).clone());
+    const p = o.geometry.attributes.position, idx = o.geometry.index;
+    const used = idx ? new Set(idx.array) : null;
+    const each = i => out.push(v.fromBufferAttribute(p, i).applyMatrix4(o.matrixWorld).clone());
+    if (used) used.forEach(each); else for (let i = 0; i < p.count; i++) each(i);
   });
   return out;
 }
+export const partBox = root => new THREE.Box3().setFromPoints(worldPoints(root));
 // convex hull of points in the xz plane (monotone chain), as [x, z] pairs, counter-clockwise
 function hullXZ(pts) {
   const p = pts.map(v => [v.x, v.z]).sort((a, b) => a[0] - b[0] || a[1] - b[1]);
@@ -260,10 +266,14 @@ export function buildAddons({ env, carbon, parts }) {
     return g;
   }
   const tips = {};
+  // laid out from the factory tip's position (measured, so it holds when the car is narrowed to its real width)
+  const tipBox = partBox(parts.tip);
+  const tz = tipBox.isEmpty() ? 0.53 : Math.abs((tipBox.min.z + tipBox.max.z) / 2);
+  const ty = tipBox.isEmpty() ? 0.285 : (tipBox.min.y + tipBox.max.y) / 2 + 0.005;
   const layouts = {
-    3: { r: 0.05, at: [[0.285, 0.555], [0.285, -0.555]] },                                        // twin, one each side
-    1: { r: 0.042, at: [[0.285, 0.48], [0.285, 0.63], [0.285, -0.48], [0.285, -0.63]] },           // quad
-    2: { r: 0.047, at: [[0.27, 0.085], [0.27, -0.085]] },                                          // centre twin
+    3: { r: 0.05, at: [[ty, tz], [ty, -tz]] },                                                    // twin, one each side
+    1: { r: 0.042, at: [[ty, tz - 0.075], [ty, tz + 0.075], [ty, -tz + 0.075], [ty, -tz - 0.075]] },   // quad
+    2: { r: 0.047, at: [[ty - 0.015, 0.085], [ty - 0.015, -0.085]] },                              // centre twin
   };
   for (const [key, { r, at }] of Object.entries(layouts)) {
     const set = new THREE.Group();

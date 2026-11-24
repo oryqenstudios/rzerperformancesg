@@ -1,7 +1,10 @@
-// Realistic detail for the 3D Evo, added at runtime (the model file has no textures and is left untouched):
-// metallic-flake paint under an orange-peel clear coat, tyre sidewall lettering and tread grooves, machined
-// discs and red calipers, gloss black rims, clear headlight lenses with lit projectors and real beams,
-// glossy tail-light lenses and an RZER number plate.
+// Real-world materials for the 3D Evo, added at runtime. The model has no UVs or textures, so every PBR channel
+// (colour, roughness, metalness and surface relief) is computed per pixel from the surface position: in effect
+// texture maps of unlimited resolution, which fade out cleanly once their detail is smaller than a pixel.
+// Metallic-flake paint under an orange-peel clear coat; satin trim with a moulded stipple; grained leather with
+// perforated seat inserts, brushed aluminium and piano-black trim inside; tyres with rubber grain, tread, sipes
+// and plain moulded sidewalls; cross-drilled machined discs and cast calipers; tail lamps with optic ridges;
+// clear headlight lenses with lit projectors. No text anywhere: the plates are blank and the sidewalls plain.
 //
 // The model shares materials between parts (the tyre rubber is also the interior, the caliper colour is also
 // the black trim), so parts are told apart by the node they hang under: 'car body', 'w1'-'w4', 'b1'-'b4', and the
@@ -18,6 +21,52 @@ float vnoise3(vec3 p) {
   return mix(mix(mix(h13(i), h13(i + vec3(1, 0, 0)), f.x), mix(h13(i + vec3(0, 1, 0)), h13(i + vec3(1, 1, 0)), f.x), f.y),
              mix(mix(h13(i + vec3(0, 0, 1)), h13(i + vec3(1, 0, 1)), f.x), mix(h13(i + vec3(0, 1, 1)), h13(i + vec3(1, 1, 1)), f.x), f.y), f.z);
 }`;
+
+// Surface relief from a procedural height field: bump mapping from screen-space derivatives (no UVs or tangents
+// needed). Heights are in metres, as the view space is.
+const BUMP = /* glsl */`
+vec3 rzBump(vec3 n, float h) {
+  // all derivatives first (they need uniform control flow), then guard: where a triangle is smaller than a pixel
+  // the derivatives can be zero, and normalising a zero vector gives NaN, which the bloom would smear over the frame
+  vec3 sx = dFdx(-vViewPosition), sy = dFdy(-vViewPosition);
+  vec2 dh = vec2(dFdx(h), dFdy(h));
+  vec3 r1 = cross(sy, n), r2 = cross(n, sx);
+  float det = dot(sx, r1);
+  vec3 b = abs(det) * n - sign(det) * (dh.x * r1 + dh.y * r2);
+  float l = length(b);
+  return (l > 1e-20 && abs(det) > 1e-20) ? b / l : n;
+}
+// how much of a pattern of frequency f (cycles per metre) still shows at this pixel
+float rzVis(vec3 p, float f) { return 1.0 - smoothstep(0.35, 1.0, length(fwidth(p * f))); }`;
+
+// Adds a micro-detail layer to a material. `glsl` runs with `p` (the surface position in metres, object space) and
+// `n` (the object-space normal) and sets rzH (relief height in metres), rzRough (added roughness), rzTint
+// (colour multiplier) and rzMetal (added metalness). `unit` is metres per object unit.
+function micro(m, unit, key, glsl, extraUniforms = {}) {
+  const prev = m.onBeforeCompile;
+  const prevKey = m.customProgramCacheKey.call(m);
+  m.onBeforeCompile = (sh, r) => {
+    if (prev) prev.call(m, sh, r);
+    if (!/varying vec3 vObjPos/.test(sh.vertexShader)) objectSpace(sh);
+    sh.uniforms.uUnit = { value: unit };
+    Object.assign(sh.uniforms, extraUniforms);
+    const decl = Object.entries(extraUniforms).map(([k, u]) => `uniform ${u.type} ${k};`).join('\n');
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', `#include <common>\nuniform float uUnit;\n${decl}\nfloat rzH; float rzRough; float rzMetal; vec3 rzTint;${BUMP}`)
+      .replace('#include <map_fragment>', `#include <map_fragment>
+        {
+          vec3 p = vObjPos * uUnit, n = normalize(vObjNormal);
+          rzH = 0.0; rzRough = 0.0; rzMetal = 0.0; rzTint = vec3(1.0);
+          ${glsl}
+          diffuseColor.rgb *= rzTint;
+        }`)
+      .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = clamp(roughnessFactor + rzRough, 0.02, 1.0);')
+      .replace('#include <metalnessmap_fragment>', '#include <metalnessmap_fragment>\nmetalnessFactor = clamp(metalnessFactor + rzMetal, 0.0, 1.0);')
+      .replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\nnormal = rzBump(normal, rzH);');
+  };
+  m.customProgramCacheKey = () => prevKey + '|' + key;
+  return m;
+}
 
 // give the fragment shader the object-space position and normal (the mesh's own units)
 function objectSpace(sh) {
@@ -50,7 +99,7 @@ function paintMaterial(color, env, unitsPerMetre) {
           // smooth metallic paint, as real paint does, instead of aliasing into noise
           vec3 fp = vObjPos * uFlake;
           float flakeVis = 1.0 - smoothstep(0.35, 1.2, length(fwidth(fp)));
-          normal = normalize(normal + (h33(floor(fp)) - 0.5) * 0.22 * flakeVis * uFlakeAmt);
+          normal = normalize(normal + (h33(floor(fp)) - 0.5) * 0.09 * flakeVis * uFlakeAmt);
         }`)
       .replace('#include <clearcoat_normal_fragment_maps>', `#include <clearcoat_normal_fragment_maps>
         vec3 peel = vec3(vnoise3(vObjPos * uPeel), vnoise3(vObjPos * uPeel + 17.3), vnoise3(vObjPos * uPeel + 41.9)) - 0.5;
@@ -62,53 +111,44 @@ function paintMaterial(color, env, unitsPerMetre) {
 }
 
 // ---------------------------------------------------------------- tyres
-function tyreLettering() {
-  const c = document.createElement('canvas');
-  c.width = 2048; c.height = 128;
-  const g = c.getContext('2d');
-  g.fillStyle = '#000'; g.fillRect(0, 0, c.width, c.height);
-  g.fillStyle = '#fff'; g.textBaseline = 'middle'; g.textAlign = 'center';
-  g.font = '800 70px Arial, Helvetica, sans-serif';
-  for (const [text, x] of [['RZER PERFORMANCE', 0.2], ['265/35 R18 97Y', 0.55], ['RADIAL TUBELESS', 0.84]]) g.fillText(text, x * c.width, 68);
-  const t = new THREE.CanvasTexture(c);
-  t.wrapS = THREE.RepeatWrapping;
-  t.anisotropy = 8;
-  return t;
-}
-// The tyre's axis is its local y. Lettering goes on the outer sidewall only (uOutward picks the face).
-function tyreMaterial(env, letters, outward) {
-  const m = new THREE.MeshPhysicalMaterial({ color: 0x121214, roughness: 0.86, metalness: 0, envMap: env, envMapIntensity: 0.45 });
+// The tyre's axis is its local y; uOutward picks the face that points away from the car. The sidewall is plain
+// moulded rubber (no lettering): a rim-protector ring and fine concentric ribs near the bead. The tread has two
+// circumferential grooves and sipes. Rubber grain everywhere.
+function tyreMaterial(env, outward, unit) {
+  const m = new THREE.MeshPhysicalMaterial({ color: 0x141416, roughness: 0.86, metalness: 0, envMap: env, envMapIntensity: 0.45 });
   m.onBeforeCompile = sh => {
     objectSpace(sh);
-    sh.uniforms.tLetters = { value: letters };
     sh.uniforms.uOutward = { value: outward };
     sh.fragmentShader = sh.fragmentShader
-      .replace('#include <common>', '#include <common>\nuniform sampler2D tLetters;\nuniform float uOutward;\nfloat tyreLetter;\nfloat tyreGroove;\nfloat tyreSide;')
+      .replace('#include <common>', '#include <common>\nuniform float uOutward;\nfloat tyreRing;\nfloat tyreGroove;\nfloat tyreSide;')
       .replace('#include <map_fragment>', `#include <map_fragment>
         {
           vec3 n = normalize(vObjNormal);
           float r = length(vObjPos.xz);
           float a = atan(vObjPos.z, vObjPos.x);
           tyreSide = step(0.5, abs(n.y));
-          tyreLetter = 0.0; tyreGroove = 0.0;
-          if (tyreSide > 0.5 && vObjPos.y * uOutward > 0.0) {
-            vec2 luv = vec2(a / 6.2831853 * 2.0 * uOutward, (r - 10.95) / 1.35);
-            if (luv.y > 0.0 && luv.y < 1.0) tyreLetter = texture2D(tLetters, luv).r;
-            tyreLetter = max(tyreLetter, 0.45 * (1.0 - smoothstep(0.03, 0.09, abs(r - 10.75))));   // rim-protector ring
-          }
-          if (tyreSide < 0.5) {
+          tyreRing = 0.0; tyreGroove = 0.0;
+          if (tyreSide > 0.5) {
+            tyreRing = 0.45 * (1.0 - smoothstep(0.03, 0.09, abs(r - 10.75)));                            // rim protector
+            tyreRing = max(tyreRing, 0.2 * step(0.5, fract(r * 6.0)) * (1.0 - smoothstep(11.1, 11.6, r)) * step(10.85, r));   // ribs by the bead
+          } else {
             float w = abs(vObjPos.y);
             tyreGroove = max(1.0 - smoothstep(0.12, 0.22, abs(w - 1.3)), 1.0 - smoothstep(0.1, 0.2, abs(w - 3.7)));
             float sipe = 1.0 - smoothstep(0.02, 0.07, abs(fract(a * 30.0) - 0.5));
             tyreGroove = max(tyreGroove, sipe * smoothstep(3.9, 4.4, w) * 0.8);
           }
-          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.17, 0.17, 0.18), tyreLetter * 0.85);
+          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.1, 0.1, 0.105), tyreRing);
           diffuseColor.rgb *= 1.0 - 0.75 * tyreGroove;
         }`)
       .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
-        roughnessFactor = tyreSide > 0.5 ? mix(0.64, 0.48, tyreLetter) : mix(0.88, 1.0, tyreGroove);`);
+        roughnessFactor = tyreSide > 0.5 ? mix(0.7, 0.55, tyreRing) : mix(0.88, 1.0, tyreGroove);`);
   };
-  return m;
+  m.customProgramCacheKey = () => 'rz-tyre';
+  // rubber grain, about 0.6 mm
+  return micro(m, unit, 'grain', `
+    float f = 1700.0;
+    rzH = (vnoise3(p * f) - 0.5) * 0.00004 * rzVis(p, f);
+    rzRough = (vnoise3(p * 500.0) - 0.5) * 0.06;`);
 }
 
 // ---------------------------------------------------------------- brakes
@@ -121,7 +161,18 @@ function discMaterial(env) {
       .replace('#include <map_fragment>', `#include <map_fragment>
         float discR = length(vObjPos.xz);
         discRing = 0.5 + 0.5 * sin(discR * 55.0);   // machining marks
-        diffuseColor.rgb *= mix(0.8, 1.0, discRing) * mix(0.5, 1.0, smoothstep(3.0, 4.2, discR));   // darker hat in the middle`)
+        diffuseColor.rgb *= mix(0.8, 1.0, discRing) * mix(0.5, 1.0, smoothstep(3.0, 4.2, discR));   // darker hat in the middle
+        {
+          // cross-drilled: two staggered rings of 24 holes across the friction face
+          float ang = atan(vObjPos.z, vObjPos.x) / 6.2831853 * 24.0, hole = 0.0;
+          for (int k = 0; k < 2; k++) {
+            float rr = 5.05 + 0.8 * float(k);
+            vec2 d = vec2((fract(ang + 0.5 * float(k)) - 0.5) * rr * 6.2831853 / 24.0, discR - rr);
+            hole = max(hole, 1.0 - smoothstep(0.13, 0.2, length(d)));
+          }
+          diffuseColor.rgb *= 1.0 - 0.9 * hole;
+          discRing = mix(discRing, 1.0, hole);
+        }`)
       .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
         roughnessFactor = mix(0.3, 0.52, discRing);`);
   };
@@ -129,15 +180,13 @@ function discMaterial(env) {
 }
 
 // ---------------------------------------------------------------- number plate
+// blank: a black plate in a thin silver frame, no lettering
 function plateTexture() {
   const c = document.createElement('canvas');
   c.width = 1040; c.height = 224;
   const g = c.getContext('2d');
   g.fillStyle = '#050505'; g.fillRect(0, 0, c.width, c.height);
   g.strokeStyle = '#d8d8d8'; g.lineWidth = 7; g.strokeRect(14, 14, c.width - 28, c.height - 28);
-  g.fillStyle = '#ececec'; g.textAlign = 'center'; g.textBaseline = 'middle';
-  g.font = '700 150px Arial, Helvetica, sans-serif';
-  g.fillText('RZER', c.width / 2, c.height / 2 + 6);
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
   t.anisotropy = 8;
@@ -186,7 +235,7 @@ function splitHeadlightLenses(glassMesh, front) {
   glassMesh.geometry = windows;
   return { geometry: lenses, boxes: [lensBox.left, lensBox.right].filter(x => !x.isEmpty()) };
 }
-// Two projectors per side, each a glowing lens inside a halo ring, plus a real beam onto the floor.
+// Two projectors per side, each a glowing lens inside a halo ring.
 function headlightUnits(boxes, colour) {
   const group = new THREE.Group();
   const glow = new THREE.MeshBasicMaterial({ color: colour.clone().multiplyScalar(7), toneMapped: true });
@@ -201,11 +250,6 @@ function headlightUnits(boxes, colour) {
       const halo = new THREE.Mesh(new THREE.TorusGeometry(0.04, 0.0045, 8, 48), ring);
       halo.position.copy(p); halo.rotation.y = Math.PI / 2; group.add(halo);
     }
-    const beam = new THREE.SpotLight(colour, 28, 12, 0.42, 0.75, 2);
-    beam.position.set(centre.x - 0.02, centre.y, centre.z);
-    beam.target.position.set(centre.x + 4, 0, centre.z * 1.25);
-    group.add(beam, beam.target);
-    beams.push(beam);
   }
   // the configurator's light colour and on/off (0-1)
   const tint = colour.clone();
@@ -227,27 +271,62 @@ export function dressCar(model, { env, paintColor, unitsPerMetre, frontX }) {
   const onBrake = o => parentNamed(o, n => /^b[1-4]$/.test(n));
 
   const paint = paintMaterial(paintColor, env, unitsPerMetre);
-  const trim = new THREE.MeshPhysicalMaterial({ color: 0x060607, metalness: 0.05, roughness: 0.55, envMap: env, envMapIntensity: 0.6 });
+  const unit = 1 / unitsPerMetre;   // metres per object unit (body and wheels share it)
+  // satin black plastic trim with a moulded stipple (about 0.4 mm)
+  const trim = micro(new THREE.MeshPhysicalMaterial({ color: 0x0b0b0c, metalness: 0.02, roughness: 0.55, envMap: env, envMapIntensity: 0.6 }), unit, 'stipple', `
+    float f = 2600.0;
+    rzH = (vnoise3(p * f) - 0.5) * 0.00003 * rzVis(p, f);
+    rzRough = (vnoise3(p * 300.0) - 0.5) * 0.08;`);
   const windows = new THREE.MeshPhysicalMaterial({
-    color: 0x0a0c0e, roughness: 0.02, transparent: true, opacity: 0.8, clearcoat: 1, clearcoatRoughness: 0,
+    color: 0x0a0d0c, roughness: 0.02, transparent: true, opacity: 0.8, clearcoat: 1, clearcoatRoughness: 0,
     envMap: env, envMapIntensity: 1.6, depthWrite: false,
   });
   const lensGlass = new THREE.MeshPhysicalMaterial({
     color: 0xffffff, roughness: 0.01, transparent: true, opacity: 0.16, clearcoat: 1, clearcoatRoughness: 0,
     envMap: env, envMapIntensity: 2, depthWrite: false,
   });
-  const tail = new THREE.MeshPhysicalMaterial({
+  // tail-lamp lenses: deep red polycarbonate with fine optic ridges moulded inside (about 2.5 mm pitch)
+  const tail = micro(new THREE.MeshPhysicalMaterial({
     color: new THREE.Color(0.42, 0.0, 0.012), roughness: 0.04, clearcoat: 1, clearcoatRoughness: 0.02, transparent: true, opacity: 0.88,
     emissive: new THREE.Color(1, 0.02, 0.012), emissiveIntensity: 0.32, envMap: env, envMapIntensity: 1.4,
-  });
+  }), unit, 'optics', `
+    float f = 400.0;
+    vec2 q = p.xy * f + vec2(0.0, step(0.5, fract(p.x * f * 0.5)) * 0.5);
+    rzH = (abs(sin(q.x * 3.14159)) * abs(sin(q.y * 3.14159)) - 0.4) * 0.00012 * rzVis(p, f);
+    rzTint = vec3(mix(1.0, 0.8 + 0.4 * abs(sin(q.x * 3.14159)), rzVis(p, f)));`);
   const rim = new THREE.MeshPhysicalMaterial({ color: 0x0b0b0c, metalness: 0.35, roughness: 0.22, clearcoat: 1, clearcoatRoughness: 0.04, envMap: env, envMapIntensity: 1.2 });
   const hub = new THREE.MeshStandardMaterial({ color: 0x1c1c1e, metalness: 0.85, roughness: 0.38, envMap: env });
   const cap = new THREE.MeshStandardMaterial({ color: 0xc8c8c8, metalness: 1, roughness: 0.2, envMap: env });
   const disc = discMaterial(env);
-  const caliper = new THREE.MeshPhysicalMaterial({ color: new THREE.Color(0.62, 0.03, 0.02), roughness: 0.3, clearcoat: 0.8, clearcoatRoughness: 0.1, envMap: env });
+  // calipers: high-temperature paint over a cast body, which shows through as a faint grain
+  const caliper = micro(new THREE.MeshPhysicalMaterial({ color: new THREE.Color(0.62, 0.03, 0.02), roughness: 0.3, clearcoat: 0.8, clearcoatRoughness: 0.1, envMap: env }), unit, 'cast', `
+    float f = 900.0;
+    rzH = (vnoise3(p * f) - 0.5) * 0.00003 * rzVis(p, f);`);
   const plate = new THREE.MeshStandardMaterial({ map: plateTexture(), roughness: 0.35, metalness: 0.1, envMap: env, envMapIntensity: 0.6 });
-  const letters = tyreLettering();
-  const carbonBody = carbonMaterial(env, 1 / unitsPerMetre);
+  const carbonBody = carbonMaterial(env, unit);
+
+  // the cabin: grained leather with perforated inserts on the seats, brushed aluminium, piano-black trim, red accents
+  const seats = { uSeatMin: { type: 'vec3', value: new THREE.Vector3(1e9, 1e9, 1e9) }, uSeatMax: { type: 'vec3', value: new THREE.Vector3(-1e9, -1e9, -1e9) } };
+  const leather = micro(new THREE.MeshPhysicalMaterial({ color: 0x18181a, roughness: 0.6, sheen: 0.35, sheenRoughness: 0.6, sheenColor: 0x3a3a3e, envMap: env, envMapIntensity: 0.5 }), unit, 'leather', `
+    // grain: two octaves of pebbled relief, about 1 mm
+    float g = vnoise3(p * 1100.0) * 0.6 + vnoise3(p * 2600.0) * 0.4;
+    rzH = (g - 0.5) * 0.00005 * rzVis(p, 1100.0);
+    rzRough = (g - 0.5) * 0.12;
+    // perforated inserts on the seats: a 4 mm grid of 1.2 mm holes on the plane the surface faces
+    vec3 an = abs(n);
+    vec2 q = (an.y > max(an.x, an.z) ? p.xz : (an.x > an.z ? p.zy : p.xy)) / 0.004;
+    float hole = (1.0 - smoothstep(0.12, 0.17, length(fract(q) - 0.5))) * rzVis(p, 250.0);
+    vec3 o = vObjPos;
+    hole *= step(uSeatMin.x, o.x) * step(o.x, uSeatMax.x) * step(uSeatMin.y, o.y) * step(o.y, uSeatMax.y) * step(uSeatMin.z, o.z) * step(o.z, uSeatMax.z);
+    rzTint = vec3(1.0 - 0.75 * hole);
+    rzRough += 0.3 * hole;`, seats);
+  // brushed aluminium: fine streaks along the length of the part
+  const aluminium = micro(new THREE.MeshPhysicalMaterial({ color: 0xb8bcc2, metalness: 1, roughness: 0.3, envMap: env, envMapIntensity: 1 }), unit, 'brushed', `
+    float s = vnoise3(vec3(p.x * 40.0, p.y * 4000.0, p.z * 4000.0));
+    rzRough = (s - 0.5) * 0.22 * rzVis(p, 4000.0);
+    rzH = (s - 0.5) * 0.000006 * rzVis(p, 4000.0);`);
+  const pianoBlack = new THREE.MeshPhysicalMaterial({ color: 0x050506, roughness: 0.08, clearcoat: 1, clearcoatRoughness: 0.03, envMap: env, envMapIntensity: 1.1 });
+  const redAccent = new THREE.MeshPhysicalMaterial({ color: new THREE.Color(0.32, 0.02, 0.02), roughness: 0.5, sheen: 0.3, sheenColor: 0x502020, envMap: env, envMapIntensity: 0.5 });
 
   // exterior materials fade out in the x-ray view; shared model materials get an exterior copy for that
   const dissolve = { value: 0 };
@@ -259,6 +338,12 @@ export function dressCar(model, { env, paintColor, unitsPerMetre, frontX }) {
     return exteriorCopies.get(m);
   };
 
+  // the seats' box (front seats and rear bench), in the interior mesh's own units, for the perforated inserts
+  const seatZone = o => {
+    const inv = o.matrixWorld.clone().invert();
+    const box = new THREE.Box3(new THREE.Vector3(-1.5, 0.42, -0.74), new THREE.Vector3(-0.1, 1.3, 0.74)).applyMatrix4(inv);
+    seats.uSeatMin.value.copy(box.min); seats.uSeatMax.value.copy(box.max);
+  };
   const extras = new THREE.Group();
   const parts = {};
   const exteriorMeshes = [];
@@ -280,12 +365,18 @@ export function dressCar(model, { env, paintColor, unitsPerMetre, frontX }) {
           // which local face of this tyre points away from the car
           const axis = new THREE.Vector3(0, 1, 0).transformDirection(o.matrixWorld);
           const centre = o.getWorldPosition(new THREE.Vector3());
-          return tyreMaterial(env, letters, Math.sign(axis.z * Math.sign(centre.z || 1)) || 1);
+          return tyreMaterial(env, Math.sign(axis.z * Math.sign(centre.z || 1)) || 1, unit);
         }
         if (n === 'wire_007007007') return rim;
         if (n === 'wire_154154154') return disc;
         if (n === 'wire_176026026') return cap;
         return hub;
+      }
+      if (part === 'interior') {
+        if (n === 'wire_040040040') { seatZone(o); return leather; }
+        if (n === 'wire_216216216') return aluminium;
+        if (n === 'wire_007007007') return pianoBlack;
+        if (n === 'wire_255000000') return redAccent;
       }
       if (onBody(o)) {
         if (n === 'wire_176026026') {
