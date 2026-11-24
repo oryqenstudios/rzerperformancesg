@@ -1,0 +1,9 @@
+[
+  {"file": "assets/generated/shots/build-clip-1.mp4", "film": [0.0, 2.25]},
+  {"file": "assets/generated/shots/build-clip-2.mp4", "film": [2.25, 4.75], "pace": [[0.42, 0.66]]},
+  {"file": "assets/generated/shots/build-clip-3.mp4", "film": [4.75, 6.25]},
+  {"file": "assets/generated/shots/build-clip-4.mp4", "film": [6.25, 7.5]},
+  {"file": "assets/generated/shots/build-clip-5.mp4", "film": [7.5, 8.75]},
+  {"file": "assets/generated/shots/build-clip-6.mp4", "film": [8.75, 9.75], "pace": [[0.3, 0.15], [0.7, 0.85]]},
+  {"file": "assets/generated/shots/build-clip-7.mp4", "film": [9.75, 10.75], "pace": [[0.3, 0.4]]}
+]

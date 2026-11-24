@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Generate a clip between two given frames with Kling O3 first-last-frame (Higgsfield).
+# Generate a clip between two given frames with Kling O3 (or Kling Omni) first-last-frame (Higgsfield).
 #
-#   tools/higgsfield-flf.sh <first_image> <last_image> <prompt_file> <duration> <name> [out_dir]
+#   [MODEL=omni] tools/higgsfield-flf.sh <first_image> <last_image> <prompt_file> <duration> <name> [out_dir]
 #
 # Writes <out_dir>/<name>.mp4 (out_dir defaults to assets/generated/shots): 16:9, pro mode, no generated sound
 # (the hero's sound is added afterwards by tools/mux-hero-audio.sh). Kling O3 takes whole seconds (5 or 10).
@@ -27,13 +27,17 @@ first_url=$(upload "$first")
 last_url=$(upload "$last")
 
 # 2. submit
+model=${MODEL:-o3}   # o3 or omni (Omni has no sound option)
 python3 -I -c "
 import json, sys
-print(json.dumps({'prompt': open(sys.argv[1]).read().strip(), 'first_frame_url': sys.argv[2], 'last_frame_url': sys.argv[3],
-                  'duration': int(sys.argv[4]), 'mode': 'pro', 'sound': 'off', 'aspect_ratio': '16:9'}))
-" "$promptf" "$first_url" "$last_url" "$dur" > "$work/req.json"
+req = {'prompt': open(sys.argv[1]).read().strip(), 'first_frame_url': sys.argv[2], 'last_frame_url': sys.argv[3],
+       'duration': int(sys.argv[4]), 'mode': 'pro', 'aspect_ratio': '16:9'}
+if sys.argv[5] == 'o3':
+    req['sound'] = 'off'
+print(json.dumps(req))
+" "$promptf" "$first_url" "$last_url" "$dur" "$model" > "$work/req.json"
 curl -sS -m 60 "${auth[@]}" -X POST -H 'Content-Type: application/json' -H "Idempotency-Key: rzer-$name-$(date +%s)" \
-  --data @"$work/req.json" "$api/kling-video/o3/first-last-frame" > "$work/submit.json"
+  --data @"$work/req.json" "$api/kling-video/$model/first-last-frame" > "$work/submit.json"
 status_url=$(field "$work/submit.json" status_url)
 
 # 3. poll and download

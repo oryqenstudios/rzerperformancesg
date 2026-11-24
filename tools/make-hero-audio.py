@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
 """Synthesise the hero film's sound: the Evo starting as its headlights snap on, one big rev, the blow-off valve,
 then pops and bangs on the overrun, in the tuning workshop. Each moment stands on its own, timed to the film
-(assets/site/hero-intro.mp4, 24 fps, 13.458 s):
+(assets/site/hero-intro.mp4, 24 fps, 15.792 s):
 
    0      faint workshop room tone (ventilation rumble, light hum); no engine while the car is being built
-   8.10   the starter turns the engine over: rur-rur-rur
-   8.625  the engine fires as the headlights snap on (frame 207): a big flare, vroom, then a fast idle
-  10.065  a full rev to 7,000 rpm, the turbo spooling
-  10.415  throttle shut as the light streak bursts out at the bumper (frame 250): a loud blow-off valve (psssh)
-  10.785  backfires as the revs fall and the streak runs round the car: BANG, pap-pap, BANG, BANG
-  12.435  one last BANG as the carbon finishes setting, just before the logo (12.533)
-  12.5    settling to idle, fading out under the logo by the end of the film (13.458)
+  10.475  the starter turns the engine over as the car's front sets: rur-rur-rur
+  11.0    the engine fires as the headlights snap on (frame 264): a big flare, vroom, then a fast idle
+  12.44   a full rev to 7,000 rpm, the turbo spooling
+  12.79   throttle shut as the light streak bursts out at the bumper: a loud blow-off valve (psssh)
+  13.16   backfires as the revs fall and the streak runs round the car: BANG, pap-pap, BANG, BANG
+  14.77   one last BANG as the carbon finishes setting, just before the logo (14.867)
+  14.9    settling to idle, fading out under the logo by the end of the film (15.792)
 
 The logo time is the film's length minus LOGO_LEAD in src/app.js; keep the two in step.
 
@@ -28,21 +28,21 @@ import wave
 import numpy as np
 
 SR = 48000
-DUR = 13.5
+DUR = 15.85
 N = int(SR * DUR)
 T = np.arange(N) / SR
 rng = np.random.default_rng(1729)
 
 # ------------------------------------------------------------------------------------------------ film beats (s)
-T_CRANK = 8.10    # starter engages
-T_HEAD = 8.625    # headlights snap on: the engine fires
+T_CRANK = 10.475  # starter engages
+T_HEAD = 11.0     # headlights snap on: the engine fires
 T_CATCH = T_HEAD
-T_REV = 10.065    # foot down
-T_LIFT = 10.415   # throttle shut: blow-off valve, as the light streak bursts out
-POPS = [(10.785, 1.0), (10.895, 0.5), (10.96, 0.5), (11.045, 0.85), (11.165, 1.0),   # (time, size): BANG, pap-pap, BANG, BANG
-        (12.435, 1.0)]                                                                # ...and the last BANG before the logo
-T_END = 323 / 24  # film ends (13.458 s)
-T_LOGO = T_END - 0.925   # the logo starts drawing (LOGO_LEAD 0.925 in app.js): 12.533 s
+T_REV = 12.44     # foot down
+T_LIFT = 12.79    # throttle shut: blow-off valve, as the light streak bursts out
+POPS = [(13.16, 1.0), (13.27, 0.5), (13.335, 0.5), (13.42, 0.85), (13.54, 1.0),   # (time, size): BANG, pap-pap, BANG, BANG
+        (14.77, 1.0)]                                                              # ...and the last BANG before the logo
+T_END = 379 / 24  # film ends (15.792 s)
+T_LOGO = T_END - 0.925   # the logo starts drawing (LOGO_LEAD 0.925 in app.js): 14.867 s
 T_FADE = T_LOGO + 0.1    # idle starts fading out under the logo
 IDLE = 1000.0
 REDLINE = 7000.0

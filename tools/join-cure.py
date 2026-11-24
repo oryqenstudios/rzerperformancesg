@@ -133,5 +133,5 @@ for n, f in enumerate(cure_frames):
     enc.stdin.write(f.tobytes())
 enc.stdin.close()
 enc.wait()
-print(f'steered garage frames {k0}-{CUT - 1} (jumps eased at {pops}); cure clip settled from its frame {settled_at}; '
+print(f'steered frames {k0}-{CUT - 1} (jumps eased at {pops}); cure clip settled from its frame {settled_at}; '
       f'{CUT - START + len(cure_frames)} frames')

@@ -2,12 +2,13 @@
 
 Website for **Rzer (RZER Performance)**, a Singapore car tuning and performance workshop (Instagram: `@rzerperformance.sg`). Built by a web designer for this client. Theme: **gloss black**. One page with three parts:
 
-1. **Hero:** a realistic 13.5 s film set in a dark, professional tuning garage (glossy black epoxy floor, a hexagonal LED ceiling, red neon, a wheel wall; the client's reference for its colours and look). Up to the headlights it follows reference video 1 beat for beat from its 3.3 s mark, including its camera moves (the client cut the opening, where the liquid flows in and a glossy dome shrinks to a drop):
-   - a drop of black liquid on the floor bursts into radiating rods and a rectangle, and the frame and chassis rise from it
-   - the body pours over as the camera comes down to a head-on view
+1. **Hero:** a realistic 15.8 s film set in a dark, professional tuning garage (glossy black epoxy floor, a hexagonal LED ceiling, red neon, a wheel wall; the client's reference for its colours and look). Its build-up follows the client's reference build video beat for beat and at its timing:
+   - black liquid crawls over a chrome ring and pulls into a glossy dome; the dome sharpens to a drop and bursts into radiating rods
+   - the rods join into a rectangle, a chassis frame rises from it, and the suspension, engine and intercooler grow
+   - the camera cranes down to head-on as the tyres, seats and cabin frame rise; the cabin skins over and the front sets over the engine into the complete black car
    - the headlights snap on, then a streak of light runs round the car and the black liquid sets into bare carbon fibre. The film ends on the client's chosen look: a full-carbon Evo IX, head-on and **centred in the frame**, with **no number plate**
 
-   It has **sound**, each moment on its own: the starter cranking, the engine firing as the headlights snap on, one full rev, the blow-off valve as the light streak bursts out, pops and bangs as it runs round the car, and one last bang just before the logo. As the carbon finishes setting, the **RZER Performance logo** draws in **at the centre of the screen, over the car**, and the hero rests on the film's final frame (`hero-final.jpg`) with the slogan and buttons centred below. A photoreal three.js Evo IX used to take over from the film here; the client asked for it to be removed from the hero, and it now lives only in the showroom preview (`src/showroom/`). The film was generated with Higgsfield; see `assets/generated/README.md`.
+   It has **sound**, each moment on its own: the starter cranking, the engine firing as the headlights snap on, one full rev, the blow-off valve as the light streak bursts out, pops and bangs as it runs round the car, and one last bang just before the logo. As the carbon finishes setting, the **RZER Performance logo** draws in **at the centre of the screen, over the car**, and the hero rests on the film's final frame (`hero-final.jpg`) with the slogan and buttons centred below. A photoreal three.js Evo IX used to take over from the film here; the client asked for it to be removed from the hero, and it now lives only in the showroom preview (`src/showroom/`). The film was generated with Higgsfield (keyframe stills, then a Kling clip between each pair); see `assets/generated/README.md`.
 2. **Scroll sections** in the style of reference video 2: the real-time 3D Evo IX (the CC BY model, three.js), presented like a product asset: neutral, even studio light on a plain solid charcoal background, no text on the car. The camera moves around it per section (side profile, rear three-quarter, x-ray with tracked hotspots, wheel close-up, headlights-on front view, contact).
 3. **Configurator** (`#build`): orbit the same 3D Evo and swap parts live (paint, wheel finish, calipers, aero, ride height, exhaust, lights/tint, carbon) with a job card, build code, hold-to-compare-stock and copy-build.
 
@@ -28,7 +29,7 @@ npm run dev          # rebuild on every change in src/; refresh dist/index.html 
 ## Stack and constraints
 
 - **The 3D view has no libraries and no 3D assets.** Raw WebGL2 with one fragment shader that raymarches signed distance fields (SDFs). The car and garage are modelled in GLSL. This was chosen because the original build environment had no CDN access, and because SDFs let an earlier 3D liquid intro morph straight into the car (since replaced by the hero film and removed from the shader). Moving to Three.js later would be a new renderer, not a port.
-- **The hero is a film.** The film files are `assets/site/hero-intro.mp4` (plus a `.webm` fallback), `hero-poster.jpg` and `hero-final.jpg`, about 9.3 MB in total. The films carry the synthesised engine sound (`tools/make-hero-audio.py`, muxed by `tools/mux-hero-audio.sh`).
+- **The hero is a film.** The film files are `assets/site/hero-intro.mp4` (plus a `.webm` fallback), `hero-poster.jpg` and `hero-final.jpg`, about 13 MB in total. The films carry the synthesised engine sound (`tools/make-hero-audio.py`, muxed by `tools/mux-hero-audio.sh`).
 - **The 3D car is three.js** for the scroll sections, the configurator and the preview (`dist/showroom/`):
   - `src/showroom/showroom.js` is an ES module that uses **three.js r170, vendored in `vendor/three/`** (MIT; no CDN). The page reaches it through an import map and a module script at the end of `index.html`.
   - The car is `assets/site/models/lancer-evolution-rzer.glb`: the CC BY 4.0 model by 3DCars4U (`assets/source/lancer-evolution.glb`) with its body split into named parts by `tools/split-model.py`. See `assets/site/models/CREDITS.md`.
@@ -52,12 +53,14 @@ npm run dev          # rebuild on every change in src/; refresh dist/index.html 
 | `assets/source/` | The model as downloaded, input to `tools/split-model.py` (not shipped) |
 | `assets/generated/` | Higgsfield stills, the segment prompts (`prompts/`), `film-plan.json`, and how the shipped files were made |
 | `tools/higgsfield-i2v.sh` | Generate one film segment (image-to-video) and pull its last frame |
-| `tools/assemble-film.py` | Reverse, retime and join the segments per `film-plan.json` (the original car-park film) |
+| `tools/assemble-film.py` | Reverse, retime and join the segments per `film-plan.json` (the original car-park film, no longer shipped) |
 | `tools/higgsfield-v2v.sh` | Restyle a whole film with Seedance video-edit (how the film moved into the tuning garage) |
 | `tools/higgsfield-edit.sh` | Edit a still from one or more reference images (Kling or Seedream image edit) |
 | `tools/higgsfield-flf.sh` | Generate a clip between a given first and last frame (Kling O3) |
-| `tools/finish-garage-film.sh` | Join the garage film and the carbon cure clip; encode the web files (without sound), the poster and the final still |
-| `tools/join-cure.py` | The join itself: a hard cut with the framing matched across it (measured with OpenCV), and camera jumps in the garage film eased out |
+| `tools/assemble-build.py` | Lay the build-up clips onto the reference's timeline per `assets/generated/build-plan.json` |
+| `tools/finish-garage-film.sh` | Assemble the build-up, join the carbon cure clip; encode the web files (without sound), the poster and the final still |
+| `tools/bridge-clips.py` | Join the start of one clip to the end of another with matched framing (kept for fixing clips; not used by the shipped film) |
+| `tools/join-cure.py` | The join to the carbon cure: a hard cut with the framing matched across it (measured with OpenCV), and camera jumps eased out |
 | `tools/make-hero-audio.py` | Synthesise the hero film's sound (engine start, revs, pops and bangs, workshop reverb), timed to the film's frames |
 | `tools/mux-hero-audio.sh` | Put that sound (or any WAV) into `hero-intro.mp4` and `.webm`. Run it after every `finish-garage-film.sh` |
 | `tools/shot.mjs` | Render the shader alone with any uniforms → `tools/shots/*.png` |
