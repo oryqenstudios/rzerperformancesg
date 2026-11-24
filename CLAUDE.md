@@ -9,8 +9,10 @@ Website for **Rzer (RZER Performance)**, a Singapore car tuning and performance 
    - the headlights snap on, the paint cures to silver, and the camera orbits to the front three-quarter
 
    It has **sound**, each moment on its own: the starter cranking, the engine firing as the headlights snap on, one full rev, the blow-off valve, then pops and bangs, the last just before the logo. As it ends, the **RZER Performance logo** draws in and the hero rests on the film's final frame (`hero-final.jpg`). A photoreal three.js Evo IX used to take over from the film here; the client asked for it to be removed from the hero, and it now lives only in the showroom preview (`src/showroom/`). The film was generated with Higgsfield in five chained segments; see `assets/generated/README.md`.
-2. **Scroll sections** in the style of reference video 2: a real-time 3D Evo IX-style car under a showroom spotlight. The camera moves around it per section (side profile, rear three-quarter, x-ray with tracked hotspots, wheel close-up, headlights-on front view, contact).
-3. **Configurator** (`#build`): orbit the car and swap parts live (paint, wheels, calipers, aero, stance, exhaust, lights/tint, carbon) with a job card, build code, hold-to-compare-stock and copy-build.
+2. **Scroll sections** in the style of reference video 2: the real-time 3D Evo IX (the CC BY model, three.js) under a showroom spotlight. The camera moves around it per section (side profile, rear three-quarter, x-ray with tracked hotspots, wheel close-up, headlights-on front view, contact).
+3. **Configurator** (`#build`): orbit the same 3D Evo and swap parts live (paint, wheel finish, calipers, aero, ride height, exhaust, lights/tint, carbon) with a job card, build code, hold-to-compare-stock and copy-build.
+
+Parts 2 and 3 need the page served over http(s). Opened from disk (file://) they fall back to the older shader car (`scene.frag`), which is also the fallback if the 3D car can't start.
 
 Reference frames are in `reference/` (`video1-*`, `video2-*`). Renders of the current state are in `reference/current-*.png`. Look at both before changing visuals.
 
@@ -28,11 +30,11 @@ npm run dev          # rebuild on every change in src/; refresh dist/index.html 
 
 - **The 3D view has no libraries and no 3D assets.** Raw WebGL2 with one fragment shader that raymarches signed distance fields (SDFs). The car and garage are modelled in GLSL. This was chosen because the original build environment had no CDN access, and because SDFs let an earlier 3D liquid intro morph straight into the car (since replaced by the hero film and removed from the shader). Moving to Three.js later would be a new renderer, not a port.
 - **The hero is a film.** The film files are `assets/site/hero-intro.mp4` (plus a `.webm` fallback), `hero-poster.jpg` and `hero-final.jpg`, about 7.8 MB in total. The films carry the synthesised engine sound (`tools/make-hero-audio.py`, muxed by `tools/mux-hero-audio.sh`).
-- **three.js is only in the showroom preview** (`dist/showroom/`), not on the main page:
-  - `src/showroom/showroom.js` is an ES module that uses **three.js r170, vendored in `vendor/three/`** (MIT; no CDN). The preview page reaches it through an import map.
-  - The car is `assets/site/models/lancer-evolution.glb` (CC BY 4.0 by 3DCars4U; see `assets/site/models/CREDITS.md`).
+- **The 3D car is three.js** for the scroll sections, the configurator and the preview (`dist/showroom/`):
+  - `src/showroom/showroom.js` is an ES module that uses **three.js r170, vendored in `vendor/three/`** (MIT; no CDN). The page reaches it through an import map and a module script at the end of `index.html`.
+  - The car is `assets/site/models/lancer-evolution-rzer.glb`: the CC BY 4.0 model by 3DCars4U (`assets/source/lancer-evolution.glb`) with its body split into named parts by `tools/split-model.py`. See `assets/site/models/CREDITS.md`.
   - `build.mjs` copies `assets/site/` to `dist/assets/`, `src/showroom/` to `dist/showroom/` and `vendor/` to `dist/vendor/`.
-- **Serve the showroom preview over HTTP.** Module scripts don't load from `file://`, so it needs a web server (for example `python3 -m http.server -d dist` or GitHub Pages). The main page works from disk too.
+- **Serve over HTTP for the 3D car.** Module scripts don't load from `file://`, so it needs a web server (for example `python3 -m http.server -d dist` or GitHub Pages). From disk the page still works, with the shader car.
 - The page is **one HTML file**. `build.mjs` inlines `style.css`, `scene.frag` (into a `<script type="x-shader/x-fragment">`) and `app.js` into `src/index.html` at the `/*__CSS__*/`, `/*__FRAG__*/`, `/*__JS__*/` placeholders.
 - It was first published as a claude.ai artifact. That host's limits shaped some choices: inline scripts only, no fetch, no form posting, and hash routes must be a plain `#name`. It is now meant for normal hosting (for example GitHub Pages from `dist/`).
 
@@ -45,16 +47,18 @@ npm run dev          # rebuild on every change in src/; refresh dist/index.html 
 | `src/app.js` | Hero film controller, WebGL setup, render loop, adaptive resolution, scroll cameras, routing, configurator UI, parts catalogue, contact form |
 | `src/scene.frag` | The whole 3D scene |
 | `assets/site/` | Hero media that ships with the site |
-| `src/showroom/` | `showroom.js`: the photoreal three.js scene (car, garage, spotlight, reflective floor, post-processing) as `startShowroom()`. `details.js`: the car's realistic materials and details. `index.html`: a full-screen preview with drag-to-orbit (`dist/showroom/`) |
+| `src/showroom/` | `showroom.js`: the three.js scene (car, garage, spotlight, reflective floor, studio lights, post-processing) as `startShowroom()`. `details.js`: the car's realistic materials and details. `parts.js`: carbon fibre, bolt-on aero, exhaust tips, the x-ray view and the controller that applies the configurator. `index.html`: a full-screen preview with drag-to-orbit (`dist/showroom/`) |
 | `vendor/three/` | three.js r170 and the add-ons the showroom imports (glTF and Draco loaders, post-processing, Reflector, OrbitControls) |
-| `assets/site/models/` | The 3D car and its credits |
+| `assets/site/models/` | The 3D car (split into parts) and its credits |
+| `assets/source/` | The model as downloaded, input to `tools/split-model.py` (not shipped) |
 | `assets/generated/` | Higgsfield stills, the segment prompts (`prompts/`), `film-plan.json`, and how the shipped files were made |
 | `tools/higgsfield-i2v.sh` | Generate one film segment (image-to-video) and pull its last frame |
 | `tools/assemble-film.py` | Reverse, retime and join the segments per `film-plan.json`; encode the web files (without sound) |
 | `tools/make-hero-audio.py` | Synthesise the hero film's sound (engine start, revs, pops and bangs, car-park reverb), timed to the film's frames |
 | `tools/mux-hero-audio.sh` | Put that sound (or any WAV) into `hero-intro.mp4` and `.webm`. Run it after every `assemble-film.py` |
 | `tools/shot.mjs` | Render the shader alone with any uniforms → `tools/shots/*.png` |
-| `tools/page.mjs` | Drive the built page through states (intro time, scroll, `#build`, clicks) → screenshots + page errors |
+| `tools/split-model.py` | Split the model's merged body into named part nodes (shell, bonnet, roof, mirrors, lip, wing, tip, interior) |
+| `tools/page.mjs` | Drive the built page through states (intro time, scroll, `#build`, clicks) → screenshots + page errors. `RZ_URL=http://…` tests the 3D car |
 
 ## Hero (`#hero-media` in `src/index.html`, controller in `src/app.js`)
 
@@ -77,15 +81,31 @@ npm run dev          # rebuild on every change in src/; refresh dist/index.html 
   The masks and the beam share one timing (`--sweep` on `.logo`); the CSS comment above the logo rules gives the geometry that keeps them together.
   Reduced motion turns the animations off. Replace it with the client's vector file when they send one.
 
-## Showroom (`src/showroom/showroom.js`)
+## 3D car (`src/showroom/`)
 
-Not on the main page: the client asked for the 3D car to be taken out of the hero. Open `dist/showroom/` to see it. It's the starting point for moving the scroll sections and configurator onto three.js. `startShowroom({canvas, interactive, onReady})` returns `setActive()` for pausing it when off screen.
+`startShowroom({ canvas, interactive, external, onReady, onError })`:
+- **external** (the main page): `app.js` sets the camera each frame with `setView({ pos, target, fov, shift })` (the same camera model as the shader: vertical fov, lens shift in NDC through `setViewOffset`), the configurator values and view state with `setState()` (the CATS uniforms plus `lights`, `xray`, `bay`, `reflect`), the pixel scale with `setPixelScale()`, and draws with `render(dt)` from its own loop.
+- **interactive**: the preview at `dist/showroom/`, with OrbitControls and its own loop, showing `PREVIEW_STATE` (the factory car in silver).
+- Loading: the page's module script starts it once the hero film can play through (or after 4 s), so the film gets the connection first. Every material variant is compiled before `onReady` (the page's `stage3d:ready` event), so swapping a part never stalls.
 
+**Parts** (`tools/split-model.py` → node names; `details.js` → `dressed.parts`):
+- `rz_shell` (paint, glass, lights, trim), `rz_bonnet` (with its vents), `rz_roof`, `rz_mirrors`, `rz_lip` (the body-colour front lip), `rz_wing` (blade and two uprights), `rz_tip` (the factory muffler and single tip), `rz_interior`.
+- Found per connected piece (vertices welded) from where the piece sits; the bonnet is cut out of the shell by position (`BONNET` in the tool). To check a change, open the preview, tint each part a loud colour through `SHOWROOM.parts.dressed.parts` and render it from a few sides.
+
+**Configurator mapping** (`carController` in `parts.js`):
+- paint colour, metal (flake on/off) and roughness (satin: no clear coat); rim colour/finish; caliper colour; window tint; light colour and headlights on/off
+- ride height: the `car_body` node drops in its own units while the wheels stay; `bodyRig` (lenses, headlights, add-ons, internals) drops with it
+- carbon bonnet/roof/mirrors/lip: their paint meshes swap to `carbonBody` (a 2×2 twill in object space that fades to plain lacquer once a tow is under a pixel)
+- add-ons (`buildAddons`, fitted to the model): a splitter following the front lip's outline with canards on the bumper corners, skirts swept along the sills, a seven-fin diffuser, a lip spoiler on the boot's trailing edge, a GT wing (inverted airfoil, end plates, gurney flap, uprights on the boot); the factory wing hides for any other wing option
+- exhaust: `rz_tip` for the factory single tip; twin, quad and centre layouts are added tips in polished, burnt titanium (vertex-colour heat tint) or black ceramic
+- **x-ray**: exterior materials dissolve through a screen-space dither (`addDissolve`, no transparency sorting or recompiles), a ghost copy of each exterior mesh glows with fresnel edges and a 12.5 cm grid, and `buildInternals` shows the 4G63 with its red cam cover, the turbo, intercooler pipes, coilovers at each corner, the exhaust and the driveline. The interior, wheels and brakes stay solid.
+- `bay` (the configurator) brings up three soft studio lights. The shadow map only redraws when the car changes shape.
+- Options the model can't show are `sdfOnly` in CATS and hidden while the 3D car is in use: wheel designs, wheel sizes, the widebody kit.
 
 - **Car config `CAR`:** the model URL, real length (4.49 m) and the tail-light material.
   - The model is scaled to its real length, centred and set on the floor. It is turned so its front faces +x, away from the tail lights.
 - **Details (`details.js`, `dressCar()`):** the model has no textures, so realism is added at runtime and the file stays untouched.
-  - **Telling parts apart:** the model shares materials between parts, so `dressCar()` goes by the node each part hangs under. Those nodes are `car_body` (GLTFLoader turns spaces in node names into underscores), `w1`–`w4` and `b1`–`b4`.
+  - **Telling parts apart:** the model shares materials between parts, so `dressCar()` goes by the node each part hangs under. Those nodes are `car_body` (GLTFLoader turns spaces in node names into underscores) with its `rz_*` part nodes, `w1`–`w4` and `b1`–`b4`.
   - **Paint:** `MeshPhysicalMaterial` with a rough metallic base (0.36) under a mirror clear coat.
     - Metallic flake tilts the base normal per 1.5 mm cell, and fades out by `fwidth` once a flake is under a pixel, so it doesn't alias into noise.
     - The clear coat gets a faint 1.5 cm orange-peel ripple.
@@ -108,8 +128,8 @@ Not on the main page: the client asked for the 3D car to be taken out of the her
   - The `Reflector` mesh itself draws nothing (`colorWrite: false`); it only renders the mirror texture.
   - The set: hazard-striped pillars, dimmed tube rows, bay lines, fog.
 - **Post:** `EffectComposer` → `UnrealBloomPass` → `OutputPass` (ACES) → a vignette and grain pass.
-- **Shader compile:** `renderer.compileAsync()` compiles every shader before `showroom:ready`. It runs in the background where `KHR_parallel_shader_compile` exists, so the page and the film don't stall.
-- **Cost:** the model is about 500,000 triangles and 19 MB uncompressed. The `Reflector` renders the scene twice. Compressing the GLB with Draco (the gltf.report script in `assets/generated/README.md` style) would cut the download several times over.
+- **Shader compile:** `renderer.compileAsync()` compiles every shader before `onReady`. It runs in the background where `KHR_parallel_shader_compile` exists, so the page and the film don't stall.
+- **Cost:** the model is about 500,000 triangles and 17 MB uncompressed. The `Reflector` renders the scene twice (it switches off below 70% pixel scale, see `quality3d` in `app.js`), and the scene isn't drawn at all while the hero film covers it. Compressing the GLB would cut the download several times over.
 
 ## Shader (`src/scene.frag`)
 
@@ -223,8 +243,8 @@ Gloss and metallic paint only read through these reflections, so **any change to
 - **No address, phone or opening hours.** Bookings point to an Instagram DM.
 - **The hero film and still are AI-generated** (Higgsfield). They show an Evo with an older Evo V/VI-style front and a Mitsubishi grille badge. The number plate was blanked by hand. A real photo of the client's car as a reference image would make it an accurate Evo IX.
 - **3D cars:**
-  - The showroom preview's car is the CC BY 4.0 Evo IX by 3DCars4U, and the preview shows its credit. Wherever it goes on the main site, its credit must go in the footer.
-  - The scroll sections and configurator still use the older primitive-built Evo IX-style car in the shader.
+  - The scroll sections, configurator and preview use the CC BY 4.0 Evo IX by 3DCars4U (split into parts for the site, which the licence allows with credit). Its credit is in the footer (`#model-credit`) and on the preview; keep it.
+  - The older primitive-built car in the shader is only the file:// and no-WebGL2 fallback.
   - Do not use the vecarz Evo IX (CC BY-NC) without a commercial licence.
   - There are no prices anywhere.
 - **The logo SVG is a redraw** of a small image of the client's logo. Swap in their vector file when available.
@@ -233,18 +253,15 @@ Gloss and metallic paint only read through these reflections, so **any change to
 
 1. `npm run build`
 2. For shader-only checks, run `node tools/shot.mjs '{"name":"x", ...uniforms}'`. Examples are in the file header.
-3. For page states (sections, `#build`, mobile 390×844), run `node tools/page.mjs W H '<steps>'`. Call `RZ.skipHero()` first: the film plays (and usually finishes) while the tool waits for the shader to compile.
+3. For page states (sections, `#build`, mobile 390×844), run `node tools/page.mjs W H '<steps>'`. Call `RZ.skipHero()` first. Serve `dist/` and set `RZ_URL=http://127.0.0.1:8765/` to test the 3D car; without it the tool opens the file and gets the shader car. Configurator colours ease in over about 20 frames.
 4. Compare against `reference/current-*.png` and the `video*` frames.
 
 Headless Chromium falls back to SwiftShader (software) without a GPU: about 1–2 s per frame, and the first draw includes shader JIT. Trigger clicks from script (`page.mjs` already does), because slow frames block real clicks.
 
 ## Ideas not yet built
 
-- Move the scroll sections and the configurator onto the three.js showroom with the same Evo model, so they match the hero:
-  - scroll cameras like `HOME_CAMS`
-  - paint, rim, caliper and tint swaps through its materials
-  - aero parts would need extra meshes
-- Draco-compress `lancer-evolution.glb`.
+- Wheel designs, wheel sizes and the widebody kit on the 3D car: they need new wheel meshes and flared arches.
+- Compress `lancer-evolution-rzer.glb` (17 MB): Draco or mesh quantization would cut it several times over.
 - A 9:16 version of the hero film and still for phones.
 - Video 2 beats: opening doors, an exploded engine, a numbers section with real dyno figures from the client.
 - Share a build by link. `buildCode()` is already a reversible mixed-radix base36 code; decoding isn't written yet.

@@ -1,9 +1,11 @@
 // Photoreal showroom: the car alone under one overhead spotlight in a dimmed underground car park.
 // World: metres, y up, car front at +x, floor at y = 0 (same as the old shader scene).
 //
-//   startShowroom({ canvas, interactive, onReady, onError }) -> { setActive(on), ready, credit }
-// Used by dist/showroom/ (drag to orbit, slow turntable). Non-interactive, it sways slowly beside the copy; it was the
-// hero car until the client asked for it to come out of the hero. Asset paths are resolved from this file, so any page can use it.
+//   startShowroom({ canvas, interactive, external, onReady, onError }) -> api
+//   - interactive: dist/showroom/ (drag to orbit, slow turntable, its own render loop)
+//   - external:    the main page's scroll sections and configurator. app.js sets the camera (api.setView), the
+//                  configurator values and view state (api.setState) and draws (api.render) from its own loop.
+// Asset paths are resolved from this file, so any page can use it.
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
@@ -15,37 +17,46 @@ import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { Reflector } from 'three/addons/objects/Reflector.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { dressCar } from './details.js';
+import { buildAddons, buildInternals, carbonMaterial, carController, ghostMaterial } from './parts.js';
 
 // ---------------------------------------------------------------- the car
-// Material names come from the model. The paint is recoloured only on meshes under `paintNode`, because the
-// same material is also used on the wheels. The front is found as the side opposite the tail-light lenses.
+// lancer-evolution-rzer.glb is the CC BY model with its body split into named parts (tools/split-model.py).
+// The front is found as the side opposite the tail-light lenses.
 const CAR = {
-  url: new URL('../assets/models/lancer-evolution.glb', import.meta.url).href,
+  url: new URL('../assets/models/lancer-evolution-rzer.glb', import.meta.url).href,
   length: 4.49,                        // Evo IX: 4,490 mm
-  paintNode: 'car_body',             // GLTFLoader renames the node 'car body' to 'car_body'
-  paint: ['wire_176026026'],
+  bodyNode: 'car_body',              // GLTFLoader renames the node 'car body' to 'car_body'
   tailLights: ['wire_255000000'],   // used to find the front; the other parts are handled in details.js
   // CC BY 4.0 requires this credit wherever the model is shown
-  credit: '<a href="https://sketchfab.com/3d-models/mitsubishi-lancer-evolution-b8087424eb45478a80a32428396f58a9">Mitsubishi Lancer Evolution</a> 3D model by <a href="https://sketchfab.com/3dcarsforyou">3DCars4U</a>, licensed under <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>.',
+  credit: '<a href="https://sketchfab.com/3d-models/mitsubishi-lancer-evolution-b8087424eb45478a80a32428396f58a9">Mitsubishi Lancer Evolution</a> 3D model by <a href="https://sketchfab.com/3dcarsforyou">3DCars4U</a>, licensed under <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>, split into parts for this site.',
 };
 const PAINT = { color: 0xb9bdc3 };   // liquid silver (the full paint material is in details.js)
+// what the preview shows: the factory car in silver with black wheels and red calipers
+const PREVIEW_STATE = {
+  uPaint: [0.62, 0.63, 0.65], uPaintRough: 0.2, uPaintMetal: 1, uRimCol: [0.008, 0.008, 0.009], uRimRough: 0.05, uRimMetal: 0,
+  uCaliper: [0.55, 0.02, 0.015], uLip: 0, uSkirts: 0, uDiffuser: 0, uSpoiler: 1, uRide: 0, uExhaust: 0, uExFinish: 0,
+  uDrl: [1, 0.97, 0.92], uTint: 0.6, uHood: 0, uRoof: 0, uMirror: 0, lights: 1, xray: 0,
+};
 
 const CEIL = 3.35;
 const SPOT_Y = 3.25;
 export const credit = CAR.credit;
 
-export function startShowroom({ canvas, interactive = false, onReady = () => {}, onError = () => {} }) {
+export function startShowroom({ canvas, interactive = false, external = false, onReady = () => {}, onError = () => {} }) {
 const size = () => [Math.max(2, canvas.clientWidth), Math.max(2, canvas.clientHeight)];
 
 // ---------------------------------------------------------------- renderer
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
-const DPR = Math.min(window.devicePixelRatio || 1, 1.75);
+const DPR = Math.min(window.devicePixelRatio || 1, external ? 1.5 : 1.75);
+let pixelScale = 1;
 renderer.setPixelRatio(DPR);
 renderer.setSize(...size(), false);
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.0;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.shadowMap.autoUpdate = false;   // the car and the light stand still: redraw the shadow only when the car changes
+renderer.shadowMap.needsUpdate = true;
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x000000);
@@ -62,7 +73,8 @@ function environment() {
   // the spotlight lens straight above the car, and its soft halo: the bright highlight on roof and bonnet
   const lens = new THREE.Mesh(new THREE.CircleGeometry(0.42, 48), basic(28, 27, 25));
   lens.rotation.x = Math.PI / 2; lens.position.y = SPOT_Y + lift; env.add(lens);
-  const halo = new THREE.Mesh(new THREE.RingGeometry(0.42, 1.8, 48), basic(0.5, 0.48, 0.46));
+  // kept tight and dim: a wide bright halo greys out every dark glossy surface that faces up (black paint, carbon)
+  const halo = new THREE.Mesh(new THREE.RingGeometry(0.42, 1.25, 48), basic(0.16, 0.155, 0.15));
   halo.rotation.x = Math.PI / 2; halo.position.y = SPOT_Y + 0.02 + lift; env.add(halo);
   // dimmed fluorescent tube rows
   const tubeGeo = new THREE.BoxGeometry(0.1, 0.04, 1.5);
@@ -189,7 +201,8 @@ ceiling.rotation.x = Math.PI / 2; ceiling.position.y = CEIL; scene.add(ceiling);
 
 const pillarMat = new THREE.MeshStandardMaterial({ map: canvasTexture(512, concrete, 1), color: 0x6e6e6e, roughness: 0.85, emissive: 0x161616 });
 const sleeveMat = new THREE.MeshStandardMaterial({ map: canvasTexture(256, hazard, 2), roughness: 0.7, emissive: 0x1a140a });
-for (let x = -22.5; x <= 22.5; x += 7.5) for (const z of [-6.6, 6.6]) {
+// pillars sit between the scroll sections' camera positions (none of them looks through one)
+for (let x = -18.75; x <= 18.75; x += 7.5) for (const z of [-6.6, 6.6]) {
   const p = new THREE.Mesh(new THREE.BoxGeometry(0.62, CEIL, 0.62), pillarMat);
   p.position.set(x, CEIL / 2, z); p.receiveShadow = true; scene.add(p);
   const s = new THREE.Mesh(new THREE.BoxGeometry(0.66, 1.0, 0.66), sleeveMat);
@@ -241,10 +254,18 @@ const beam = new THREE.Mesh(
 beam.position.y = SPOT_Y / 2;
 scene.add(beam);
 
-// ---------------------------------------------------------------- camera: front three-quarter from the car's left, car right of the copy
+// the configurator's studio: soft key, fill and rim lights that come up with view state `bay`
+const studio = [
+  [new THREE.DirectionalLight(0xfff6ee, 0.95), [4, 5, 3]],
+  [new THREE.DirectionalLight(0xe8f0ff, 0.45), [-3, 3, -4]],
+  [new THREE.DirectionalLight(0xffffff, 0.6), [-5, 4, 2]],
+].map(([l, p]) => { l.position.set(...p); l.intensity0 = l.intensity; l.intensity = 0; scene.add(l); return l; });
+
+// ---------------------------------------------------------------- camera
 const camera = new THREE.PerspectiveCamera(30, size()[0] / size()[1], 0.1, 80);
 const HOME = { pos: new THREE.Vector3(5.75, 1.2, -3.95), target: new THREE.Vector3(0.1, 0.55, 0.05) };
 camera.position.copy(HOME.pos);
+camera.lookAt(HOME.target);
 const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
 let controls = null;
 if (interactive) {
@@ -259,28 +280,26 @@ if (interactive) {
   controls.autoRotate = !still;
   controls.autoRotateSpeed = 0.35;   // one turn in about three minutes
   controls.update();
-} else {
-  camera.lookAt(HOME.target);
-}
-// hero: a slow sway either side of the front three-quarter, so the car stays beside the logo
-const sway = new THREE.Spherical().setFromVector3(HOME.pos.clone().sub(HOME.target));
-function swayCamera(t) {
-  const s = sway.clone();
-  s.theta += Math.sin(t * Math.PI * 2 / 28) * 0.16;
-  s.phi += Math.sin(t * Math.PI * 2 / 37) * 0.025;
-  camera.position.setFromSpherical(s).add(HOME.target);
-  camera.lookAt(HOME.target);
 }
 
-function frame() {
-  const [w, h] = size(), portrait = w / h < 0.9;
+// the page's camera: position, target, vertical fov and a lens shift in NDC (the old shader's uShift)
+const view = { shift: [0, 0] };
+function applyView() {
+  const [w, h] = size();
   camera.aspect = w / h;
-  camera.fov = portrait ? 52 : 30;
-  // lens shift: move the car right of the logo on wide screens
-  if (portrait) camera.clearViewOffset(); else camera.setViewOffset(w, h, -w * 0.2, h * 0.05, w, h);
+  if (external) camera.setViewOffset(w, h, -view.shift[0] * w / 2, view.shift[1] * h / 2, w, h);
+  else if (w / h < 0.9) { camera.fov = 52; camera.clearViewOffset(); }
+  else { camera.fov = 30; camera.setViewOffset(w, h, -w * 0.2, h * 0.05, w, h); }
   camera.updateProjectionMatrix();
+}
+function resize() {
+  const [w, h] = size();
+  renderer.setPixelRatio(DPR * pixelScale);
   renderer.setSize(w, h, false);
+  composer.setPixelRatio(DPR * pixelScale);
   composer.setSize(w, h);
+  reflector.getRenderTarget().setSize(Math.round(w * DPR * pixelScale * 0.5), Math.round(h * DPR * pixelScale * 0.5));
+  applyView();
 }
 
 // ---------------------------------------------------------------- post: bloom, tone mapping, grain and vignette
@@ -300,11 +319,13 @@ const grain = new ShaderPass({
       gl_FragColor = vec4(c, 1.0); }`,
 });
 composer.addPass(grain);
-frame();
-new ResizeObserver(frame).observe(canvas);
+resize();
+new ResizeObserver(resize).observe(canvas);
 
 // ---------------------------------------------------------------- load the car
 const names = m => (Array.isArray(m) ? m : [m]);
+const under = (o, name) => { for (let p = o; p; p = p.parent) if (p.name === name) return true; return false; };
+let controller = null;
 function prepareCar(model) {
   model.updateMatrixWorld(true);
   const box = new THREE.Box3().setFromObject(model);
@@ -323,16 +344,39 @@ function prepareCar(model) {
   car.scale.setScalar(CAR.length / Math.max(size.x, size.z));
   car.updateMatrixWorld(true);
   car.position.y = -new THREE.Box3().setFromObject(car).min.y;
-
   car.updateMatrixWorld(true);
 
   // realistic materials and details (src/showroom/details.js)
   let metresPerUnit = 0.025;
-  model.traverse(o => { if (o.isMesh && o.parent && o.parent.name === CAR.paintNode) metresPerUnit = o.matrixWorld.getMaxScaleOnAxis(); });
-  scene.add(dressCar(model, {
+  model.traverse(o => { if (o.isMesh && under(o, CAR.bodyNode)) metresPerUnit = o.matrixWorld.getMaxScaleOnAxis(); });
+  const dressed = dressCar(model, {
     env: ENV, paintColor: PAINT.color, unitsPerMetre: 1 / metresPerUnit,
     frontX: new THREE.Box3().setFromObject(car).max.x,
-  }));
+  });
+
+  // everything that rides with the body: lenses and headlights, bolt-on parts, the x-ray internals
+  const bodyRig = new THREE.Group();
+  bodyRig.add(dressed.extras);
+  const carbon = carbonMaterial(ENV, 1);
+  carbon.side = THREE.DoubleSide;
+  const addons = buildAddons({ env: ENV, carbon, parts: dressed.parts });
+  bodyRig.add(addons.group);
+  const internals = buildInternals(ENV);
+  bodyRig.add(internals);
+  scene.add(bodyRig);
+  // the x-ray outline: each exterior mesh drawn again with the ghost material
+  const ghostMat = ghostMaterial();
+  const ghosts = dressed.exteriorMeshes.map(o => {
+    const g = new THREE.Mesh(o.geometry, ghostMat);
+    g.position.copy(o.position); g.quaternion.copy(o.quaternion); g.scale.copy(o.scale);
+    g.renderOrder = 10; g.visible = false;
+    o.parent.add(g);
+    return g;
+  });
+  controller = carController({
+    dressed, addons, internals, ghosts, ghostMat, carbonBody: dressed.materials.carbonBody,
+    bodyNode: model.getObjectByName(CAR.bodyNode), bodyRig, renderer,
+  });
 
   // soft contact shadow so the tyres sit on the floor
   const shadowTex = canvasTexture(256, (g, n) => {
@@ -343,15 +387,48 @@ function prepareCar(model) {
   const contact = new THREE.Mesh(new THREE.PlaneGeometry(CAR.length * 1.12, CAR.length * 0.5), new THREE.MeshBasicMaterial({ map: shadowTex, transparent: true, depthWrite: false }));
   contact.rotation.x = -Math.PI / 2; contact.position.y = 0.004;
   scene.add(contact);
-  return car;
+
+  // so every variant is compiled before the car shows (no stall when a part is swapped): show them all once
+  const warm = new THREE.Group();
+  const tile = new THREE.PlaneGeometry(0.01, 0.01);
+  for (const m of [dressed.materials.carbonBody, ...addons.tipMats, ghostMat]) { const t = new THREE.Mesh(tile, m); t.position.y = -1; warm.add(t); }
+  scene.add(warm);
+  internals.visible = true;
+  api.parts = { dressed, addons, internals };   // for tests and tuning
+  return { car, warm, internals };
 }
 
-const api = { ready: false, credit: CAR.credit, setActive, camera, controls, spot, scene, renderer, floorMat, reflector, beam, composer };
+const api = {
+  ready: false, credit: CAR.credit, setActive, camera, controls, spot, scene, renderer, floorMat, reflector, beam, composer,
+  // external mode: { pos: [x,y,z], target: [x,y,z], fov, shift: [x,y] } from app.js's camera
+  setView({ pos, target, fov, shift }) {
+    camera.position.set(...pos);
+    camera.lookAt(target[0], target[1], target[2]);
+    camera.fov = fov;
+    view.shift = shift || [0, 0];
+    applyView();
+  },
+  // configurator values (CATS uniforms in app.js) plus view state: lights, xray, bay (studio light), reflect
+  setState(s) {
+    if (controller) controller.set(s);
+    const bay = s.bay ?? 0;
+    for (const l of studio) l.intensity = l.intensity0 * bay;
+    reflector.visible = (s.reflect ?? 1) > 0;
+    if (floorMat.userData.shader) floorMat.userData.shader.uniforms.reflStrength.value = 0.6 * (s.reflect ?? 1);
+  },
+  setPixelScale(s) { if (Math.abs(s - pixelScale) > 0.01) { pixelScale = s; resize(); } },
+  render(dt = 0.016) { grain.uniforms.uTime.value += dt; composer.render(); },
+};
 const draco = new DRACOLoader().setDecoderPath(new URL('../vendor/three/addons/libs/draco/gltf/', import.meta.url).href);
 new GLTFLoader().setDRACOLoader(draco).load(CAR.url, gltf => {
-  scene.add(prepareCar(gltf.scene));
+  const { car, warm, internals } = prepareCar(gltf.scene);
+  scene.add(car);
   // compile every shader in the background (KHR_parallel_shader_compile), so the page and the film don't stall
   renderer.compileAsync(scene, camera).catch(() => {}).then(() => {
+    scene.remove(warm);
+    internals.visible = false;
+    controller.set(PREVIEW_STATE);
+    renderer.shadowMap.needsUpdate = true;
     api.ready = true;
     onReady(api);
   });
@@ -360,19 +437,16 @@ new GLTFLoader().setDRACOLoader(draco).load(CAR.url, gltf => {
   onError(err);
 });
 
-// ---------------------------------------------------------------- loop
+// ---------------------------------------------------------------- loop (the preview; the page drives its own)
 const clock = new THREE.Clock();
-let time = 0;
 function tick() {
   const dt = Math.min(clock.getDelta(), 0.05);
-  time += still ? 0 : dt;
-  if (controls) controls.update(dt); else swayCamera(time);
-  grain.uniforms.uTime.value += dt;
-  composer.render();
+  if (controls) controls.update(dt);
+  api.render(dt);
 }
 // render only while someone can see it
 function setActive(on) {
-  renderer.setAnimationLoop(on ? tick : null);
+  renderer.setAnimationLoop(on && !external ? tick : null);
   if (on) clock.getDelta();
 }
 setActive(interactive);

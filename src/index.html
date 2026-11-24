@@ -8,12 +8,16 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&amp;display=swap" rel="stylesheet">
+<script type="importmap">
+{ "imports": { "three": "./vendor/three/three.module.min.js", "three/addons/": "./vendor/three/addons/" } }
+</script>
 <style>
 /*__CSS__*/
 </style>
 </head>
 <body class="is-intro">
 <canvas id="stage" aria-label="3D view of the Rzer Evo IX build in an underground car park"></canvas>
+<canvas id="stage3d" aria-label="3D view of the Rzer Evo IX build in an underground car park"></canvas>
 <p class="loading" id="loading">Loading the 3D scene</p>
 <p class="nogl-note" id="nogl" hidden>This browser could not start the 3D view, so the page is showing without it. Try a current version of Chrome, Safari, Edge or Firefox to see the car.</p>
 
@@ -132,7 +136,7 @@
       <h2 class="display chrome">Try the parts before we fit them</h2>
       <p class="lede">Change paint, wheels, aero, stance and exhaust on a live 3D car, then send the build to us for a quote.</p>
       <ul class="cta-list" aria-label="What you can change">
-        <li>6 paint finishes</li><li>4 wheel designs</li><li>3 ride heights</li><li>Widebody kit</li><li>GT wing</li><li>Exhaust tips</li>
+        <li>6 paint finishes</li><li>4 wheel finishes</li><li>3 ride heights</li><li>Carbon panels</li><li>GT wing</li><li>Exhaust tips</li>
       </ul>
       <div><a class="btn btn-chrome" href="#build">Open the configurator</a></div>
     </div>
@@ -170,6 +174,7 @@
 <footer class="footer">
   <span>RZER Performance, Singapore</span>
   <a href="https://www.instagram.com/rzerperformance.sg/" target="_blank" rel="noopener">@rzerperformance.sg on Instagram</a>
+  <span class="credit" id="model-credit"></span>
 </footer>
 
 <div class="tach" aria-hidden="true">
@@ -178,10 +183,10 @@
 </div>
 
 <div class="hotspots" aria-hidden="true">
-  <div class="hotspot" data-pos="1.23,0.60,0.05"><span>Turbo and ECU map</span></div>
-  <div class="hotspot" data-pos="1.28,0.62,0.52"><span>Coilovers</span></div>
-  <div class="hotspot" data-pos="1.31,0.40,0.84"><span>Big-brake kit</span></div>
-  <div class="hotspot" data-pos="-2.30,0.215,0.56"><span>Valved exhaust</span></div>
+  <div class="hotspot" data-pos="1.72,0.66,0.22"><span>Turbo and ECU map</span></div>
+  <div class="hotspot" data-pos="-1.32,0.72,0.56"><span>Coilovers</span></div>
+  <div class="hotspot" data-pos="1.34,0.38,0.8"><span>Big-brake kit</span></div>
+  <div class="hotspot" data-pos="-0.5,0.21,0.16"><span>Valved exhaust</span></div>
 </div>
 
 <div class="builder" id="builder" hidden>
@@ -226,6 +231,29 @@
 </script>
 <script>
 /*__JS__*/
+</script>
+<script type="module">
+// The 3D Evo for the scroll sections and the configurator (src/showroom/showroom.js, three.js and the CC BY model).
+// app.js drives it once it fires 'stage3d:ready'; on 'stage3d:error' the shader car takes over.
+// The film gets the connection first: the car's 17 MB download starts once the film can play through (or after 4 s).
+import { startShowroom, credit } from './showroom/showroom.js';
+document.getElementById('model-credit').innerHTML = credit;
+const fail = err => document.dispatchEvent(new CustomEvent('stage3d:error', { detail: err }));
+let started = false;
+const start = () => {
+  if (started) return;
+  started = true;
+  try {
+    window.RZ_STAGE = startShowroom({
+      canvas: document.getElementById('stage3d'), external: true,
+      onReady: api => document.dispatchEvent(new CustomEvent('stage3d:ready', { detail: api })),
+      onError: fail,
+    });
+  } catch (err) { console.error('[stage3d]', err); fail(err); }
+};
+const film = document.getElementById('hero-video');
+if (!film || film.readyState >= 4 || location.hash) start();
+else { film.addEventListener('canplaythrough', start, { once: true }); setTimeout(start, 4000); }
 </script>
 </body>
 </html>

@@ -29,17 +29,18 @@ const steps = JSON.parse(json);
 const outDir = path.join(here, 'shots');
 fs.mkdirSync(outDir, { recursive: true });
 
-const b = await chromium.launch({ args: ['--ignore-gpu-blocklist', '--enable-unsafe-swiftshader'] });
+const b = await chromium.launch({ args: ['--ignore-gpu-blocklist', '--enable-unsafe-swiftshader', '--use-gl=angle', '--use-angle=swiftshader'] });
 const ctx = await b.newContext({ viewport: { width: +W, height: +H }, deviceScaleFactor: 1 });
 const p = await ctx.newPage();
 const errors = [];
 p.on('pageerror', e => errors.push('pageerror: ' + e.message));
 p.on('console', m => { if (m.type() === 'error' && !/fonts\.(googleapis|gstatic)|Failed to load resource/.test(m.text())) errors.push('console: ' + m.text()); });
 
-const url = pathToFileURL(path.join(here, '..', 'dist', 'index.html')).href + (steps.hash || '');
+// RZ_URL=http://127.0.0.1:8765/ tests the 3D car (it needs http); the default file:// URL gets the shader car
+const url = (process.env.RZ_URL || pathToFileURL(path.join(here, '..', 'dist', 'index.html')).href) + (steps.hash || '');
 const t0 = Date.now();
 await p.goto(url);
-await p.waitForFunction(() => window.RZ && (RZ.state().ready || RZ.state().glFailed), null, { timeout: 120000 });
+await p.waitForFunction(() => window.RZ && (RZ.state().ready || RZ.state().glFailed), null, { timeout: 300000 });
 console.log('shader ready in', ((Date.now() - t0) / 1000).toFixed(1), 's');
 if (steps.scale) await p.evaluate(q => { RZ.quality.scale = q; RZ.quality.min = q; RZ.quality.max = q; }, steps.scale);
 const frames = async n => { for (let i = 0; i < n; i++) await p.evaluate(() => new Promise(r => requestAnimationFrame(() => r()))); };

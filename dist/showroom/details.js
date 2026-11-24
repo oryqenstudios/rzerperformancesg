@@ -4,8 +4,11 @@
 // glossy tail-light lenses and an RZER number plate.
 //
 // The model shares materials between parts (the tyre rubber is also the interior, the caliper colour is also
-// the black trim), so parts are told apart by the node they hang under: 'car body', 'w1'-'w4', 'b1'-'b4'.
+// the black trim), so parts are told apart by the node they hang under: 'car body', 'w1'-'w4', 'b1'-'b4', and the
+// body's part nodes from tools/split-model.py (rz_shell, rz_bonnet, rz_roof, rz_mirrors, rz_lip, rz_wing, rz_tip,
+// rz_interior). Exterior materials get the x-ray dissolve (parts.js); the interior, wheels and brakes stay solid.
 import * as THREE from 'three';
+import { addDissolve, carbonMaterial } from './parts.js';
 
 const NOISE = /* glsl */`
 float h13(vec3 p) { p = fract(p * 0.1031); p += dot(p, p.zyx + 31.32); return fract((p.x + p.y) * p.z); }
@@ -37,21 +40,24 @@ function paintMaterial(color, env, unitsPerMetre) {
     objectSpace(sh);
     // cells per model unit: flakes about 1.5 mm across, orange-peel ripples about 1.5 cm
     sh.uniforms.uFlake = { value: 1 / (unitsPerMetre * 0.0015) };
+    sh.uniforms.uFlakeAmt = m.userData.flake;   // 1 for metallic paint, 0 for solid colours
     sh.uniforms.uPeel = { value: 1 / (unitsPerMetre * 0.015) };
     sh.fragmentShader = sh.fragmentShader
-      .replace('#include <common>', '#include <common>\nuniform float uFlake;\nuniform float uPeel;')
+      .replace('#include <common>', '#include <common>\nuniform float uFlake;\nuniform float uPeel;\nuniform float uFlakeAmt;')
       .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
         {
           // flakes only show where a flake is bigger than about a pixel; further off they average out to
           // smooth metallic paint, as real paint does, instead of aliasing into noise
           vec3 fp = vObjPos * uFlake;
           float flakeVis = 1.0 - smoothstep(0.35, 1.2, length(fwidth(fp)));
-          normal = normalize(normal + (h33(floor(fp)) - 0.5) * 0.22 * flakeVis);
+          normal = normalize(normal + (h33(floor(fp)) - 0.5) * 0.22 * flakeVis * uFlakeAmt);
         }`)
       .replace('#include <clearcoat_normal_fragment_maps>', `#include <clearcoat_normal_fragment_maps>
         vec3 peel = vec3(vnoise3(vObjPos * uPeel), vnoise3(vObjPos * uPeel + 17.3), vnoise3(vObjPos * uPeel + 41.9)) - 0.5;
         clearcoatNormal = normalize(clearcoatNormal + peel * 0.012);`);
   };
+  m.userData.flake = { value: 1 };
+  m.customProgramCacheKey = () => 'rz-paint';
   return m;
 }
 
@@ -185,6 +191,7 @@ function headlightUnits(boxes, colour) {
   const group = new THREE.Group();
   const glow = new THREE.MeshBasicMaterial({ color: colour.clone().multiplyScalar(7), toneMapped: true });
   const ring = new THREE.MeshBasicMaterial({ color: colour.clone().multiplyScalar(4) });
+  const beams = [];
   for (const box of boxes) {
     const centre = box.getCenter(new THREE.Vector3()), size = box.getSize(new THREE.Vector3());
     for (const k of [-0.22, 0.22]) {
@@ -198,13 +205,22 @@ function headlightUnits(boxes, colour) {
     beam.position.set(centre.x - 0.02, centre.y, centre.z);
     beam.target.position.set(centre.x + 4, 0, centre.z * 1.25);
     group.add(beam, beam.target);
+    beams.push(beam);
   }
-  return group;
+  // the configurator's light colour and on/off (0-1)
+  const tint = colour.clone();
+  const set = level => {
+    glow.color.copy(tint).multiplyScalar(7 * level + 0.06);
+    ring.color.copy(tint).multiplyScalar(4 * level + 0.04);
+    for (const b of beams) { b.color.copy(tint); b.intensity = 28 * level; }
+  };
+  return { group, colour: tint, set };
 }
 
 // ---------------------------------------------------------------- dress the whole car
 export function dressCar(model, { env, paintColor, unitsPerMetre, frontX }) {
   const parentNamed = (o, test) => { for (let p = o; p; p = p.parent) if (test(p.name)) return true; return false; };
+  const partOf = o => { for (let p = o; p; p = p.parent) if (/^rz_/.test(p.name)) return p.name.slice(3); return null; };
   // GLTFLoader renames nodes (spaces become underscores), so 'car body' arrives as 'car_body'
   const onBody = o => parentNamed(o, n => n.replace(/[\s.]+/g, '_') === 'car_body');
   const onWheel = o => parentNamed(o, n => /^w[1-4]$/.test(n));
@@ -231,12 +247,30 @@ export function dressCar(model, { env, paintColor, unitsPerMetre, frontX }) {
   const caliper = new THREE.MeshPhysicalMaterial({ color: new THREE.Color(0.62, 0.03, 0.02), roughness: 0.3, clearcoat: 0.8, clearcoatRoughness: 0.1, envMap: env });
   const plate = new THREE.MeshStandardMaterial({ map: plateTexture(), roughness: 0.35, metalness: 0.1, envMap: env, envMapIntensity: 0.6 });
   const letters = tyreLettering();
+  const carbonBody = carbonMaterial(env, 1 / unitsPerMetre);
+
+  // exterior materials fade out in the x-ray view; shared model materials get an exterior copy for that
+  const dissolve = { value: 0 };
+  for (const m of [paint, trim, windows, tail, plate, carbonBody]) addDissolve(m, dissolve);
+  const trimInside = trim.clone();
+  const exteriorCopies = new Map();
+  const exterior = m => {
+    if (!exteriorCopies.has(m)) exteriorCopies.set(m, addDissolve(m.clone(), dissolve));
+    return exteriorCopies.get(m);
+  };
 
   const extras = new THREE.Group();
+  const parts = {};
+  const exteriorMeshes = [];
+  let headlights = { colour: new THREE.Color(1, 0.97, 0.92), set() {} };
   model.traverse(o => {
+    const part = partOf(o);
+    if (part && !parts[part]) parts[part] = model.getObjectByName('rz_' + part);
     if (!o.isMesh) return;
     o.castShadow = true;
     o.receiveShadow = true;
+    const outside = onBody(o) && part !== 'interior';
+    if (outside) exteriorMeshes.push(o);
     const mats = Array.isArray(o.material) ? o.material : [o.material];
     const out = mats.map(m => {
       const n = m.name;
@@ -254,8 +288,11 @@ export function dressCar(model, { env, paintColor, unitsPerMetre, frontX }) {
         return hub;
       }
       if (onBody(o)) {
-        if (n === 'wire_176026026') return paint;
-        if (n === 'wire_216216216') return trim;
+        if (n === 'wire_176026026') {
+          if (['bonnet', 'roof', 'mirrors', 'lip'].includes(part)) o.userData.paintSlot = true;   // can turn carbon
+          return paint;
+        }
+        if (n === 'wire_216216216') return outside ? trim : trimInside;
         if (n === 'wire_255000000') { o.castShadow = false; return tail; }
         if (n === 'plate x' || n === 'plate_x') { plateUVs(o); return plate; }
         if (n === 'wire_255255255') {
@@ -266,15 +303,23 @@ export function dressCar(model, { env, paintColor, unitsPerMetre, frontX }) {
             lensMesh.matrixAutoUpdate = false;
             lensMesh.matrix.copy(o.matrixWorld);
             extras.add(lensMesh);
-            extras.add(headlightUnits(split.boxes, new THREE.Color(1, 0.97, 0.92)));
+            headlights = headlightUnits(split.boxes, new THREE.Color(1, 0.97, 0.92));
+            extras.add(headlights.group);
           }
           return windows;
         }
       }
       m.envMap = env;
-      return m;
+      return outside ? exterior(m) : m;
     });
     o.material = Array.isArray(o.material) ? out : out[0];
   });
-  return extras;   // world-space additions (clear lenses, projectors, beams): add to the scene as-is
+  return {
+    extras,   // world-space additions (clear lenses, projectors, beams): add to the scene as-is
+    parts,    // rz_* part nodes by name (shell, bonnet, roof, mirrors, lip, wing, tip, interior)
+    exteriorMeshes,
+    headlights,
+    dissolve,
+    materials: { paint, trim, windows, lensGlass, tail, rim, caliper, carbonBody },
+  };
 }

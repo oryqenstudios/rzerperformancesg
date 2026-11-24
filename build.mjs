@@ -19,12 +19,13 @@ function build() {
   html = html.replace('/*__JS__*/', () => read('app.js'));
   fs.mkdirSync(path.dirname(out), { recursive: true });
   fs.writeFileSync(out, html);
-  // hero film, poster and final still ship next to the page
-  const assetsIn = path.join(root, 'assets', 'site'), assetsOut = path.join(root, 'dist', 'assets');
-  if (fs.existsSync(assetsIn)) fs.cpSync(assetsIn, assetsOut, { recursive: true });
-  // the photoreal three.js showroom (dist/showroom/) and the vendored three.js it imports
-  fs.cpSync(path.join(srcDir, 'showroom'), path.join(root, 'dist', 'showroom'), { recursive: true });
-  fs.cpSync(path.join(root, 'vendor'), path.join(root, 'dist', 'vendor'), { recursive: true });
+  // copied folders are replaced whole, so files removed or renamed in the source don't linger in dist/
+  const copy = (from, to) => { fs.rmSync(to, { recursive: true, force: true }); if (fs.existsSync(from)) fs.cpSync(from, to, { recursive: true }); };
+  // hero film, poster, final still and the 3D car ship next to the page
+  copy(path.join(root, 'assets', 'site'), path.join(root, 'dist', 'assets'));
+  // the three.js stage and preview (dist/showroom/) and the vendored three.js they import
+  copy(path.join(srcDir, 'showroom'), path.join(root, 'dist', 'showroom'));
+  copy(path.join(root, 'vendor'), path.join(root, 'dist', 'vendor'));
   console.log(`[build] dist/index.html ${(html.length / 1024).toFixed(1)} KB`);
 }
 

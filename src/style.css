@@ -37,6 +37,10 @@ button { font: inherit; color: inherit; }
   z-index: 0;
   touch-action: none;
 }
+/* the 3D Evo (three.js) replaces the shader car when the page is served over http(s); see app.js */
+#stage3d { position: fixed; inset: 0; width: 100vw; height: 100vh; display: none; z-index: 0; touch-action: none; }
+.use-3d #stage3d { display: block; }
+.use-3d #stage { display: none; }
 .nogl-bg #stage { display: none; }
 .nogl-bg { background: radial-gradient(120% 80% at 70% 60%, #1a1c1f 0%, #000 60%); }
 
@@ -259,6 +263,8 @@ fieldset.field { border: 0; margin: 0; padding: 0; }
   padding: 28px var(--gutter) 36px; border-top: 1px solid var(--hair);
   color: var(--graphite); font-size: 0.875rem; background: rgba(0, 0, 0, 0.7);
 }
+.footer .credit { flex-basis: 100%; font-size: 0.75rem; color: var(--graphite); }
+.footer .credit a { color: inherit; }
 .footer a { color: var(--steel); }
 
 /* ---------- rev counter scroll gauge */
@@ -288,6 +294,9 @@ fieldset.field { border: 0; margin: 0; padding: 0; }
 .hotspot { position: absolute; left: 0; top: 0; display: flex; align-items: center; gap: 10px; opacity: 0; will-change: transform, opacity; }
 .hotspot::before { content: ""; width: 9px; height: 9px; border-radius: 50%; background: var(--chrome); box-shadow: 0 0 0 4px rgba(232, 235, 238, 0.18), 0 0 16px rgba(255, 255, 255, 0.7); flex: none; transform: translateX(-4px); }
 .hotspot span { font-size: 0.8125rem; font-weight: 600; color: var(--chrome); background: rgba(0, 0, 0, 0.6); padding: 4px 9px; border-left: 1px solid var(--chrome); white-space: nowrap; }
+.hotspot.flip { flex-direction: row-reverse; }
+.hotspot.flip::before { transform: translateX(4px); }
+.hotspot.flip span { border-left: 0; border-right: 1px solid var(--chrome); }
 .in-builder .hotspots { display: none; }
 
 /* ---------- configurator */

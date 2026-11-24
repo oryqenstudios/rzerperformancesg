@@ -5,6 +5,15 @@ const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const body = document.body;
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const coarse = matchMedia('(pointer: coarse)').matches;
+// The 3D Evo (three.js and the CC BY model, src/showroom/) draws the scroll sections and the configurator whenever
+// the page is served over http(s). Opened from disk, module scripts can't load, so the older shader car (scene.frag)
+// draws instead; it is also the fallback if the 3D car can't start.
+const canvas3d = $('#stage3d');
+let use3d = location.protocol !== 'file:' && !!canvas3d;
+let stage3d = null;
+// options the 3D car can't show (wheel designs and sizes, widebody) are hidden while it's in use
+const shown = g => !(use3d && g.sdfOnly);
+const stockHidden = c => { for (const g of GROUPS) if (!shown(g)) c[g.key] = STOCK[g.key]; return c; };
 
 // ------------------------------------------------------------------ math
 const add = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
@@ -34,13 +43,13 @@ const CATS = [
       { id: 'red', name: 'Redline red', note: 'Solid red in gloss', swatch: '#8e0d08', u: { uPaint: [0.34, 0.012, 0.01], uPaintRough: 0.02, uPaintMetal: 0 } },
     ] } ] },
   { id: 'wheels', label: 'Wheels', view: 'wheels', groups: [
-    { key: 'wheel', label: 'Design', card: 'Wheels', items: [
+    { key: 'wheel', label: 'Design', card: 'Wheels', sdfOnly: true, items: [
       { id: 'factory', name: 'Factory six-spoke', note: 'As delivered', mark: 'F', u: { uWheel: 2 } },
       { id: 'rz5', name: 'RZ-5 split spoke', note: 'Forged, twin-blade spokes', mark: '5', u: { uWheel: 0 } },
       { id: 'rz10', name: 'RZ-10 mesh', note: 'Ten thin spokes with a mesh ring', mark: '10', u: { uWheel: 1 } },
       { id: 'aero', name: 'Aero disc', note: 'Closed face with angled cooling slots', mark: 'A', u: { uWheel: 3 } },
     ] },
-    { key: 'size', label: 'Size', card: 'Wheel size', items: [
+    { key: 'size', label: 'Size', card: 'Wheel size', sdfOnly: true, items: [
       { id: '17', name: '17 inch', note: 'Factory size, tallest sidewall', mark: '17', u: { uRimR: 0.216 } },
       { id: '18', name: '18 inch', note: 'Lower profile tyre', mark: '18', u: { uRimR: 0.229 } },
       { id: '19', name: '19 inch', note: 'Thinnest sidewall, sharpest look', mark: '19', u: { uRimR: 0.241 } },
@@ -84,13 +93,14 @@ const CATS = [
       { id: 'springs', name: 'Lowering springs', note: 'About 30 mm lower', mark: '30', u: { uRide: 0.03 } },
       { id: 'coilovers', name: 'Coilovers', note: 'About 50 mm lower, adjustable', mark: '50', u: { uRide: 0.05 } },
     ] },
-    { key: 'wide', label: 'Body', card: 'Body', items: [
+    { key: 'wide', label: 'Body', card: 'Body', sdfOnly: true, items: [
       { id: 'factory', name: 'Factory width', note: 'As delivered', mark: '—', u: { uWide: 0 } },
       { id: 'wide', name: 'Widebody kit', note: 'Flared arches, wider track', mark: 'W', u: { uWide: 1 } },
     ] } ] },
   { id: 'exhaust', label: 'Exhaust', view: 'exhaust', groups: [
     { key: 'exhaust', label: 'Layout', card: 'Exhaust', items: [
-      { id: 'dual', name: 'Factory twin', note: 'One tip each side', mark: '2', u: { uExhaust: 0 } },
+      { id: 'factory', name: 'Factory single', note: 'One large tip, as delivered', mark: '1', u: { uExhaust: 0 } },
+      { id: 'dual', name: 'Twin tips', note: 'One tip each side', mark: '2', u: { uExhaust: 3 } },
       { id: 'quad', name: 'Quad valved', note: 'Two tips each side, valve control', mark: '4', u: { uExhaust: 1 } },
       { id: 'centre', name: 'Centre twin', note: 'Two tips in the middle of the diffuser', mark: 'C', u: { uExhaust: 2 } },
     ] },
@@ -135,6 +145,7 @@ const item = (key, id) => { const g = GROUPS.find(x => x.key === key); return g.
 const uniformsFor = cfg => { const u = {}; for (const g of GROUPS) Object.assign(u, item(g.key, cfg[g.key]).u); return u; };
 
 let config = Object.assign({}, SIGNATURE);
+if (use3d) stockHidden(config);
 const INTS = new Set(['uWheel', 'uSpoiler', 'uLip', 'uSkirts', 'uDiffuser', 'uExhaust', 'uExFinish', 'uHood', 'uRoof', 'uMirror', 'uZero']);
 
 // ------------------------------------------------------------------ cameras
@@ -151,7 +162,7 @@ const BUILD_VIEWS = {
   paint:   { pos: [4.9, 1.45, 3.3],  target: [0.0, 0.55, 0.0] },
   wheels:  { pos: [2.9, 0.55, 3.2],  target: [1.15, 0.38, 0.8] },
   brakes:  { pos: [2.35, 0.48, 2.5], target: [1.4, 0.36, 0.85] },
-  aero:    { pos: [-4.5, 1.9, 3.4],  target: [-0.3, 0.6, 0.0] },
+  aero:    { pos: [-4.6, 2.7, 3.3],  target: [-0.5, 0.65, 0.0] },
   stance:  { pos: [0.2, 0.34, 5.7],  target: [0.0, 0.45, 0.0] },
   exhaust: { pos: [-5.4, 0.75, 2.6], target: [-1.6, 0.4, 0.2] },
   lights:  { pos: [5.1, 0.7, 1.9],   target: [1.4, 0.5, 0.0] },
@@ -216,6 +227,8 @@ function setU(name, v) {
 
 // ------------------------------------------------------------------ quality
 const quality = { scale: (coarse || innerWidth < 820) ? 0.45 : 0.6, max: 0.9, min: 0.34, ema: 0.016, frames: 0, reflect: 1 };
+// the 3D car: share of min(devicePixelRatio, 1.5); below 0.7 the floor reflection goes off
+const quality3d = { scale: (coarse || innerWidth < 820) ? 0.75 : 1, max: 1, min: 0.5, ema: 0.016, frames: 0 };
 function sizeCanvas() {
   const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
   const w = Math.max(2, Math.round(innerWidth * dpr * quality.scale));
@@ -223,18 +236,18 @@ function sizeCanvas() {
   if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
 }
 function adapt(dt) {
-  quality.frames++;
-  if (quality.frames < 40) return;
-  quality.ema = quality.ema * 0.92 + dt * 0.08;
-  if (quality.frames % 30 !== 0) return;
-  if (quality.ema > 0.034 && quality.scale > quality.min) {
-    quality.scale = Math.max(quality.min, quality.scale * 0.86);
-    if (quality.scale < 0.5) quality.reflect = 0;
-    sizeCanvas();
-  } else if (quality.ema < 0.0185 && quality.scale < quality.max) {
-    quality.scale = Math.min(quality.max, quality.scale * 1.05);
-    sizeCanvas();
-  }
+  const q = stage3d ? quality3d : quality;
+  q.frames++;
+  if (q.frames < 40) return;
+  q.ema = q.ema * 0.92 + dt * 0.08;
+  if (q.frames % 30 !== 0) return;
+  let to = q.scale;
+  if (q.ema > 0.034 && q.scale > q.min) to = Math.max(q.min, q.scale * 0.86);
+  else if (q.ema < 0.0185 && q.scale < q.max) to = Math.min(q.max, q.scale * 1.05);
+  if (to === q.scale) return;
+  q.scale = to;
+  if (stage3d) stage3d.setPixelScale(q.scale);
+  else { if (q.scale < 0.5) quality.reflect = 0; sizeCanvas(); }
 }
 
 // ------------------------------------------------------------------ state
@@ -381,7 +394,7 @@ function openBuilder() {
   body.classList.add('in-builder');
   $('#builder').hidden = false;
   $('#home').setAttribute('inert', '');
-  canvas.tabIndex = 0;
+  [canvas, canvas3d].forEach(el => el && (el.tabIndex = 0));
   setCategory(activeCat || 'paint', true);
   layoutBuilder();
   lastInteract = performance.now();
@@ -394,7 +407,7 @@ function closeBuilder(h) {
   body.classList.remove('in-builder');
   $('#builder').hidden = true;
   $('#home').removeAttribute('inert');
-  canvas.removeAttribute('tabindex');
+  [canvas, canvas3d].forEach(el => el && el.removeAttribute('tabindex'));
   measure();
   const el = h && h !== 'top' ? document.getElementById(h) : null;
   requestAnimationFrame(() => {
@@ -424,7 +437,7 @@ function setCategory(id, jump) {
   const cat = CATS.find(c => c.id === id);
   $$('.b-tab', tabsEl).forEach(b => b.setAttribute('aria-selected', String(b.dataset.cat === id)));
   optsEl.setAttribute('aria-labelledby', 'tab-' + id);
-  optsEl.innerHTML = cat.groups.map(g => `<fieldset class="og"><legend>${g.label}</legend><div class="og-items">${g.items.map((it, idx) => {
+  optsEl.innerHTML = cat.groups.filter(shown).map(g => `<fieldset class="og"><legend>${g.label}</legend><div class="og-items">${g.items.map((it, idx) => {
     const lead = it.swatch ? `<span class="sw" style="--sw:${it.swatch}"></span>` : `<span class="mark">${it.mark || ''}</span>`;
     const tag = idx === 0 ? '<span class="stock-tag">stock</span>' : '';
     return `<button class="opt" type="button" data-key="${g.key}" data-id="${it.id}" aria-pressed="${config[g.key] === it.id}">${lead}<span class="opt-name">${it.name}${tag}</span><span class="opt-note">${it.note}</span>${TICK}</button>`;
@@ -449,7 +462,7 @@ function buildCode(cfg) {
   return 'RZ-' + v.toString(36).toUpperCase().padStart(6, '0');
 }
 function renderCard() {
-  const changed = GROUPS.filter(g => config[g.key] !== STOCK[g.key]);
+  const changed = GROUPS.filter(shown).filter(g => config[g.key] !== STOCK[g.key]);
   $('#card-count').textContent = String(changed.length);
   $('#jc-code').textContent = buildCode(config);
   $('#jc-sub').textContent = changed.length ? `${changed.length} ${changed.length === 1 ? 'change' : 'changes'} from stock` : 'Stock car';
@@ -459,7 +472,7 @@ function renderCard() {
 }
 function buildText() {
   const lines = ['RZER build request', 'Build code: ' + buildCode(config), 'My car: (make, model, year)', ''];
-  for (const c of CATS) for (const g of c.groups) {
+  for (const c of CATS) for (const g of c.groups.filter(shown)) {
     const stock = config[g.key] === STOCK[g.key];
     lines.push(`${g.card || g.label}: ${item(g.key, config[g.key]).name}${stock ? ' (stock)' : ''}`);
   }
@@ -484,7 +497,7 @@ cardToggle.addEventListener('click', () => {
   body.classList.toggle('card-open', !card.hidden);
   layoutBuilder();
 });
-$('#preset').addEventListener('click', () => { config = Object.assign({}, SIGNATURE); setCategory(activeCat); renderCard(); });
+$('#preset').addEventListener('click', () => { config = stockHidden(Object.assign({}, SIGNATURE)); setCategory(activeCat); renderCard(); });
 $('#reset').addEventListener('click', () => { config = Object.assign({}, STOCK); setCategory(activeCat); renderCard(); });
 const lightsBtn = $('#lights');
 lightsBtn.addEventListener('click', () => { lightsOn = !lightsOn; lightsBtn.setAttribute('aria-pressed', String(lightsOn)); });
@@ -515,16 +528,17 @@ function buildShift() {
 // orbit controls
 const pointers = new Map();
 let pinchDist = 0;
-canvas.addEventListener('pointerdown', e => {
+const onStage = (type, fn, opts) => [canvas, canvas3d].forEach(el => el && el.addEventListener(type, fn, opts));
+onStage('pointerdown', e => {
   if (mode !== 'build') return;
-  canvas.setPointerCapture(e.pointerId);
+  e.currentTarget.setPointerCapture(e.pointerId);
   pointers.set(e.pointerId, [e.clientX, e.clientY]);
   if (!userOrbit) userOrbit = Object.assign({}, cam.orbit, { target: cam.orbit.target.slice() });
   orbitGoal = null;
   if (pointers.size === 2) { const [a, b] = [...pointers.values()]; pinchDist = Math.hypot(a[0] - b[0], a[1] - b[1]); }
   touched();
 });
-canvas.addEventListener('pointermove', e => {
+onStage('pointermove', e => {
   if (mode !== 'build' || !pointers.has(e.pointerId)) return;
   const prev = pointers.get(e.pointerId);
   pointers.set(e.pointerId, [e.clientX, e.clientY]);
@@ -539,8 +553,8 @@ canvas.addEventListener('pointermove', e => {
   }
   touched();
 });
-['pointerup', 'pointercancel'].forEach(ev => canvas.addEventListener(ev, e => { pointers.delete(e.pointerId); pinchDist = 0; }));
-canvas.addEventListener('wheel', e => {
+['pointerup', 'pointercancel'].forEach(ev => onStage(ev, e => { pointers.delete(e.pointerId); pinchDist = 0; }));
+onStage('wheel', e => {
   if (mode !== 'build') return;
   e.preventDefault();
   if (!userOrbit) userOrbit = Object.assign({}, cam.orbit, { target: cam.orbit.target.slice() });
@@ -548,7 +562,7 @@ canvas.addEventListener('wheel', e => {
   userOrbit.r = clamp(userOrbit.r * Math.exp(e.deltaY * 0.0012), 2.0, 8.5);
   touched();
 }, { passive: false });
-canvas.addEventListener('keydown', e => {
+onStage('keydown', e => {
   if (mode !== 'build') return;
   const k = { ArrowLeft: [-0.12, 0], ArrowRight: [0.12, 0], ArrowUp: [0, 0.08], ArrowDown: [0, -0.08] }[e.key];
   if (!k) return;
@@ -605,8 +619,8 @@ function frame(now) {
   update(dt, now / 1000);
   // at the top of the home page the hero film covers the stage: draw only now and then to stay warm
   const covered = mode === 'home' && scrollY < 2;
-  if (ready && (!covered || coveredFrames++ % 30 === 0)) {
-    draw(now / 1000);
+  if (ready && (!covered || (!stage3d && coveredFrames++ % 30 === 0))) {
+    draw(now / 1000, dt);
     if (!covered) adapt(dt);
   }
   requestAnimationFrame(frame);
@@ -648,7 +662,10 @@ function update(dt, time) {
   const asp = innerWidth / innerHeight;
   const fit = asp < 1 ? 1 + clamp((1 - asp) / 0.55, 0, 1) * (mode === 'build' ? 0.75 : 0.45) : 1;
   cam.pos = orbitPos(Object.assign({}, o, { r: o.r * fit })); cam.tgt = o.target;
-  cam.fov = lerp(cam.fov, goal.fov, k);
+  // tall screens: widen the lens so the whole car fits across (about 80% of the square-screen view)
+  let fov = goal.fov;
+  if (mode === 'home' && asp < 0.8) fov = Math.atan(Math.tan(fov * Math.PI / 360) * 0.8 / asp) * 360 / Math.PI;
+  cam.fov = lerp(cam.fov, fov, k);
   cam.shift = [lerp(cam.shift[0], goal.shift[0], k), lerp(cam.shift[1], goal.shift[1], k)];
 
   // hotspots
@@ -657,13 +674,14 @@ function update(dt, time) {
     const s = spotsOn > 0.01 ? project(add(h.p, [0, -(live.uRide || 0), 0])) : null;
     if (!s) { h.el.style.opacity = '0'; continue; }
     h.el.style.opacity = spotsOn.toFixed(2);
-    h.el.style.transform = `translate(${s[0].toFixed(1)}px, ${s[1].toFixed(1)}px) translateY(-50%)`;
+    // near the right edge the label goes on the dot's left, so it stays on screen
+    const flip = s[0] > innerWidth - 190;
+    h.el.classList.toggle('flip', flip);
+    h.el.style.transform = `translate(${s[0].toFixed(1)}px, ${s[1].toFixed(1)}px) translate(${flip ? '-100%' : '0'}, -50%)`;
   }
 }
 
-function draw(time) {
-  sizeCanvas();
-  gl.viewport(0, 0, canvas.width, canvas.height);
+function draw(time, dt) {
   const target = uniformsFor(mode === 'build' && compare ? STOCK : config);
   const ks = 0.18;
   for (const [n, v] of Object.entries(target)) {
@@ -671,6 +689,14 @@ function draw(time) {
     else if (Array.isArray(v)) live[n] = live[n].map((x, i) => x + (v[i] - x) * ks);
     else live[n] = live[n] + (v - live[n]) * ks;
   }
+  if (stage3d) {
+    stage3d.setView({ pos: cam.pos, target: cam.tgt, fov: cam.fov, shift: cam.shift });
+    stage3d.setState(Object.assign({}, live, { lights, xray: xray < 0.003 ? 0 : xray, bay, reflect: quality3d.scale >= 0.7 ? 1 : 0 }));
+    stage3d.render(dt);
+    return;
+  }
+  sizeCanvas();
+  gl.viewport(0, 0, canvas.width, canvas.height);
   for (const [n, v] of Object.entries(live)) setU(n, v);
   const f = norm(sub(cam.tgt, cam.pos)), r = norm(cross(f, [0, 1, 0])), u = cross(r, f);
   setU('uCamPos', cam.pos); setU('uCamFwd', f); setU('uCamRight', r); setU('uCamUp', u);
@@ -692,9 +718,31 @@ function draw(time) {
 addEventListener('resize', () => { measure(); sizeCanvas(); onScroll(); layoutBuilder(); });
 addEventListener('load', measure);
 document.fonts && document.fonts.ready.then(measure);
+function start3d() {
+  body.classList.add('use-3d');
+  loadingEl.textContent = 'Loading the 3D car';
+  const slow = setTimeout(() => { if (!stage3d && use3d) loadingEl.textContent = 'Loading the 3D car. The first visit takes a little longer.'; }, 12000);
+  document.addEventListener('stage3d:ready', e => {
+    clearTimeout(slow);
+    stage3d = e.detail;
+    stage3d.setPixelScale(quality3d.scale);
+    ready = true;
+    loadingEl.classList.add('gone');
+  });
+  // no 3D car (an old browser, a failed download): the shader car takes over, with all its options
+  document.addEventListener('stage3d:error', () => {
+    clearTimeout(slow);
+    use3d = false; stage3d = null;
+    body.classList.remove('use-3d');
+    loadingEl.textContent = 'Loading the 3D scene';
+    renderCard();
+    if (activeCat) setCategory(activeCat);
+    initGL();
+  });
+}
 measure(); onScroll(); renderCard();
 if (reduceMotion) finishIntro();
-initGL();
+if (use3d) start3d(); else initGL();
 route();
 if (location.hash && location.hash !== '#build' && location.hash !== '#top') finishIntro();
 startHero();
@@ -702,10 +750,11 @@ requestAnimationFrame(frame);
 
 // test hook
 window.RZ = {
-  state: () => ({ heroDone, heroTime: heroVideo.currentTime, mode, scale: quality.scale, ready, glFailed, xray, cam: { pos: cam.pos, tgt: cam.tgt } }),
+  state: () => ({ heroDone, heroTime: heroVideo.currentTime, mode, three: !!stage3d, scale: stage3d ? quality3d.scale : quality.scale, ready, glFailed, xray, cam: { pos: cam.pos, tgt: cam.tgt } }),
   skipHero: () => finishIntro(),
   setConfig: c => { Object.assign(config, c); renderCard(); if (activeCat) setCategory(activeCat); },
   quality,
+  quality3d,
   settle: v => { settle = v; },
 };
 })();
