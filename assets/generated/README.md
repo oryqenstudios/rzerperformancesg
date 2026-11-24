@@ -48,17 +48,15 @@ tools/mux-hero-audio.sh
 
 | Film time | Sound |
 |---|---|
-| 0–6.7 s | faint car-park room tone |
-| 6.68 s | ignition relay click as the parking lights glow amber |
-| 6.82 s | starter cranks |
-| 7.42 s | engine catches, flares and settles to a lumpy idle |
-| 8.15 s | a blip to 4,800 rpm, a few pops |
-| 8.90 s | full rev to 7,300 rpm with turbo spool |
-| 9.35 s | lift-off: blow-off valve; the first bang lands with the headlights (9.375 s, frame 225) |
-| 9.4–10.27 s | pops, crackle and bangs as the revs fall; the last bang is just before the logo (10.34 s) |
-| 10.3–12.4 s | idle, fading out under the logo |
+| 0–8.85 s | faint car-park room tone only, while the car is being built |
+| 8.85 s | the starter turns the engine over: five chugs, rur-rur-rur |
+| 9.375 s | the engine fires as the headlights snap on (frame 225) and flares |
+| 9.68 s | one full rev to 7,000 rpm, the turbo spooling |
+| 10.06 s | throttle shut: the blow-off valve vents (pssh), on its own |
+| 10.40–10.80 s | bang, pop, pop, bang as the revs fall |
+| 10.94 s | the logo starts drawing (`LOGO_LEAD` 1.6 s in `src/app.js`); the idle fades out under it |
 
-The engine is a pulse train at the 4-cylinder firing rate (rpm / 30 per second) ringing a set of exhaust resonances, with per-cylinder imbalance at idle and brighter pulses under load. Pops are noise cracks with a low thump, all in a car-park reverb. Levels: idle about −25 dBFS RMS, full rev −13, bangs peak at −1. `python3 tools/make-hero-audio.py out.wav spectrogram.png` also draws a spectrogram with the beats marked. To use a real recording instead, pass it to `tools/mux-hero-audio.sh recording.wav`.
+Each moment has its own slot so the sound stays clean: the reverb is short, nothing overlaps the blow-off, and the bangs are mixed so the limiter barely works (under 1 dB), so nothing pumps. The engine is a pulse train at the 4-cylinder firing rate (rpm / 30 per second): sharp pressure spikes ringing a set of exhaust resonances, with per-cylinder imbalance at idle and brighter pulses under load. Levels: cranking about −23 dBFS RMS, full rev −13, blow-off −16, bangs peak at −1. `python3 tools/make-hero-audio.py out.wav spectrogram.png` also draws a spectrogram with the beats marked. To use a real recording instead, pass it to `tools/mux-hero-audio.sh recording.wav`.
 
 Each prompt in `prompts/` describes its phase **in reverse** (what happens from the start frame). The chain is:
 

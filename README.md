@@ -1,6 +1,6 @@
 # RZER Performance website
 
-Gloss-black website for Rzer, a Singapore car tuning workshop. The hero is a realistic film: a black liquid droplet in an underground car park becomes the client's silver Evo IX under a showroom spotlight, with the engine starting, revving and popping and banging on the overrun, then the RZER Performance logo draws in over its final frame. Below it, scroll scenes move around a shader-drawn 3D Evo, and a parts configurator lets visitors build their own. The page's own code is inlined into one HTML file, with the hero media next to it. A separate full-screen preview shows a photoreal real-time 3D Evo IX (three.js, CC BY 4.0 model by 3DCars4U).
+Gloss-black website for Rzer, a Singapore car tuning workshop. The hero is a realistic film: a black liquid droplet in an underground car park becomes the client's silver Evo IX under a showroom spotlight, with the engine firing as the headlights come on, a rev, the blow-off valve and pops and bangs, then the RZER Performance logo draws in over its final frame. Below it, scroll scenes move around a shader-drawn 3D Evo, and a parts configurator lets visitors build their own. The page's own code is inlined into one HTML file, with the hero media next to it. A separate full-screen preview shows a photoreal real-time 3D Evo IX (three.js, CC BY 4.0 model by 3DCars4U).
 
 ```bash
 npm run build   # writes dist/index.html and dist/assets/

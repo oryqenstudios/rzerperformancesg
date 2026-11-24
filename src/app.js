@@ -249,7 +249,9 @@ let lastInteract = 0;
 
 // ------------------------------------------------------------------ hero intro: realistic film -> final still -> logo
 const heroMedia = $('#hero-media'), heroVideo = $('#hero-video'), introBar = $('#intro-bar');
-const LOGO_LEAD = 2.2;   // the logo starts drawing in this many seconds before the film ends
+// the logo starts drawing this many seconds before the film ends, just after the last bang of the sound
+// (tools/make-hero-audio.py times the pops to it, so change both together)
+const LOGO_LEAD = 1.6;
 let heroDone = false, logoShown = false;
 function revealLogo() {
   if (logoShown) return;
@@ -290,8 +292,6 @@ addEventListener('touchmove', () => { if (!heroDone && mode === 'home') fastForw
 heroVideo.addEventListener('timeupdate', () => {
   if (!heroVideo.duration) return;
   introBar.style.width = (heroVideo.currentTime / heroVideo.duration * 100).toFixed(1) + '%';
-  // the logo comes in with the film's final shot, not after it
-  if (heroVideo.currentTime >= heroVideo.duration - LOGO_LEAD) revealLogo();
 });
 heroVideo.addEventListener('ended', finishIntro);
 heroVideo.addEventListener('error', finishIntro);
@@ -592,6 +592,9 @@ let coveredFrames = 0;
 function frame(now) {
   const dt = Math.min(0.1, Math.max(0.001, (now - last) / 1000));
   last = now;
+  // the logo comes in with the film's final shot, right after the last bang; checked every frame, because
+  // timeupdate only fires about every 250 ms
+  if (!logoShown && !heroDone && heroVideo.duration && heroVideo.currentTime >= heroVideo.duration - LOGO_LEAD) revealLogo();
   update(dt, now / 1000);
   // at the top of the home page the hero film covers the stage: draw only now and then to stay warm
   const covered = mode === 'home' && scrollY < 2;
