@@ -40,14 +40,38 @@
     <div class="hero-copy">
       <h1 class="logo" id="logo">
         <span class="sr-only">RZER Performance</span>
-        <svg class="logo-svg" viewBox="0 0 640 230" aria-hidden="true" focusable="false">
-          <path class="logo-line" pathLength="1" d="M34 158 C96 151 150 143 196 131 C226 123 248 116 262 108 C286 94 312 76 342 64 C360 57 380 54 404 54 C438 54 462 57 482 66 C500 74 516 86 532 96 C548 105 566 110 588 112 L598 101 L603 115 C611 118 617 123 620 131"/>
-          <path class="logo-spark" pathLength="1" d="M34 158 C96 151 150 143 196 131 C226 123 248 116 262 108 C286 94 312 76 342 64 C360 57 380 54 404 54 C438 54 462 57 482 66 C500 74 516 86 532 96 C548 105 566 110 588 112 L598 101 L603 115 C611 118 617 123 620 131"/>
+        <svg class="logo-svg logo-base" viewBox="0 0 640 230" aria-hidden="true" focusable="false">
+          <defs>
+            <!-- bevelled glass edges: a soft bump from the mark's own outline, lit from both sides, so whichever
+                 edges the beam passes catch the light -->
+            <filter id="logo-glass" x="-6%" y="-25%" width="112%" height="150%" color-interpolation-filters="sRGB">
+              <feGaussianBlur in="SourceAlpha" stdDeviation="1.4" result="bump"/>
+              <feSpecularLighting in="bump" result="from-left" surfaceScale="5" specularConstant="1.3" specularExponent="30" lighting-color="#fff">
+                <feDistantLight azimuth="200" elevation="35"/>
+              </feSpecularLighting>
+              <feSpecularLighting in="bump" result="from-right" surfaceScale="5" specularConstant="1.3" specularExponent="30" lighting-color="#fff">
+                <feDistantLight azimuth="340" elevation="35"/>
+              </feSpecularLighting>
+              <feComposite in="from-left" in2="from-right" operator="arithmetic" k1="0" k2="1" k3="1" k4="0" result="lit"/>
+              <feComposite in="lit" in2="SourceAlpha" operator="in"/>
+            </filter>
+          </defs>
+          <path class="logo-line" d="M34 158 C96 151 150 143 196 131 C226 123 248 116 262 108 C286 94 312 76 342 64 C360 57 380 54 404 54 C438 54 462 57 482 66 C500 74 516 86 532 96 C548 105 566 110 588 112 L598 101 L603 115 C611 118 617 123 620 131"/>
           <g class="logo-words">
             <text class="logo-rzer" x="30" y="212" textLength="236" lengthAdjust="spacingAndGlyphs">RZER</text>
             <text class="logo-perf" x="280" y="212" textLength="336" lengthAdjust="spacingAndGlyphs">PERFORMANCE</text>
           </g>
         </svg>
+        <svg class="logo-svg logo-glint" viewBox="0 0 640 230" aria-hidden="true" focusable="false">
+          <g filter="url(#logo-glass)">
+            <path class="logo-line" d="M34 158 C96 151 150 143 196 131 C226 123 248 116 262 108 C286 94 312 76 342 64 C360 57 380 54 404 54 C438 54 462 57 482 66 C500 74 516 86 532 96 C548 105 566 110 588 112 L598 101 L603 115 C611 118 617 123 620 131"/>
+            <g class="logo-words">
+              <text class="logo-rzer" x="30" y="212" textLength="236" lengthAdjust="spacingAndGlyphs">RZER</text>
+              <text class="logo-perf" x="280" y="212" textLength="336" lengthAdjust="spacingAndGlyphs">PERFORMANCE</text>
+            </g>
+          </g>
+        </svg>
+        <span class="logo-beam" aria-hidden="true"></span>
       </h1>
       <p class="hero-line">Performance tuning, fitment and builds in Singapore.</p>
       <div class="hero-actions">

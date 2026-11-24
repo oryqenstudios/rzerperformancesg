@@ -67,13 +67,14 @@ npm run dev          # rebuild on every change in src/; refresh dist/index.html 
 - **Fallbacks:** if autoplay is refused, the last `<source>` errors, or nothing has played after 7 s, it shows the still. The film's last frame and the still differ by about 1.2% per pixel, so the crossfade is invisible.
 - While the film covers the stage (home page, `scrollY < 2`), the old shader view draws only every 30th frame.
 - **Portrait screens** (`max-aspect-ratio: 9/10`): the media takes the top 72svh and the copy sits on black below. The hero's own black background hides the 3D stage behind it, and `.hero::after` fades it into the next section.
-- **Logo:** inline SVG, white, no background, redrawn from the client's logo. The words are bold slanted RZER and outlined PERFORMANCE, in Archivo at 125% width, skewed −12°. The reveal (CSS keyframes on `.revealed`, about 2.2 s) runs:
-  1. `.logo-line`, the car roofline swoosh, draws in as a light trace with `stroke-dashoffset` on a `pathLength="1"` path.
-  2. `.logo-spark`, a short glowing dash on the same path, rides its tip.
-  3. `.logo-rzer` slides in out of a blur.
-  4. `.logo-perf` draws its outline with `stroke-dasharray`.
-  5. `.logo-words` pulses a glow as it lands.
+- **Logo:** inline SVG, white, no background, redrawn from the client's logo. The words are bold slanted RZER and outlined PERFORMANCE, in Archivo at 125% width, skewed −12°. The reveal follows the client's brief (a light beam over bevelled glass, then the slogan with a shimmer). It runs on `.revealed`, about 1.7 s, in vector so the mark never changes shape:
+  1. The mark appears as faint dark glass (`.logo-base` under a mask at 12%).
+  2. `.logo-beam`, a soft, slanted volumetric beam with a haze around it, sweeps left to right. Behind it the mark turns solid white (the base mask slides with it).
+  3. `.logo-glint`, a copy of the mark through the `#logo-glass` SVG filter (specular lighting on a blurred outline, lit from both sides), shows only in a narrow band at the beam, so the bevelled glass edges catch the light as it passes.
+  4. `.hero-copy::before` darkens the area behind the logo and slogan to a deep matte black.
+  5. Once the beam has crossed (`LOGO_SWEEP` in `app.js` sets `--slogan-delay`), the slogan fades in and one shimmer brightens it from grey to `--chrome`; the buttons follow. Then everything holds.
 
+  The masks and the beam share one timing (`--sweep` on `.logo`); the CSS comment above the logo rules gives the geometry that keeps them together.
   Reduced motion turns the animations off. Replace it with the client's vector file when they send one.
 
 ## Showroom (`src/showroom/showroom.js`)

@@ -127,30 +127,61 @@ main { position: relative; z-index: 1; }
   position: absolute; left: var(--gutter); bottom: clamp(64px, 11vh, 128px);
   display: grid; gap: 22px; max-width: min(92vw, 980px);
 }
-/* RZER Performance logo. Reveal (on .revealed, which starts in the film's last seconds):
-   the roofline draws in as a light trace with a spark at its head, RZER slides out of a blur,
-   PERFORMANCE draws its outline, and the words glow as they land. */
-.logo { margin: 0; width: clamp(260px, 31vw, 520px); line-height: 0; }
+/* RZER Performance logo. Reveal (on .revealed, which starts just after the last bang of the film's sound):
+   a soft volumetric beam, slanted like the logo, sweeps across left to right. Behind it the mark turns from dark
+   glass to solid white, and its bevelled glass edges (.logo-glint, the #logo-glass filter) catch the light as the
+   beam passes. Then the slogan fades in with a shimmer, and everything holds. The base and glint masks and the
+   beam share one timing, so they move together: the edge sits at -15% of the logo's width at the start and +115%
+   at the end (mask-position 82.5% -> 17.5% on a 300%-wide gradient; the beam is 30% wide, translateX -100% -> 333%). */
+.logo { --sweep: 1.5s cubic-bezier(0.45, 0, 0.2, 1) 0.2s both; position: relative; margin: 0; width: clamp(260px, 31vw, 520px); line-height: 0; }
 .logo-svg { display: block; width: 100%; height: auto; overflow: visible; }
-.logo-line { fill: none; stroke: #fff; stroke-width: 3.2; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 1; stroke-dashoffset: 0; filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.35)); }
-.logo-spark { fill: none; stroke: #fff; stroke-width: 7; stroke-linecap: round; stroke-dasharray: 0.03 1.2; stroke-dashoffset: 0.03; opacity: 0; filter: drop-shadow(0 0 5px #fff) drop-shadow(0 0 16px rgba(255, 255, 255, 0.85)); }
+.logo-line { fill: none; stroke: #fff; stroke-width: 3.2; stroke-linecap: round; stroke-linejoin: round; }
+.logo-base .logo-line { filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.35)); }
 .logo-rzer { fill: #fff; font-family: var(--font); font-weight: 900; font-stretch: 125%; font-size: 84px; transform: skewX(-12deg); transform-origin: 30px 212px; }
-.logo-perf { fill: none; stroke: #fff; stroke-width: 1.4; stroke-dasharray: 160; stroke-dashoffset: 0; font-family: var(--font); font-weight: 800; font-stretch: 125%; font-size: 44px; letter-spacing: 0.02em; transform: skewX(-12deg); transform-origin: 280px 212px; }
-.is-intro .logo:not(.revealed) .logo-line { stroke-dashoffset: 1; }
-.is-intro .logo:not(.revealed) .logo-rzer, .is-intro .logo:not(.revealed) .logo-perf { opacity: 0; }
-.logo.revealed .logo-line { animation: logo-draw 1.5s cubic-bezier(0.65, 0, 0.25, 1) both; }
-.logo.revealed .logo-spark { animation: logo-spark 1.5s cubic-bezier(0.65, 0, 0.25, 1) both; }
-.logo.revealed .logo-rzer { animation: logo-rzer 1s cubic-bezier(0.2, 0.7, 0.2, 1) 0.55s both; }
-.logo.revealed .logo-perf { animation: logo-perf 1.3s cubic-bezier(0.3, 0.6, 0.2, 1) 0.85s both; }
-.logo.revealed .logo-words { animation: logo-glow 2.2s ease-out 0.6s both; }
-@keyframes logo-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
-@keyframes logo-spark { 0% { stroke-dashoffset: 0.03; opacity: 1; } 88% { opacity: 1; } 100% { stroke-dashoffset: -1; opacity: 0; } }
-@keyframes logo-rzer { from { opacity: 0; transform: translateX(-34px) skewX(-12deg); filter: blur(10px); } to { opacity: 1; transform: translateX(0) skewX(-12deg); filter: blur(0); } }
-@keyframes logo-perf { from { opacity: 0; stroke-dashoffset: 160; transform: translateX(20px) skewX(-12deg); } 25% { opacity: 1; } to { opacity: 1; stroke-dashoffset: 0; transform: translateX(0) skewX(-12deg); } }
-@keyframes logo-glow { 0% { filter: drop-shadow(0 0 0 rgba(255, 255, 255, 0)); } 55% { filter: drop-shadow(0 0 16px rgba(255, 255, 255, 0.8)); } 100% { filter: drop-shadow(0 0 3px rgba(255, 255, 255, 0.25)); } }
-.hero-line, .hero-actions { transition: opacity 0.8s ease 0.3s; }
+.logo-perf { fill: none; stroke: #fff; stroke-width: 1.4; font-family: var(--font); font-weight: 800; font-stretch: 125%; font-size: 44px; letter-spacing: 0.02em; transform: skewX(-12deg); transform-origin: 280px 212px; }
+.logo-glint, .logo-beam { position: absolute; pointer-events: none; opacity: 0; }
+.logo-glint { inset: 0; filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.85)); }
+.logo-beam {
+  top: -75%; bottom: -55%; left: 0; width: 30%;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.08) 25%, rgba(238, 243, 248, 0.32) 46%, rgba(255, 255, 255, 0.5) 50%, rgba(238, 243, 248, 0.32) 54%, rgba(255, 255, 255, 0.08) 75%, rgba(255, 255, 255, 0));
+  -webkit-mask-image: linear-gradient(180deg, transparent, #000 32%, #000 68%, transparent); mask-image: linear-gradient(180deg, transparent, #000 32%, #000 68%, transparent);
+  filter: blur(9px); mix-blend-mode: screen; transform: translateX(-100%) skewX(-12deg);
+}
+/* the haze the beam lights up around itself */
+.logo-beam::before { content: ''; position: absolute; inset: 0 -80%; background: radial-gradient(closest-side, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0)); }
+.logo-base, .logo-glint { -webkit-mask-size: 300% 100%; mask-size: 300% 100%; -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat; }
+.is-intro .logo:not(.revealed) .logo-base { opacity: 0; }
+.logo.revealed .logo-base {
+  -webkit-mask-image: linear-gradient(90deg, #000 46%, rgba(0, 0, 0, 0.12) 54%); mask-image: linear-gradient(90deg, #000 46%, rgba(0, 0, 0, 0.12) 54%);
+  animation: logo-glass-in 0.3s ease-out both, logo-sweep var(--sweep);
+}
+.logo.revealed .logo-glint {
+  -webkit-mask-image: linear-gradient(90deg, transparent 46.5%, #000 50%, transparent 53.5%); mask-image: linear-gradient(90deg, transparent 46.5%, #000 50%, transparent 53.5%);
+  animation: logo-sweep var(--sweep), logo-glint var(--sweep);
+}
+.logo.revealed .logo-beam { animation: logo-beam var(--sweep); }
+@keyframes logo-glass-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes logo-sweep { from { -webkit-mask-position: 82.5% 0; mask-position: 82.5% 0; } to { -webkit-mask-position: 17.5% 0; mask-position: 17.5% 0; } }
+@keyframes logo-glint { 0% { opacity: 0; } 12% { opacity: 1; } 85% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes logo-beam { 0% { opacity: 0; transform: translateX(-100%) skewX(-12deg); } 15% { opacity: 1; } 80% { opacity: 1; } 100% { opacity: 0; transform: translateX(333.3%) skewX(-12deg); } }
+/* a deep matte darkening behind the logo and slogan, so the beam reads */
+.hero-copy::before {
+  content: ''; position: absolute; z-index: -1; inset: -25% -15% -20% calc(-1 * var(--gutter)); pointer-events: none;
+  background: radial-gradient(60% 55% at 35% 45%, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0) 72%); opacity: 0; transition: opacity 1.2s ease;
+}
+.hero-copy.brand-on::before { opacity: 1; }
+/* the slogan fades in once the beam has crossed (--slogan-delay on .hero-copy, set in app.js), with one crisp
+   shimmer; the buttons follow it */
+.hero-actions { transition: opacity 0.8s ease calc(var(--slogan-delay, 0s) + 0.6s); }
 .is-intro .hero-line, .is-intro .hero-actions { opacity: 0; pointer-events: none; }
 .hero-line { font-size: clamp(1rem, 1.4vw, 1.25rem); color: var(--chrome); max-width: 24em; }
+@supports ((-webkit-background-clip: text) or (background-clip: text)) {
+  /* the shimmer brightens the slogan as it passes, ending on --chrome */
+  .hero-line { background: linear-gradient(100deg, var(--chrome) 44%, #fff 50%, #8d939a 56%) 0 0 / 300% 100% no-repeat; -webkit-background-clip: text; background-clip: text; color: transparent; }
+}
+.intro-done .hero-line { animation: slogan-in 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) var(--slogan-delay, 0s) both, slogan-shimmer 1.4s ease-in-out calc(var(--slogan-delay, 0s) + 0.35s) both; }
+@keyframes slogan-in { from { opacity: 0; transform: translateY(8px); filter: blur(5px); } to { opacity: 1; transform: none; filter: none; } }
+@keyframes slogan-shimmer { from { background-position: 100% 0; } to { background-position: 0 0; } }
 .hero-actions { display: flex; flex-wrap: wrap; gap: 12px; }
 
 .intro-ui {
@@ -391,7 +422,8 @@ body:not(.in-builder) .loading { display: none; }
 
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
-  .hero-line, .hero-actions { transition: none; }
-  .logo.revealed .logo-line, .logo.revealed .logo-spark, .logo.revealed .logo-rzer, .logo.revealed .logo-perf, .logo.revealed .logo-words { animation: none; }
+  .hero-actions, .hero-copy::before { transition: none; }
+  .logo.revealed .logo-base, .logo.revealed .logo-glint, .logo.revealed .logo-beam, .intro-done .hero-line { animation: none; }
+  .logo.revealed .logo-base { -webkit-mask-image: none; mask-image: none; }
   .btn { transition: none; }
 }

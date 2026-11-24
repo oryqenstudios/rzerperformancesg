@@ -253,20 +253,27 @@ const heroMedia = $('#hero-media'), heroVideo = $('#hero-video'), introBar = $('
 // (tools/make-hero-audio.py times the pops to it, so change both together)
 const LOGO_LEAD = 1.6;
 let heroDone = false, logoShown = false;
+const LOGO_SWEEP = 1.7;   // s: the beam's delay and sweep across the logo (style.css --sweep); the slogan follows it
+let logoStart = 0;
 function revealLogo() {
   if (logoShown) return;
   logoShown = true;
+  logoStart = performance.now();
   $('#logo').classList.add('revealed');
+  $('.hero-copy').classList.add('brand-on');
 }
 function finishIntro() {
   if (heroDone) return;
   heroDone = true;
+  revealLogo();
+  // the slogan comes in once the beam has crossed the logo, however the film ended (played out, skipped, linked past)
+  const wait = Math.max(0, LOGO_SWEEP - (performance.now() - logoStart) / 1000);
+  $('.hero-copy').style.setProperty('--slogan-delay', wait.toFixed(2) + 's');
   heroMedia.classList.add('is-final');
   try { heroVideo.pause(); } catch (e) { /* never started */ }
   stopListening();
   introBar.style.width = '100%';
   body.classList.remove('is-intro'); body.classList.add('intro-done');
-  revealLogo();
 }
 // Esc, wheel or a swipe speed the film up; the skip button cuts straight to the final frame
 function fastForward() {
