@@ -285,17 +285,6 @@ heroVideo.addEventListener('error', finishIntro);
 // the browser falls through the <source> list; only the last one failing means there is no film
 const heroSources = $$('source', heroVideo);
 if (heroSources.length) heroSources[heroSources.length - 1].addEventListener('error', finishIntro);
-// the photoreal three.js Evo (module script in index.html) replaces the final still once it has loaded
-document.addEventListener('showroom:ready', () => heroMedia.classList.add('has-3d'));
-let heroCarActive = false;
-function updateHeroCar() {
-  const car = window.RZ_SHOWROOM;
-  if (!car) return;
-  // render it only from the last moments of the film, and only while the hero is on screen
-  const nearEnd = heroDone || (heroVideo.duration > 0 && heroVideo.currentTime > heroVideo.duration - 1.5);
-  const want = mode === 'home' && nearEnd && scrollY < innerHeight;
-  if (want !== heroCarActive) { heroCarActive = want; car.setActive(want); }
-}
 function startHero() {
   if (heroDone) return;
   heroVideo.muted = true;
@@ -585,7 +574,6 @@ function frame(now) {
   const dt = Math.min(0.1, Math.max(0.001, (now - last) / 1000));
   last = now;
   update(dt, now / 1000);
-  updateHeroCar();
   // at the top of the home page the hero film covers the stage: draw only now and then to stay warm
   const covered = mode === 'home' && scrollY < 2;
   if (ready && (!covered || coveredFrames++ % 30 === 0)) {

@@ -8,9 +8,6 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&amp;display=swap" rel="stylesheet">
-<script type="importmap">
-{ "imports": { "three": "./vendor/three/three.module.min.js", "three/addons/": "./vendor/three/addons/" } }
-</script>
 <style>
 /*__CSS__*/
 </style>
@@ -39,7 +36,6 @@
         <source src="assets/hero-intro.webm" type="video/webm">
       </video>
       <img class="hero-still" src="assets/hero-final.jpg" alt="" decoding="async">
-      <canvas class="hero-3d" id="hero-3d"></canvas>
     </div>
     <div class="hero-copy">
       <h1 class="logo" id="logo">
@@ -150,7 +146,6 @@
 <footer class="footer">
   <span>RZER Performance, Singapore</span>
   <a href="https://www.instagram.com/rzerperformance.sg/" target="_blank" rel="noopener">@rzerperformance.sg on Instagram</a>
-  <span class="credit" id="model-credit"></span>
 </footer>
 
 <div class="tach" aria-hidden="true">
@@ -207,24 +202,6 @@
 </script>
 <script>
 /*__JS__*/
-</script>
-<script type="module">
-// The photoreal three.js Evo IX for the end of the hero film (src/showroom/showroom.js).
-// It loads while the film plays; app.js shows it after the film and only renders it while the hero is visible.
-// Opened straight on #build, it waits until the visitor leaves the configurator, so its download and shader
-// compiles don't hold up the configurator's own 3D view.
-import { startShowroom, credit } from './showroom/showroom.js';
-document.getElementById('model-credit').innerHTML = credit;
-const start = () => {
-  window.RZ_SHOWROOM = startShowroom({
-    canvas: document.getElementById('hero-3d'),
-    onReady: api => document.dispatchEvent(new CustomEvent('showroom:ready', { detail: api })),
-  });
-};
-if (location.hash === '#build') {
-  const later = () => { if (location.hash !== '#build') { removeEventListener('hashchange', later); start(); } };
-  addEventListener('hashchange', later);
-} else start();
 </script>
 </body>
 </html>

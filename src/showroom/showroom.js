@@ -2,8 +2,8 @@
 // World: metres, y up, car front at +x, floor at y = 0 (same as the old shader scene).
 //
 //   startShowroom({ canvas, interactive, onReady, onError }) -> { setActive(on), ready, credit }
-// Used by the hero (non-interactive, slow sway, rendered only while visible) and by dist/showroom/
-// (drag to orbit, slow turntable). Asset paths are resolved from this file, so any page can use it.
+// Used by dist/showroom/ (drag to orbit, slow turntable). Non-interactive, it sways slowly beside the copy; it was the
+// hero car until the client asked for it to come out of the hero. Asset paths are resolved from this file, so any page can use it.
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';

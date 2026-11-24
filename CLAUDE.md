@@ -8,7 +8,7 @@ Website for **Rzer (RZER Performance)**, a Singapore car tuning and performance 
    - the body pours over as the camera comes down to a head-on view
    - the headlights snap on, the paint cures to silver, and the camera orbits to the front three-quarter
 
-   As it ends, the **RZER Performance logo** draws in, and the film hands over to a **photoreal real-time three.js Evo IX** under the showroom spotlight (`src/showroom/`). The AI still is the fallback until the 3D car loads. The film was generated with Higgsfield in five chained segments; see `assets/generated/README.md`.
+   As it ends, the **RZER Performance logo** draws in and the hero rests on the film's final frame (`hero-final.jpg`). A photoreal three.js Evo IX used to take over from the film here; the client asked for it to be removed from the hero, and it now lives only in the showroom preview (`src/showroom/`). The film was generated with Higgsfield in five chained segments; see `assets/generated/README.md`.
 2. **Scroll sections** in the style of reference video 2: a real-time 3D Evo IX-style car under a showroom spotlight. The camera moves around it per section (side profile, rear three-quarter, x-ray with tracked hotspots, wheel close-up, headlights-on front view, contact).
 3. **Configurator** (`#build`): orbit the car and swap parts live (paint, wheels, calipers, aero, stance, exhaust, lights/tint, carbon) with a job card, build code, hold-to-compare-stock and copy-build.
 
@@ -27,11 +27,12 @@ npm run dev          # rebuild on every change in src/; refresh dist/index.html 
 ## Stack and constraints
 
 - **The 3D view has no libraries and no 3D assets.** Raw WebGL2 with one fragment shader that raymarches signed distance fields (SDFs). The car and garage are modelled in GLSL. This was chosen because the original build environment had no CDN access, and because SDFs let an earlier 3D liquid intro morph straight into the car (since replaced by the hero film and removed from the shader). Moving to Three.js later would be a new renderer, not a port.
-- **The hero is a film, then three.js.** The film files are `assets/site/hero-intro.mp4` (plus a `.webm` fallback), `hero-poster.jpg` and `hero-final.jpg`, about 7.5 MB in total. After the film comes the photoreal car:
-  - `src/showroom/showroom.js` is an ES module that uses **three.js r170, vendored in `vendor/three/`** (MIT; no CDN). The page reaches it through an import map.
+- **The hero is a film.** The film files are `assets/site/hero-intro.mp4` (plus a `.webm` fallback), `hero-poster.jpg` and `hero-final.jpg`, about 7.5 MB in total.
+- **three.js is only in the showroom preview** (`dist/showroom/`), not on the main page:
+  - `src/showroom/showroom.js` is an ES module that uses **three.js r170, vendored in `vendor/three/`** (MIT; no CDN). The preview page reaches it through an import map.
   - The car is `assets/site/models/lancer-evolution.glb` (CC BY 4.0 by 3DCars4U; see `assets/site/models/CREDITS.md`).
   - `build.mjs` copies `assets/site/` to `dist/assets/`, `src/showroom/` to `dist/showroom/` and `vendor/` to `dist/vendor/`.
-- **Serve over HTTP.** Module scripts don't load from `file://`, so the 3D car needs a web server (for example `python3 -m http.server -d dist` or GitHub Pages). Opened from disk, the hero falls back to the AI still.
+- **Serve the showroom preview over HTTP.** Module scripts don't load from `file://`, so it needs a web server (for example `python3 -m http.server -d dist` or GitHub Pages). The main page works from disk too.
 - The page is **one HTML file**. `build.mjs` inlines `style.css`, `scene.frag` (into a `<script type="x-shader/x-fragment">`) and `app.js` into `src/index.html` at the `/*__CSS__*/`, `/*__FRAG__*/`, `/*__JS__*/` placeholders.
 - It was first published as a claude.ai artifact. That host's limits shaped some choices: inline scripts only, no fetch, no form posting, and hash routes must be a plain `#name`. It is now meant for normal hosting (for example GitHub Pages from `dist/`).
 
@@ -59,12 +60,7 @@ npm run dev          # rebuild on every change in src/; refresh dist/index.html 
 - **Skip** cuts straight to the final frame. Esc, the wheel or a swipe set `playbackRate = 4`. `prefers-reduced-motion` and in-page hash links go straight to the still.
 - **Fallbacks:** if autoplay is refused, the last `<source>` errors, or nothing has played after 7 s, it shows the still. The film's last frame and the still differ by about 1.2% per pixel, so the crossfade is invisible.
 - While the film covers the stage (home page, `scrollY < 2`), the old shader view draws only every 30th frame.
-- **Photoreal hero car:**
-  - The module script at the end of `index.html` starts `startShowroom()` on `#hero-3d` while the film plays. If the page opens straight on `#build`, it waits until the visitor leaves the configurator, so its 19 MB download and shader compiles don't delay the configurator's view.
-  - When it's ready, it fires `showroom:ready`; `app.js` then adds `.has-3d`, which crossfades the canvas over the still.
-  - `updateHeroCar()` in `app.js` renders it only from 1.5 s before the film ends, and only while the hero is on screen. It uses `setActive()`.
-  - The camera sways slowly around the front three-quarter from the car's left, with a lens shift that puts the car right of the logo. Portrait screens use a wider lens.
-- **Portrait screens** (`max-aspect-ratio: 9/10`): the media takes the top 72svh and the copy sits on black below. The hero's own black background hides the 3D stage, and `.hero::after` fades it into the next section.
+- **Portrait screens** (`max-aspect-ratio: 9/10`): the media takes the top 72svh and the copy sits on black below. The hero's own black background hides the 3D stage behind it, and `.hero::after` fades it into the next section.
 - **Logo:** inline SVG, white, no background, redrawn from the client's logo. The words are bold slanted RZER and outlined PERFORMANCE, in Archivo at 125% width, skewed −12°. The reveal (CSS keyframes on `.revealed`, about 2.2 s) runs:
   1. `.logo-line`, the car roofline swoosh, draws in as a light trace with `stroke-dashoffset` on a `pathLength="1"` path.
   2. `.logo-spark`, a short glowing dash on the same path, rides its tip.
@@ -75,6 +71,9 @@ npm run dev          # rebuild on every change in src/; refresh dist/index.html 
   Reduced motion turns the animations off. Replace it with the client's vector file when they send one.
 
 ## Showroom (`src/showroom/showroom.js`)
+
+Not on the main page: the client asked for the 3D car to be taken out of the hero. Open `dist/showroom/` to see it. It's the starting point for moving the scroll sections and configurator onto three.js. `startShowroom({canvas, interactive, onReady})` returns `setActive()` for pausing it when off screen.
+
 
 - **Car config `CAR`:** the model URL, real length (4.49 m) and the tail-light material.
   - The model is scaled to its real length, centred and set on the floor. It is turned so its front faces +x, away from the tail lights.
@@ -217,7 +216,7 @@ Gloss and metallic paint only read through these reflections, so **any change to
 - **No address, phone or opening hours.** Bookings point to an Instagram DM.
 - **The hero film and still are AI-generated** (Higgsfield). They show an Evo with an older Evo V/VI-style front and a Mitsubishi grille badge. The number plate was blanked by hand. A real photo of the client's car as a reference image would make it an accurate Evo IX.
 - **3D cars:**
-  - The hero's 3D car is the CC BY 4.0 Evo IX by 3DCars4U. Its credit must stay in the footer.
+  - The showroom preview's car is the CC BY 4.0 Evo IX by 3DCars4U, and the preview shows its credit. Wherever it goes on the main site, its credit must go in the footer.
   - The scroll sections and configurator still use the older primitive-built Evo IX-style car in the shader.
   - Do not use the vecarz Evo IX (CC BY-NC) without a commercial licence.
   - There are no prices anywhere.
