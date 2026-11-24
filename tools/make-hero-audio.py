@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
 """Synthesise the hero film's sound: the Evo starting as its headlights snap on, one big rev, the blow-off valve,
 then pops and bangs on the overrun, in the tuning workshop. Each moment stands on its own, timed to the film
-(assets/site/hero-intro.mp4, 24 fps, 13.875 s):
+(assets/site/hero-intro.mp4, 24 fps, 13.458 s):
 
    0      faint workshop room tone (ventilation rumble, light hum); no engine while the car is being built
-   8.52   the starter turns the engine over: rur-rur-rur
-   9.04   the engine fires as the headlights snap on (frame 217): a big flare, vroom, then a fast idle
-  10.48   a full rev to 7,000 rpm, the turbo spooling
-  10.83   throttle shut as the light streak bursts out at the bumper (frame 260): a loud blow-off valve (psssh)
-  11.2    backfires as the revs fall and the streak runs round the car: BANG, pap-pap, BANG, BANG
-  12.85   one last BANG as the carbon finishes setting, just before the logo (12.95)
-  12.9    settling to idle, fading out under the logo by the end of the film (13.875)
+   8.10   the starter turns the engine over: rur-rur-rur
+   8.625  the engine fires as the headlights snap on (frame 207): a big flare, vroom, then a fast idle
+  10.065  a full rev to 7,000 rpm, the turbo spooling
+  10.415  throttle shut as the light streak bursts out at the bumper (frame 250): a loud blow-off valve (psssh)
+  10.785  backfires as the revs fall and the streak runs round the car: BANG, pap-pap, BANG, BANG
+  12.435  one last BANG as the carbon finishes setting, just before the logo (12.533)
+  12.5    settling to idle, fading out under the logo by the end of the film (13.458)
 
 The logo time is the film's length minus LOGO_LEAD in src/app.js; keep the two in step.
 
@@ -28,22 +28,22 @@ import wave
 import numpy as np
 
 SR = 48000
-DUR = 13.9
+DUR = 13.5
 N = int(SR * DUR)
 T = np.arange(N) / SR
 rng = np.random.default_rng(1729)
 
 # ------------------------------------------------------------------------------------------------ film beats (s)
-T_CRANK = 8.52    # starter engages
-T_HEAD = 9.04     # headlights snap on: the engine fires
+T_CRANK = 8.10    # starter engages
+T_HEAD = 8.625    # headlights snap on: the engine fires
 T_CATCH = T_HEAD
-T_REV = 10.48     # foot down
-T_LIFT = 10.83    # throttle shut: blow-off valve, as the light streak bursts out
-POPS = [(11.20, 1.0), (11.31, 0.5), (11.375, 0.5), (11.46, 0.85), (11.58, 1.0),   # (time, size): BANG, pap-pap, BANG, BANG
-        (12.85, 1.0)]                                                              # ...and the last BANG before the logo
-T_LOGO = 12.95    # the logo starts drawing (film length 13.875 - LOGO_LEAD 0.925 in app.js)
-T_FADE = 13.05    # idle starts fading out under the logo
-T_END = 13.875    # film ends
+T_REV = 10.065    # foot down
+T_LIFT = 10.415   # throttle shut: blow-off valve, as the light streak bursts out
+POPS = [(10.785, 1.0), (10.895, 0.5), (10.96, 0.5), (11.045, 0.85), (11.165, 1.0),   # (time, size): BANG, pap-pap, BANG, BANG
+        (12.435, 1.0)]                                                                # ...and the last BANG before the logo
+T_END = 323 / 24  # film ends (13.458 s)
+T_LOGO = T_END - 0.925   # the logo starts drawing (LOGO_LEAD 0.925 in app.js): 12.533 s
+T_FADE = T_LOGO + 0.1    # idle starts fading out under the logo
 IDLE = 1000.0
 REDLINE = 7000.0
 
@@ -125,12 +125,12 @@ def place(bus, sig, t):
 running = T >= T_CATCH
 rpm = automation([
     (T_CATCH, T_CATCH + 0.195, 350, 3300, 'out'),   # fires and flares: vroom
-    (T_CATCH + 0.195, 9.9, 3300, 1450, 'out'),
-    (9.9, T_REV, 1450, 1300, 'inout'),               # fast idle, slowly settling
+    (T_CATCH + 0.195, T_CATCH + 0.86, 3300, 1450, 'out'),
+    (T_CATCH + 0.86, T_REV, 1450, 1300, 'inout'),    # fast idle, slowly settling
     (T_REV, T_LIFT, 1500, REDLINE, 'in'),            # full rev
-    (T_LIFT, 11.70, REDLINE, 2100, 'out'),           # overrun: blow-off, then pops and bangs
-    (11.70, 12.95, 2100, 1150, 'out'),               # revs still falling for the last bang
-    (12.95, 13.40, 1150, IDLE, 'inout'),
+    (T_LIFT, T_LIFT + 0.87, REDLINE, 2100, 'out'),   # overrun: blow-off, then pops and bangs
+    (T_LIFT + 0.87, T_LOGO, 2100, 1150, 'out'),      # revs still falling for the last bang
+    (T_LOGO, T_LOGO + 0.45, 1150, IDLE, 'inout'),
 ], IDLE)
 rpm += 35 * np.sin(2 * np.pi * 0.8 * T) * (rpm < 1300)          # idle lope
 rpm = smooth(rpm, 0.025)
@@ -139,7 +139,7 @@ load = automation([
     (T_CATCH, T_CATCH + 0.175, 1.0, 1.0, 'lin'),
     (T_CATCH + 0.175, T_REV - 0.01, 0.2, 0.2, 'lin'),   # running at a fast idle before the rev
     (T_REV - 0.01, T_LIFT, 1.0, 1.0, 'lin'),
-    (T_LIFT, 12.95, 0.0, 0.0, 'lin'),
+    (T_LIFT, T_LOGO, 0.0, 0.0, 'lin'),
 ], 0.12)
 load[~running] = 0
 load = smooth(load, 0.012)
@@ -369,8 +369,8 @@ with wave.open(out, 'wb') as w:
     w.setframerate(SR)
     w.writeframes(pcm.astype('<i2').tobytes())
 print('wrote', out)
-for name, (t0, t1) in {'room tone': (1, 8.4), 'cranking': (T_CRANK + 0.05, T_CATCH - 0.01),
-                       'fires': (T_CATCH, T_CATCH + 0.22), 'fast idle': (9.6, T_REV), 'full rev': (T_REV, T_LIFT),
+for name, (t0, t1) in {'room tone': (1, T_CRANK - 0.1), 'cranking': (T_CRANK + 0.05, T_CATCH - 0.01),
+                       'fires': (T_CATCH, T_CATCH + 0.22), 'fast idle': (T_CATCH + 0.56, T_REV), 'full rev': (T_REV, T_LIFT),
                        'blow-off': (T_LIFT + 0.02, T_LIFT + 0.3), 'pops': (POPS[0][0] - 0.02, POPS[4][0] + 0.12),
                        'last bang': (POPS[-1][0] - 0.02, POPS[-1][0] + 0.12),
                        'idle under logo': (T_LOGO + 0.1, T_LOGO + 0.5)}.items():

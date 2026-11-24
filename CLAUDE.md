@@ -2,9 +2,8 @@
 
 Website for **Rzer (RZER Performance)**, a Singapore car tuning and performance workshop (Instagram: `@rzerperformance.sg`). Built by a web designer for this client. Theme: **gloss black**. One page with three parts:
 
-1. **Hero:** a realistic 13.9 s film set in a dark, professional tuning garage (glossy black epoxy floor, a hexagonal LED ceiling, red neon, a wheel wall; the client's reference for its colours and look). Up to the headlights it follows reference video 1 beat for beat from its 3 s mark, including its camera moves (the client cut the opening, where the liquid flows in):
-   - a glossy black dome on the floor shrinks to a drop
-   - the drop bursts into radiating rods and a rectangle, and the frame and chassis rise from it
+1. **Hero:** a realistic 13.5 s film set in a dark, professional tuning garage (glossy black epoxy floor, a hexagonal LED ceiling, red neon, a wheel wall; the client's reference for its colours and look). Up to the headlights it follows reference video 1 beat for beat from its 3.3 s mark, including its camera moves (the client cut the opening, where the liquid flows in and a glossy dome shrinks to a drop):
+   - a drop of black liquid on the floor bursts into radiating rods and a rectangle, and the frame and chassis rise from it
    - the body pours over as the camera comes down to a head-on view
    - the headlights snap on, then a streak of light runs round the car and the black liquid sets into bare carbon fibre. The film ends on the client's chosen look: a full-carbon Evo IX, head-on and **centred in the frame**, with **no number plate**
 
@@ -58,6 +57,7 @@ npm run dev          # rebuild on every change in src/; refresh dist/index.html 
 | `tools/higgsfield-edit.sh` | Edit a still from one or more reference images (Kling or Seedream image edit) |
 | `tools/higgsfield-flf.sh` | Generate a clip between a given first and last frame (Kling O3) |
 | `tools/finish-garage-film.sh` | Join the garage film and the carbon cure clip; encode the web files (without sound), the poster and the final still |
+| `tools/join-cure.py` | The join itself: a hard cut with the framing matched across it (measured with OpenCV), and camera jumps in the garage film eased out |
 | `tools/make-hero-audio.py` | Synthesise the hero film's sound (engine start, revs, pops and bangs, workshop reverb), timed to the film's frames |
 | `tools/mux-hero-audio.sh` | Put that sound (or any WAV) into `hero-intro.mp4` and `.webm`. Run it after every `finish-garage-film.sh` |
 | `tools/shot.mjs` | Render the shader alone with any uniforms → `tools/shots/*.png` |
