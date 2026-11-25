@@ -42,7 +42,9 @@ shows in one picture. The shipped files are in `assets/site/config/` (`build.mjs
    - window tint keeps only glass the edit made darker (one edit turned the windscreen milky)
    - the wing delete for every paint is cut to the outline of the wing removed from the silver photo (a silver wing
      on the dark wall gives a clean outline; on dark paints the wing barely differs from the wall and left holes)
-5. **Ride height** is not photographed: the page moves the body down by 30 mm (lowering springs) or 50 mm
+5. **Ride height** is not photographed (the split between body and reflection is the line where the tyres meet the floor,
+   so a splitter or skirt hanging over the floor drops with the body; the front and rear views are fitted to the 3D maps
+   by hand-placed landmarks in `landmarks.json`, as the car's long floor reflection pulls the automatic fit down): the page moves the body down by 30 mm (lowering springs) or 50 mm
    (coilovers), converted to pixels per view from the camera distance, over wheels that stay put, and moves its floor
    reflection up, with the empty workshop behind. The masks (`m-body`, `m-tyres`, `m-refl`, `m-floor`) come from the
    3D ID maps trimmed to the photo's own car outline. (A lowered edit from Kling moved the whole car about 120 px, so
@@ -76,6 +78,9 @@ parts list and the job card, its edges fading into a blurred copy of itself.
 
 - The car is a generated likeness of a stock Evo IX with the 3D model's mesh wheels, not a photo of a real car. No
   badges or number plates.
+- The first front-view photo (`a000`) had its front wheels splayed outward (their faces visible from dead ahead); it was
+  regenerated with the wheels spelled out (upright, only the tread showing), its grille badge removed by a second edit,
+  and its edits and the two turning films that touch it made again.
 - `exhaust__diffuser-carbon` was regenerated: Kling wrote "LICENSE PLATE" on the blank plate. Check new edits for text.
 - Option shapes are Kling's own (its race splitter is deep and long; its exhaust layouts and GT wing are its
   interpretation), so they can differ slightly between views.

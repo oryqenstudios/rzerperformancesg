@@ -1,16 +1,20 @@
 #!/usr/bin/env python3
-"""Synthesise the hero film's sound: the Evo starting as its headlights snap on, one big rev, the blow-off valve,
-then pops and bangs on the overrun, in the tuning workshop. Each moment stands on its own, timed to the film
-(assets/site/hero-intro.mp4, 60 fps, 15.783 s):
+"""Synthesise the hero film's sound: the car assembling itself, then the Evo starting as its headlights snap on, one
+big rev, the blow-off valve, then pops and bangs on the overrun, in the tuning workshop. Each moment stands on its own,
+timed to the film (assets/site/hero-intro.mp4, 60 fps, 15.6 s):
 
-   0      faint workshop room tone (ventilation rumble, light hum); no engine while the car is being built
-  10.475  the starter turns the engine over as the car's front sets: rur-rur-rur
-  11.0    the engine fires as the headlights snap on (frame 264): a big flare, vroom, then a fast idle
-  12.44   a full rev to 7,000 rpm, the turbo spooling
-  12.79   throttle shut as the light streak bursts out at the bumper: a loud blow-off valve (psssh)
-  13.16   backfires as the revs fall and the streak runs round the car: BANG, pap-pap, BANG, BANG
-  14.77   one last BANG as the carbon finishes setting, just before the logo (14.858)
-  14.9    settling to idle, fading out under the logo by the end of the film (15.783)
+   0      faint workshop room tone (ventilation rumble, light hum)
+   0-9.5  the parts fly in and assemble: air rushing past them (following how much the film moves), and a metallic
+          clank where each part stops, some with a servo whir and a latch clicking shut, and a heavy thud when the
+          chassis lands; times found from the film's motion (assets/generated/assembly/motion.json, written by
+          tools/finish-assembly-film.py)
+   9.475  the starter turns the engine over as the last doors shut (the headlights dim): rur-rur-rur
+  10.0    the engine fires and the headlights come back to full: a big flare, vroom, then a fast idle
+  11.44   a full rev to 7,000 rpm, the turbo spooling
+  11.79   throttle shut: a loud blow-off valve (psssh)
+  12.16   backfires as the revs fall: BANG, pap-pap, BANG, BANG
+  14.57   one last BANG, just before the logo (14.675)
+  14.7    settling to idle, fading out under the logo by the end of the film (15.6)
 
 The logo time is the film's length minus LOGO_LEAD in src/app.js; keep the two in step.
 
@@ -28,21 +32,22 @@ import wave
 import numpy as np
 
 SR = 48000
-DUR = 15.85
+DUR = 15.65
 N = int(SR * DUR)
 T = np.arange(N) / SR
 rng = np.random.default_rng(1729)
 
 # ------------------------------------------------------------------------------------------------ film beats (s)
-T_CRANK = 10.475  # starter engages
-T_HEAD = 11.0     # headlights snap on: the engine fires
+T_HEAD = 10.0     # the engine fires as the assembled car settles (T_FIRE in tools/finish-assembly-film.py)
+T_CRANK = T_HEAD - 0.525   # starter engages
 T_CATCH = T_HEAD
-T_REV = 12.44     # foot down
-T_LIFT = 12.79    # throttle shut: blow-off valve, as the light streak bursts out
-POPS = [(13.16, 1.0), (13.27, 0.5), (13.335, 0.5), (13.42, 0.85), (13.54, 1.0),   # (time, size): BANG, pap-pap, BANG, BANG
-        (14.77, 1.0)]                                                              # ...and the last BANG before the logo
-T_END = 947 / 60  # film ends (15.783 s)
-T_LOGO = T_END - 0.925   # the logo starts drawing (LOGO_LEAD 0.925 in app.js): 14.858 s
+T_REV = T_HEAD + 1.44      # foot down
+T_LIFT = T_HEAD + 1.79     # throttle shut: blow-off valve
+T_END = 936 / 60  # film ends (15.6 s)
+T_LOGO = T_END - 0.925   # the logo starts drawing (LOGO_LEAD 0.925 in app.js): 14.675 s
+POPS = [(T_HEAD + d, z) for d, z in [(2.16, 1.0), (2.27, 0.5), (2.335, 0.5), (2.42, 0.85), (2.54, 1.0)]] \
+    + [(T_LOGO - 0.105, 1.0)]   # BANG, pap-pap, BANG, BANG ... and the last BANG just before the logo
+MOTION = 'assets/generated/assembly/motion.json'   # the film's motion per frame (tools/finish-assembly-film.py)
 T_FADE = T_LOGO + 0.1    # idle starts fading out under the logo
 IDLE = 1000.0
 REDLINE = 7000.0
@@ -296,6 +301,86 @@ for i in np.flatnonzero(np.diff(np.floor(pc)) > 0):
     place(starter, chug * (1 - np.exp(-tn / 0.003)), T_CRANK + t[i] + 0.03)
 place(starter, 0.25 * pop(0.1), T_CRANK)                  # the pinion engaging
 
+# ------------------------------------------------------------------------------------------------ the assembly
+# Air rushing past the moving parts follows how much the film moves; where the motion stops short, a part has landed:
+# a metallic clank (inharmonic modes of steel and carbon panels), now and then a servo whir before it and a latch
+# clicking shut after it; the biggest stop (the chassis landing) also gets a deep thud.
+def clank(size):
+    n = int(0.5 * SR)
+    t = np.arange(n) / SR
+    out = np.zeros(n)
+    for f, tau, a in [(310, .16, .5), (742, .12, .8), (1185, .09, .7), (1730, .07, .6), (2460, .05, .45), (3390, .035, .3), (4620, .025, .2)]:
+        f *= rng.uniform(0.85, 1.18) * (1.25 - 0.4 * size)
+        out += a * np.exp(-t / (tau * (0.6 + 0.8 * size))) * np.sin(2 * np.pi * f * t + rng.uniform(0, 6.28))
+    hit = unit(filt(noise(n), lambda f: band(f, 400, 6000))) * np.exp(-t / 0.006)
+    thump = np.sin(2 * np.pi * np.cumsum(70 * (1 + 0.6 * np.exp(-t / 0.03))) / SR) * np.exp(-t / (0.05 + 0.08 * size))
+    return size * (0.35 * out / np.max(np.abs(out)) + 0.25 * hit + 0.6 * size * thump) * (1 - np.exp(-t / 0.0005))
+
+
+def servo(dur):
+    n = int(dur * SR)
+    t = np.arange(n) / SR
+    f = 650 + 900 * (t / dur) ** 0.7
+    ph = np.cumsum(f) / SR
+    tone = np.sin(2 * np.pi * ph) + 0.4 * np.sin(4 * np.pi * ph) + 0.2 * np.sin(6 * np.pi * ph)
+    env = np.clip(t / 0.03, 0, 1) * np.clip((dur - t) / 0.04, 0, 1)
+    grit = unit(filt(noise(n), lambda f: band(f, 800, 3000))) * 0.3
+    return 0.05 * env * (tone + grit)
+
+
+def latch():
+    out = np.zeros(int(0.15 * SR))
+    for k, d in enumerate([0.0, 0.028, 0.051, 0.07]):
+        c = clank(0.12)[:int(0.04 * SR)] * (0.6 if k < 3 else 1.0)
+        place(out, c, d)
+    return out
+
+
+sfx = np.zeros(N)
+air = np.zeros(N)
+try:
+    import json
+    mo = json.load(open(MOTION))
+    fps, m = mo['fps'], np.asarray(mo['motion'], float)
+    tm = np.arange(len(m)) / fps
+    lvl = np.clip(np.interp(T, tm, m) / max(np.percentile(m[tm < T_HEAD - 0.3], 95), 1e-6), 0, 1.4)
+    lvl[T > T_HEAD - 0.25] *= np.clip((T_HEAD - T[T > T_HEAD - 0.25]) / 0.25, 0, 1)
+    lvl = smooth(lvl, 0.06)
+    lo = unit(filt(noise(N), lambda f: band(f, 120, 900, 2)))
+    hi = unit(filt(noise(N), lambda f: band(f, 700, 4000, 2) * peak(f, 1500, 1.0, 1.6)))
+    air = 0.05 * lvl ** 1.5 * ((1 - np.clip(lvl, 0, 1)) * lo + np.clip(lvl, 0, 1) * hi)
+    # stops: the motion falls by much within a few frames after a peak
+    ms = np.convolve(m, np.ones(3) / 3, mode='same')
+    drop = np.maximum(0, ms - np.roll(ms, -4))
+    # a stop counts if it is the biggest within 0.1 s and big for its stretch of the film (the assembly moves less
+    # than the fly-in, so each stretch is judged against its own busiest moment within a second either side)
+    local = np.array([drop[max(0, i - fps):i + fps].max() for i in range(len(drop))])
+    cand = [i for i in range(4, len(m) - 4) if drop[i] == drop[max(0, i - 6):i + 7].max()
+            and drop[i] > max(0.35 * local[i], 0.04 * drop.max()) and tm[i] < T_HEAD - 0.45]
+    last = -1.0
+    events = []
+    for i in sorted(cand, key=lambda i: -drop[i]):
+        events.append((tm[i] + 4 / fps * 0.5, drop[i] / drop.max()))
+    events.sort()
+    kept = []
+    for t0, z in events:
+        if t0 - last >= 0.12:
+            kept.append((t0, z))
+            last = t0
+    big = max(kept, key=lambda e: e[1])[0] if kept else None
+    for k, (t0, z) in enumerate(kept):
+        size = 0.45 + 0.55 * z
+        place(sfx, clank(size), t0)
+        if k % 3 == 1:
+            place(sfx, servo(0.22), t0 - 0.24)
+        if k % 2 == 0 and z < 0.8:
+            place(sfx, latch(), t0 + 0.06)
+        if t0 == big:
+            place(sfx, 1.4 * clank(1.0), t0)
+    print(f'assembly: {len(kept)} clanks from the film\'s motion')
+except FileNotFoundError:
+    print('no assembly motion file: no assembly sounds')
+
 # ------------------------------------------------------------------------------------------------ the workshop
 amb = 0.004 * unit(filt(noise(N), lambda f: band(f, 25, 400)))
 amb += 0.0012 * np.sin(2 * np.pi * 100 * T) + 0.0005 * np.sin(2 * np.pi * 200 * T + 1)   # strip-light hum
@@ -323,8 +408,8 @@ def car_park_ir():
 
 
 engine_bus = (eng + intake) * fade
-dry = 0.55 * engine_bus + turbo * fade + bov + 0.55 * pops + starter
-send = 0.55 * engine_bus * 0.2 + bov * 0.25 + 0.55 * pops * 0.33 + starter * 0.2
+dry = 0.55 * engine_bus + turbo * fade + bov + 0.55 * pops + starter + 0.5 * sfx + air
+send = 0.55 * engine_bus * 0.2 + bov * 0.25 + 0.55 * pops * 0.33 + starter * 0.2 + 0.5 * sfx * 0.35 + air * 0.2
 wet = [conv(send, car_park_ir()) for _ in range(2)]
 mix = np.stack([dry + 0.5 * wet[0], dry + 0.5 * wet[1]], axis=1) + amb[:, None]
 mix = np.stack([filt(mix[:, ch], lambda f: band(f, 28, 10000, 1)) for ch in range(2)], axis=1)
@@ -369,7 +454,7 @@ with wave.open(out, 'wb') as w:
     w.setframerate(SR)
     w.writeframes(pcm.astype('<i2').tobytes())
 print('wrote', out)
-for name, (t0, t1) in {'room tone': (1, T_CRANK - 0.1), 'cranking': (T_CRANK + 0.05, T_CATCH - 0.01),
+for name, (t0, t1) in {'assembly': (0.5, T_CRANK - 0.1), 'cranking': (T_CRANK + 0.05, T_CATCH - 0.01),
                        'fires': (T_CATCH, T_CATCH + 0.22), 'fast idle': (T_CATCH + 0.56, T_REV), 'full rev': (T_REV, T_LIFT),
                        'blow-off': (T_LIFT + 0.02, T_LIFT + 0.3), 'pops': (POPS[0][0] - 0.02, POPS[4][0] + 0.12),
                        'last bang': (POPS[-1][0] - 0.02, POPS[-1][0] + 0.12),

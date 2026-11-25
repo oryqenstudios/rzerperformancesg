@@ -134,7 +134,7 @@ class Ids:
             pids = list(self.PAINT_IDS) + [i + 100 for i in self.PAINT_IDS]
             p3 = np.isin(self.maps['stock'], pids)
             self.how, self.A = 'landmarks', None
-            self.iou = float((p3 & (photo_paint_mask > 0)).sum() / max(1, (p3 | (photo_paint_mask > 0)).sum()))
+            self.iou = self.score = float((p3 & (photo_paint_mask > 0)).sum() / max(1, (p3 | (photo_paint_mask > 0)).sum()))
             return
         pids = list(self.PAINT_IDS) + [i + 100 for i in self.PAINT_IDS]
         cands = [('paint', self.fit(photo_paint_mask, np.isin(st, pids)))]
@@ -145,9 +145,13 @@ class Ids:
             warped = cv2.warpAffine(st, A, (W, H), flags=cv2.INTER_NEAREST | cv2.WARP_INVERSE_MAP)
             p3 = np.isin(warped, pids)
             iou = float((p3 & (photo_paint_mask > 0)).sum() / max(1, (p3 | (photo_paint_mask > 0)).sum()))
-            if best is None or iou > best[2]:
-                best = (name, A, iou)
-        self.how, self.A, self.iou = best
+            # judged by the car's outline when the empty-workshop edit gives a clean one, else by the paint
+            c3 = (warped > 0) & (warped < 100)
+            out_iou = float((c3 & (photo_car > 0)).sum() / max(1, (c3 | (photo_car > 0)).sum()))
+            score = out_iou if outline_ok else iou
+            if best is None or score > best[3]:
+                best = (name, A, iou, score)
+        self.how, self.A, self.iou, self.score = best
         self.maps = {k: cv2.warpAffine(m, self.A, (W, H), flags=cv2.INTER_NEAREST | cv2.WARP_INVERSE_MAP) for k, m in raw.items()}
 
     def part(self, state, names, mirror=True):
@@ -323,7 +327,7 @@ def build_view(v):
     paint_px = paint_red | paint_everywhere(base, [get(f'paint-{p}') for p in J.PAINTS if have(f'paint-{p}')])
     clean_plate = photo_car.mean() < 0.5     # else the edit re-rendered most of the frame
     ids = Ids(v, photo_car, paint_red, clean_plate)
-    notes.append(f'3D fit by {ids.how}: paint overlap {ids.iou:.2f}')
+    notes.append(f'3D fit by {ids.how}: score {ids.score:.2f}')
     paint3d = ids.part('stock', ['paint'], mirror=False)
     if not clean_plate:                      # the car's outline then comes from the 3D car
         photo_car = cv2.dilate(((ids.maps['stock'] > 0) & (ids.maps['stock'] != 200)).astype(np.uint8), disk(4))
@@ -331,15 +335,35 @@ def build_view(v):
     tyres = cv2.dilate(ids.part('stock', ['rim', 'tyre', 'caliper']), disk(3))
     floor3d = (ids.maps['stock'] >= 100).astype(np.uint8)
     car3d = ((ids.maps['stock'] > 0) & (ids.maps['stock'] < 100)).astype(np.uint8)
-    body = photo_car & cv2.dilate(car3d, disk(10)) & (1 - tyres) & (1 - (floor3d & (1 - cv2.dilate(car3d, disk(3)))))
+    # where the tyres meet the floor: the body (and anything hung under it, like a splitter) is everything above that
+    # line, its reflection everything below. Splitting by the floor's own outline tore parts that hang over the floor.
+    below = np.zeros((H, W), np.uint8)
+    # each tyre's reflection starts where the tyre meets the floor (from dead ahead little tread shows, but its
+    # reflection always does)
+    n_, lab_, st_, _ = cv2.connectedComponentsWithStats((ids.maps['stock'] == ID['tyre'] + 100).astype(np.uint8), 8)
+    pts = []
+    for i in range(1, n_):
+        if st_[i, cv2.CC_STAT_AREA] > 300:
+            ys_, xs_ = np.nonzero(lab_ == i)
+            top = ys_.min()
+            pts.append((int(xs_[ys_ <= top + 3].mean()), int(top)))
+    if len(pts) >= 2:
+        pts.sort()
+        line = np.interp(np.arange(W), [p_[0] for p_ in pts], [p_[1] for p_ in pts])
+        below = (np.arange(H)[:, None] > line[None, :] - 2).astype(np.uint8)
+    else:
+        below = floor3d
+    floor3d = floor3d & below
+    body = photo_car & cv2.dilate(car3d, disk(10)) & (1 - tyres) & (1 - below)
+    body |= photo_car & (1 - below) & (1 - tyres) & cv2.dilate(car3d, disk(40))
     refl3d = (ids.maps['stock'] > 100) & (ids.maps['stock'] < 200)
-    refl = photo_car & cv2.dilate(refl3d.astype(np.uint8), disk(12)) & (1 - body) & (1 - tyres)
+    refl = photo_car & cv2.dilate(refl3d.astype(np.uint8), disk(12)) & below & (1 - tyres)
     if v in J.ORBIT:
         for name, m in [('body', body), ('tyres', tyres), ('refl', refl), ('floor', floor3d | refl)]:
             save_mask(f'{OUT}/{v}/m-{name}.png', cv2.GaussianBlur(m.astype(np.float32), (0, 0), 1.0))
     # the body is only lowered where the 3D outline fits the photo well (around the car; the close-ups are framed
     # too differently)
-    entry['masks'] = bool(v in J.ORBIT and clean_plate)
+    entry['masks'] = bool(v in J.ORBIT and clean_plate and (ids.how == 'landmarks' or ids.score >= 0.5))
     g = GUIDES[v]
     dist = float(np.linalg.norm(np.subtract(g['pos'], g['target'])))
     px_per_m = (H / 2) / np.tan(np.radians(g['fov']) / 2) / dist
