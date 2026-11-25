@@ -145,8 +145,12 @@ Smoothing before it went on the site:
 - **Camera.** The push-in starts from rest and is still moving when the swing takes over, so the camera never stops.
 - **The tall wing.** The body clip bolts a tall GT wing onto the boot and only shrinks it to the factory spoiler in its
   last frames. From body frame 52, as the roof lands over it, the wing's area comes from the finished car (`car34`).
-- **The floor** stays the plate's crisp floor while the parts fly in (only the parts and their reflections come from the
-  clip); the car's whole place comes from the clip once the chassis is landing.
+- **The floor.** A few frames into each clip Kling re-renders the floor's reflections its own way (the hexagons move),
+  which the part detection first took for movement, so the floor turned patchy. A pixel now counts as a part only if it
+  differs from the plate and from the clip's own background and the previous clip's (per-pixel medians of their
+  frames, `film_lib.background`, the chassis clip's from its second half, after the brakes stop hovering), so the
+  plate's crisp floor stays while the parts fly in. The car's whole place comes from the clip once the chassis has
+  landed.
 
 ```bash
 python3 tools/finish-swarm-film.py assets/site      # needs clips/swarm and clips/idle.mp4; preview/hero to try a change

@@ -69,16 +69,32 @@ def tone(f, ref_img, amount=1.0):
     return np.clip(f - cv2.resize(off, (W, H)), 0, 255).astype(np.uint8)
 
 
-def movers(fr, plate, thr=22):
+def _half(im):
+    return cv2.GaussianBlur(cv2.resize(im, (W // 2, H // 2), interpolation=cv2.INTER_AREA), (0, 0), 1.2)
+
+
+def background(fr, start=0):
+    """A clip's own background at half size: the per-pixel median of its frames from `start` (the parts move, or hover
+    only for a while, so they drop out of it)."""
+    return np.median(np.stack([_half(f) for f in fr[start::2]]), axis=0).astype(np.uint8)
+
+
+def movers(fr, plate, thr=22, backgrounds=()):
     """Per frame, at half size: where a part is. A pixel is part of something only if it falls outside the range the
-    plate covers within a few pixels of it; specks are dropped, each part's holes filled and the parts grown a little."""
-    p = cv2.GaussianBlur(cv2.resize(plate, (W // 2, H // 2), interpolation=cv2.INTER_AREA), (0, 0), 1.2).astype(np.int16)
+    plate covers within a few pixels of it, and also outside the range each of `backgrounds` covers there (the clip's
+    own background and the previous clip's, from background()). Kling re-renders the floor's reflections in its own way
+    a few frames into a clip; that matches one of those backgrounds, not a part, so the plate's crisp floor stays.
+    Specks are dropped, each part's holes filled and the parts grown a little."""
     k = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (7, 7))
-    hi, lo = cv2.dilate(p, k).astype(np.int16), cv2.erode(p, k).astype(np.int16)
+    small = [_half(f) for f in fr]
+    refs = [(cv2.dilate(b, k).astype(np.int16), cv2.erode(b, k).astype(np.int16)) for b in (_half(plate), *backgrounds)]
     out = []
-    for f in fr:
-        g = cv2.GaussianBlur(cv2.resize(f, (W // 2, H // 2), interpolation=cv2.INTER_AREA), (0, 0), 1.2).astype(np.int16)
-        m = (np.maximum(g - hi, lo - g).max(2) > thr).astype(np.uint8)
+    for g in small:
+        g = g.astype(np.int16)
+        m = np.ones(g.shape[:2], bool)
+        for hi, lo in refs:
+            m &= np.maximum(g - hi, lo - g).max(2) > thr
+        m = m.astype(np.uint8)
         m = cv2.morphologyEx(m, cv2.MORPH_OPEN, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3)))
         n, lab, st, _ = cv2.connectedComponentsWithStats(m, 8)
         m = np.isin(lab, [i for i in range(1, n) if st[i, cv2.CC_STAT_AREA] >= 25]).astype(np.uint8)   # small parts count

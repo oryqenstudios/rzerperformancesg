@@ -37,7 +37,7 @@ import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from config_layers import align, load   # noqa: E402
-from film_lib import H, W, Retimed, frames, movers, over, steady, tone   # noqa: E402
+from film_lib import H, W, Retimed, background, frames, movers, over, steady, tone   # noqa: E402
 
 A = 'assets/generated/assembly'
 K = f'{A}/keys/swarm'
@@ -53,6 +53,9 @@ T_CRANK = T_FIRE - 0.525
 T_END = 15.6
 LAMPS = [(590, 641, 204, 102), (1084, 643, 244, 111)]   # the headlights in the final frame (x, y, w, h)
 CRANK_DIM = 0.45
+BG_FROM = {'engine': 12, 'chassis': 60, 'body': 0}  # where each clip's own background starts (film_lib.background):
+                                                  # after the engine clip re-renders the floor; after the chassis clip's
+                                                  # brakes and coilovers stop hovering still
 WING = (52, 8, (980, 220, 1420, 430))   # the body clip's tall wing: from frame 52 (the roof has landed), blended in over
                                         # 8 frames, the area it sits in (x0, y0, x1, y1) comes from the finished car
 
@@ -145,12 +148,14 @@ def unwing(fr):
     return out
 
 
-clips, paces = {}, {}
+clips, paces, prev_bg = {}, {}, None
 for k in ('engine', 'chassis', 'body'):
     fr = [tone(f, plate) for f in steady(raw[k], plate, bg)]
     if k == 'body':
         fr = unwing(fr)
-    clips[k] = Retimed(fr, movers(fr, plate))
+    own = background(fr, BG_FROM[k])
+    clips[k] = Retimed(fr, movers(fr, plate, backgrounds=[b for b in (own, prev_bg) if b is not None]))
+    prev_bg = own
     paces[k] = pace(fr)
     print('laid out', k, 'time share of each quarter:', np.round(np.diff(np.interp([0, 30, 60, 90, 120], np.arange(len(fr)), paces[k])), 2))
 clips['swing'] = Retimed(list(raw['swing']))          # the camera moves: Kling's own frames
@@ -160,12 +165,12 @@ clips['idle'] = Retimed(idle)
 
 def built(k, t):
     """Build clip k at film time t, laid over the plate. The car's place always comes from the clip once the
-    chassis is landing (before that only the flying parts and their reflections do, so the floor stays crisp)."""
+    chassis has landed (before that only the flying parts and their reflections do, so the floor stays crisp)."""
     t0, t1 = TIMES[k]
     tau = paces[k]
     u = float(np.interp(np.clip((t - t0) / (t1 - t0), 0, 1), tau, np.linspace(0, 1, len(tau))))
     f, m = clips[k].at(u)
-    zw = {'engine': 0.0, 'chassis': min(1.0, u / 0.35), 'body': 1.0}[k]
+    zw = {'engine': 0.0, 'chassis': float(np.clip((u - 0.3) / 0.15, 0, 1)), 'body': 1.0}[k]   # as the chassis lands
     return over(f, m, plate, zone * zw)
 
 
