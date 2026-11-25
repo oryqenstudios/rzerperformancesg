@@ -45,7 +45,7 @@ OUT = sys.argv[1] if len(sys.argv) > 1 else 'preview/hero'
 FPS = 60
 CLIPS = {'engine': 'swarm/engine-b', 'chassis': 'swarm/chassis-b', 'body': 'swarm/body-b', 'swing': 'swarm/swing-a', 'idle': 'idle'}
 TIMES = {'engine': (0.0, 2.6), 'chassis': (2.6, 4.9), 'body': (4.9, 7.2), 'swing': (7.2, 9.4)}
-JOIN = 0.1          # crossfade between the build clips
+JOIN = 0.2          # each clip's still tail morphs into the next clip's first frame over this long before the cut
 DISSOLVE = 0.25     # the swing -> the real final frame
 PUSH = (1.15, 0.4471, 0.5652)   # the push-in over the build: zoom at its end, and the centre it closes in on
 T_FIRE = 10.0       # the engine fires
@@ -53,6 +53,8 @@ T_CRANK = T_FIRE - 0.525
 T_END = 15.6
 LAMPS = [(590, 641, 204, 102), (1084, 643, 244, 111)]   # the headlights in the final frame (x, y, w, h)
 CRANK_DIM = 0.45
+WING = (52, 8, (980, 220, 1420, 430))   # the body clip's tall wing: from frame 52 (the roof has landed), blended in over
+                                        # 8 frames, the area it sits in (x0, y0, x1, y1) comes from the finished car
 
 # ------------------------------------------------------------------------------------------------ the stills
 final = load('assets/generated/carbon-final.jpg')
@@ -78,11 +80,11 @@ plate = (car34 * (1 - zone) + empty34 * zone + 0.5).astype(np.uint8)
 
 
 def push(f, t):
-    """The slow push-in, eased over the build: the view narrows to 1/PUSH[0] of the frame while its centre drifts to
-    PUSH's centre, ending on exactly the crop the swing clip starts from (keys/swarm/car34-push.jpg)."""
+    """The slow push-in over the build: the view narrows to 1/PUSH[0] of the frame while its centre drifts to PUSH's
+    centre, ending on exactly the crop the swing clip starts from (keys/swarm/car34-push.jpg). It starts from rest and
+    is still moving when the swing takes over, so the camera never stops between the two."""
     z_end, cx, cy = PUSH
-    u = np.clip(t / TIMES['body'][1], 0, 1)
-    u = u * u * (3 - 2 * u)
+    u = np.clip(t / TIMES['body'][1], 0, 1) ** 1.6
     z = 1 + (z_end - 1) * u
     c = np.array([W / 2 + (cx * W - W / 2) * u, H / 2 + (cy * H - H / 2) * u])   # the source point at the view's centre
     M = np.float32([[z, 0, W / 2 - z * c[0]], [0, z, H / 2 - z * c[1]]])
@@ -90,22 +92,81 @@ def push(f, t):
 
 
 # ------------------------------------------------------------------------------------------------ the clips
+def pace(fr):
+    """Where each source frame of a clip falls in its slot (0..1). Kling eases every clip in and out of its key
+    frames, so played at an even speed the build would stop at each join; here the time a frame gets follows how much
+    moves in it (the square root, smoothed), so near-still stretches pass quickly and the busy ones keep their pace.
+    Motion is capped at its 60th percentile first, so a burst (Kling smearing parts together) is not slowed down."""
+    g = [cv2.resize(cv2.cvtColor(f, cv2.COLOR_BGR2GRAY), (240, 135), interpolation=cv2.INTER_AREA).astype(np.float32) for f in fr]
+    m = np.array([np.abs(g[i + 1] - g[i]).mean() for i in range(len(g) - 1)])
+    m = np.minimum(m, np.percentile(m, 60))
+    m = np.convolve(np.pad(m, 4, mode='edge'), np.ones(9) / 9, mode='valid')
+    w = np.sqrt(m + 0.35 * np.median(m))
+    tau = np.concatenate([[0], np.cumsum(w)])
+    return tau / tau[-1]
+
+
+DIS = cv2.DISOpticalFlow_create(cv2.DISOPTICAL_FLOW_PRESET_MEDIUM)
+GRID = np.stack(np.meshgrid(np.arange(W, dtype=np.float32), np.arange(H, dtype=np.float32)), -1)
+
+
+def morph(a, b, w):
+    """An in-between of two nearly matching frames at w (0..1): each pushed along the optical flow towards the other,
+    then blended, so parts that sit a little apart slide into place instead of showing twice."""
+    ga = cv2.cvtColor(cv2.resize(a, (W // 2, H // 2), interpolation=cv2.INTER_AREA), cv2.COLOR_BGR2GRAY)
+    gb = cv2.cvtColor(cv2.resize(b, (W // 2, H // 2), interpolation=cv2.INTER_AREA), cv2.COLOR_BGR2GRAY)
+    fab = cv2.resize(DIS.calc(ga, gb, None), (W, H)) * 2
+    fba = cv2.resize(DIS.calc(gb, ga, None), (W, H)) * 2
+    A_ = cv2.remap(a, GRID - w * fba, None, cv2.INTER_LINEAR, borderMode=cv2.BORDER_REPLICATE)
+    B_ = cv2.remap(b, GRID - (1 - w) * fab, None, cv2.INTER_LINEAR, borderMode=cv2.BORDER_REPLICATE)
+    w = w * w * (3 - 2 * w)
+    return (A_.astype(np.float32) * (1 - w) + B_.astype(np.float32) * w + 0.5).astype(np.uint8)
+
+
 raw = {k: frames(f'{A}/clips/{v}.mp4') for k, v in CLIPS.items()}
 bg = cv2.resize((zone[..., 0] < 0.05).astype(np.uint8), (W // 2, H // 2), interpolation=cv2.INTER_NEAREST)
-clips = {}
+def unwing(fr):
+    """Kling's body clip bolts a tall GT wing onto the boot and only shrinks it to the car's factory spoiler in its
+    last frames. Once the roof has landed, the wing's area (where it differs from the finished car) is taken from the
+    finished car instead, so the spoiler is the real one from then on."""
+    i0, ramp, (x0, y0, x1, y1) = WING
+    ref = fr[90]
+    d = np.abs(cv2.GaussianBlur(ref.astype(np.float32), (0, 0), 2) - cv2.GaussianBlur(car34.astype(np.float32), (0, 0), 2)).max(2)
+    m = np.zeros((H, W), np.uint8)
+    m[y0:y1, x0:x1] = (d[y0:y1, x0:x1] > 30)
+    m = cv2.morphologyEx(m, cv2.MORPH_OPEN, np.ones((3, 3), np.uint8))
+    m = cv2.dilate(m, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (31, 31)))
+    m = cv2.GaussianBlur(m.astype(np.float32), (0, 0), 6)[..., None]
+    out = []
+    for i, f in enumerate(fr):
+        w = float(np.clip((i - i0) / ramp, 0, 1))
+        w = w * w * (3 - 2 * w)
+        out.append(f if w == 0 else (f * (1 - w * m) + car34 * (w * m) + 0.5).astype(np.uint8))
+    return out
+
+
+clips, paces = {}, {}
 for k in ('engine', 'chassis', 'body'):
     fr = [tone(f, plate) for f in steady(raw[k], plate, bg)]
+    if k == 'body':
+        fr = unwing(fr)
     clips[k] = Retimed(fr, movers(fr, plate))
-    print('laid out', k)
+    paces[k] = pace(fr)
+    print('laid out', k, 'time share of each quarter:', np.round(np.diff(np.interp([0, 30, 60, 90, 120], np.arange(len(fr)), paces[k])), 2))
 clips['swing'] = Retimed(list(raw['swing']))          # the camera moves: Kling's own frames
 idle = steady(raw['idle'], final, cv2.resize((final_zone[..., 0] < 0.05).astype(np.uint8), (W // 2, H // 2)))
 clips['idle'] = Retimed(idle)
 
 
 def built(k, t):
+    """Build clip k at film time t, laid over the plate. The car's place always comes from the clip once the
+    chassis is landing (before that only the flying parts and their reflections do, so the floor stays crisp)."""
     t0, t1 = TIMES[k]
-    f, m = clips[k].at((t - t0) / (t1 - t0))
-    return over(f, m, plate, zone)
+    tau = paces[k]
+    u = float(np.interp(np.clip((t - t0) / (t1 - t0), 0, 1), tau, np.linspace(0, 1, len(tau))))
+    f, m = clips[k].at(u)
+    zw = {'engine': 0.0, 'chassis': min(1.0, u / 0.35), 'body': 1.0}[k]
+    return over(f, m, plate, zone * zw)
 
 
 # ------------------------------------------------------------------------------------------------ the film
@@ -127,16 +188,17 @@ for n in range(n_total):
         k = next(c for c in order if t < TIMES[c][1])
         f = built(k, t)
         i = order.index(k)
-        if i > 0 and t < TIMES[k][0] + JOIN:            # out of the previous clip's last frame
-            w = (t - TIMES[k][0]) / JOIN
-            f = (built(order[i - 1], TIMES[k][0]) * (1 - w) + f * w + 0.5).astype(np.uint8)
-        f = push(f, t)
+        t1 = TIMES[k][1]
+        if i < len(order) - 1 and t > t1 - JOIN:        # slide into the next clip's first frame before the cut
+            f = morph(f, built(order[i + 1], t1), (t - (t1 - JOIN)) / JOIN)
+        elif k == 'body' and t > t1 - JOIN:             # and into the swing's first frame (in pushed-in framing)
+            f = push(f, t)
+            f = morph(f, clips['swing'].at(0.0)[0], (t - (t1 - JOIN)) / JOIN)
+        if not (k == 'body' and t > t1 - JOIN):
+            f = push(f, t)
     elif t < TIMES['swing'][1]:
         t0, t1 = TIMES['swing']
         f = clips['swing'].at((t - t0) / (t1 - t0))[0]
-        if t < t0 + JOIN:                               # out of the pushed-in end of the build
-            w = (t - t0) / JOIN
-            f = (push(built('body', t0), t0) * (1 - w) + f * w + 0.5).astype(np.uint8)
         if t > t1 - DISSOLVE:                           # into the real final frame
             w = (t - (t1 - DISSOLVE)) / DISSOLVE
             f = (f * (1 - w) + final * w + 0.5).astype(np.uint8)

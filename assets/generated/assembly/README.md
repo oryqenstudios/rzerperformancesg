@@ -1,4 +1,10 @@
-# Hero film: the assembly
+# Hero films
+
+The shipped hero film is the **swarm film** (last section below): a 3D car assembly breakdown seen from a high corner,
+then a swing round to the head-on final frame. The two sections before it describe the earlier films (the transforming
+assembly, the first one below, and the wheel roll), whose tools are kept for reference.
+
+## The assembly film (earlier)
 
 The hero film (15.6 s, 60 fps) keeps the old film's final frame, `../carbon-final.jpg`: the full-carbon Evo IX head-on and
 centred in the tuning garage, same camera, same background. What leads up to it is new: the car's parts fly into the
@@ -98,7 +104,7 @@ python3 tools/finish-roll-film.py preview/hero     # or assets/site to ship it
 HERO_MOTION=assets/generated/assembly/roll-motion.json python3 tools/make-hero-audio.py hero.wav
 ```
 
-## The swarm film (preview, not on the site yet)
+## The swarm film (the shipped hero film)
 
 After the client's reference, a 3D car assembly breakdown: one camera, high and in front of the car's front-left
 corner, looking down at the car in a front three-quarter view, pushing in slowly. In the lit workshop a swarm of small
@@ -125,10 +131,25 @@ out of the reference's order, `body-a` panels flapping like sheets, `swing-b` he
 
 `tools/finish-swarm-film.py` builds it with `tools/film_lib.py`. The build clips keep the camera locked off and the
 push-in is added afterwards, so the workshop stays the plate's and the clips join cleanly; each frame is steadied onto
-the plate, its tone drift taken out, and only the moving parts (and the car's own place) are laid over the plate. The
-swing keeps Kling's frames (the camera moves) and dissolves into the real final frame. Retimed to 60 fps by optical flow.
+the plate, its tone drift taken out, and only the moving parts (and, once the chassis lands, the car's own place) are
+laid over the plate. The swing keeps Kling's frames (the camera moves) and dissolves into the real final frame.
+
+Smoothing before it went on the site:
+- **Joins.** Kling's clip starts drift a few pixels and jump a little in framing in their first frames, so a crossfade at
+  each join showed parts twice. Instead, each clip's last 0.2 s slides into the next clip's first frame by optical flow
+  (each frame pushed along the flow towards the other, then blended), and the body clip slides into the swing's first
+  frame the same way.
+- **Pacing.** Kling eases every clip in and out of its key frames, so at an even speed the build stopped at each join.
+  Each clip's frames are retimed so the time a frame gets follows how much moves in it (square root of the motion,
+  capped at its 60th percentile so a smeared burst is not slowed down), and 24 fps becomes 60 fps by optical flow.
+- **Camera.** The push-in starts from rest and is still moving when the swing takes over, so the camera never stops.
+- **The tall wing.** The body clip bolts a tall GT wing onto the boot and only shrinks it to the factory spoiler in its
+  last frames. From body frame 52, as the roof lands over it, the wing's area comes from the finished car (`car34`).
+- **The floor** stays the plate's crisp floor while the parts fly in (only the parts and their reflections come from the
+  clip); the car's whole place comes from the clip once the chassis is landing.
 
 ```bash
-python3 tools/finish-swarm-film.py preview/hero     # or assets/site to ship it
-HERO_MOTION=assets/generated/assembly/swarm-motion.json python3 tools/make-hero-audio.py hero.wav
+python3 tools/finish-swarm-film.py assets/site      # needs clips/swarm and clips/idle.mp4; preview/hero to try a change
+tools/mux-hero-audio.sh                             # synthesises the sound from swarm-motion.json and muxes it
+npm run build
 ```

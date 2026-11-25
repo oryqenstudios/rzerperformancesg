@@ -2,7 +2,7 @@
 # Put the hero film's sound (tools/make-hero-audio.py) into the web films, keeping the video streams as they are.
 #   tools/mux-hero-audio.sh            # synthesises the sound, then muxes it
 #   tools/mux-hero-audio.sh some.wav   # muxes a sound file you made elsewhere (any length; it is cut to the film)
-# Run it again after tools/finish-garage-film.sh (or tools/assemble-film.py) re-encodes the films without sound.
+# Run it again after tools/finish-swarm-film.py assets/site re-encodes the films without sound.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 work=$(mktemp -d)

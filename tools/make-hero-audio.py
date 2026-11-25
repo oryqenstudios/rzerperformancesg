@@ -6,8 +6,8 @@ timed to the film (assets/site/hero-intro.mp4, 60 fps, 15.6 s):
    0      faint workshop room tone (ventilation rumble, light hum)
    0-9.5  the parts fly in and assemble: air rushing past them (following how much the film moves), and a metallic
           clank where each part stops, some with a servo whir and a latch clicking shut, and a heavy thud when the
-          chassis lands; times found from the film's motion (assets/generated/assembly/motion.json, written by
-          tools/finish-assembly-film.py)
+          chassis lands; times found from the film's motion (assets/generated/assembly/swarm-motion.json, written by
+          tools/finish-swarm-film.py)
    9.475  the starter turns the engine over as the last doors shut (the headlights dim): rur-rur-rur
   10.0    the engine fires and the headlights come back to full: a big flare, vroom, then a fast idle
   11.44   a full rev to 7,000 rpm, the turbo spooling
@@ -35,8 +35,9 @@ import numpy as np
 
 # The film's motion per frame, and (for the wheel-roll film, tools/finish-roll-film.py) its beats: when the engine
 # fires, how long it runs, when the wheel rolls, when the car assembles and when each bank of ceiling lights comes on.
-# HERO_MOTION picks the file; without those fields the timings below are the assembly film's.
-MOTION = os.environ.get('HERO_MOTION', 'assets/generated/assembly/motion.json')
+# HERO_MOTION picks the file (default: the shipped swarm film's, written by tools/finish-swarm-film.py; the older
+# assembly film's is assets/generated/assembly/motion.json); without those fields the timings below are the assembly film's.
+MOTION = os.environ.get('HERO_MOTION', 'assets/generated/assembly/swarm-motion.json')
 try:
     MO = json.load(open(MOTION))
 except FileNotFoundError:
