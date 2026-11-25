@@ -6,3 +6,6 @@ assets/generated/hero-*.json
 assets/generated/intro-*.json
 assets/generated/shots/
 assets/generated/carbon-evo-reference.png
+assets/generated/config/src/
+assets/generated/config/clips/
+tools/__pycache__/

@@ -396,6 +396,22 @@ fieldset.field { border: 0; margin: 0; padding: 0; }
 #hold.is-down { background: var(--chrome); color: #000; }
 .b-hint { position: absolute; left: 50%; bottom: 90px; transform: translateX(-50%); margin: 0; font-size: 0.8125rem; color: var(--steel); pointer-events: none; transition: opacity 0.6s ease; white-space: nowrap; }
 .b-hint.gone { opacity: 0; }
+/* photo configurator: the photo sits between the panels (placed by psLayout in app.js), its edges fading into a
+   blurred, darkened copy of itself that fills the screen; a new view crossfades in over the last */
+.photo-build #stage3d, .photo-build #stage, .photo-build .loading { display: none; }
+.ps { position: absolute; inset: 0; background: var(--black); touch-action: pan-y; cursor: grab; outline: none; overflow: hidden; }
+.ps[hidden] { display: none; }
+.ps:active { cursor: grabbing; }
+.ps-bg { position: absolute; inset: -6%; width: 112%; height: 112%; object-fit: cover; filter: blur(28px) brightness(0.42) saturate(1.1); }
+.ps-frame { position: absolute; -webkit-mask-image: radial-gradient(ellipse 72% 70% at 50% 50%, #000 72%, transparent 100%); mask-image: radial-gradient(ellipse 72% 70% at 50% 50%, #000 72%, transparent 100%); }
+.ps-c, .ps-v { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; transition: opacity 0.4s ease; }
+.ps-c.on, .ps-v.on { opacity: 1; }
+.ps-v { object-fit: cover; z-index: 100000; transition: none; }
+.ps-load { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); margin: 0; font-size: 0.875rem; color: var(--steel); pointer-events: none; }
+.ps-dots { position: absolute; display: flex; gap: 7px; transform: translateX(-50%); pointer-events: none; }
+.ps-dots span { width: 6px; height: 6px; border-radius: 50%; background: rgba(232, 235, 238, 0.25); transition: background-color 0.3s ease, transform 0.3s ease; }
+.ps-dots span.on { background: var(--chrome); transform: scale(1.3); }
+.ps:focus-visible .ps-frame { outline: 2px solid var(--chrome); outline-offset: 4px; }
 .b-stock-badge { position: absolute; left: 50%; top: 84px; transform: translateX(-50%); padding: 6px 14px; font-size: 0.8125rem; font-weight: 600; color: #000; background: var(--chrome); border-radius: 3px; pointer-events: none; }
 .b-stock-badge[hidden] { display: none; }
 

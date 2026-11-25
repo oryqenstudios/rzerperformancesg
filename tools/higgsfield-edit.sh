@@ -59,5 +59,7 @@ d = json.load(open(sys.argv[1]))
 imgs = d.get('images') or [d.get('image')]
 print(imgs[0]['url'])" "$work/status.json")
 curl -sS -m 300 -o "$work/out" "$url"
-python3 -I -c "from PIL import Image; import sys; Image.open(sys.argv[1]).convert('RGB').save(sys.argv[2])" "$work/out" "$out/$name.png"
+# written next to its final name, then moved, so nothing ever reads a half-written file
+python3 -I -c "from PIL import Image; import sys; Image.open(sys.argv[1]).convert('RGB').save(sys.argv[2], format='PNG')" "$work/out" "$out/.$name.png.part"
+mv "$out/.$name.png.part" "$out/$name.png"
 echo "saved $out/$name.png"

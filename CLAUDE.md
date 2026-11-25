@@ -10,9 +10,9 @@ Website for **Rzer (RZER Performance)**, a Singapore car tuning and performance 
 
    It has **sound**, each moment on its own: the starter cranking, the engine firing as the headlights snap on, one full rev, the blow-off valve as the light streak bursts out, pops and bangs as it runs round the car, and one last bang just before the logo. As the carbon finishes setting, the **RZER Performance logo** draws in **at the centre of the screen, over the car**, and the hero rests on the film's final frame (`hero-final.jpg`) with the slogan and buttons centred below. A photoreal three.js Evo IX used to take over from the film here; the client asked for it to be removed from the hero, and it now lives only in the showroom preview (`src/showroom/`). The film was generated with Higgsfield (keyframe stills, then a Kling clip between each pair); see `assets/generated/README.md`.
 2. **Scroll sections** in the style of reference video 2: the real-time 3D Evo IX (the CC BY model, three.js), presented like a product asset: neutral, even studio light on a plain solid charcoal background, no text on the car. The camera moves around it per section (side profile, rear three-quarter, x-ray with tracked hotspots, wheel close-up, headlights-on front view, contact).
-3. **Configurator** (`#build`): orbit the same 3D Evo and swap parts live (paint, wheel finish, calipers, aero, ride height, exhaust, lights/tint, carbon) with a job card, build code, hold-to-compare-stock and copy-build.
+3. **Configurator** (`#build`): a **photo configurator**. Real-looking photos of a stock Evo IX in the tuning garage (Higgsfield), from eight angles around the car plus close-ups, the interior and the engine bay. Every option (paint, wheel finish, calipers, aero, ride height, exhaust, lights/tint, carbon) is laid over the photo as its own layer, so any combination shows. Drag to turn the car (a short turning film plays while it is stock), with Interior and Engine bay buttons (fly-in films), a job card, build code, hold-to-compare-stock and copy-build. Without the photos (`assets/config/manifest.js`) the 3D Evo is the configurator. See `assets/generated/config/README.md`.
 
-Parts 2 and 3 need the page served over http(s). Opened from disk (file://) they fall back to the older shader car (`scene.frag`), which is also the fallback if the 3D car can't start.
+Part 2 (and the 3D configurator fallback) needs the page served over http(s). Opened from disk (file://) it falls back to the older shader car (`scene.frag`), which is also the fallback if the 3D car can't start. The photo configurator works either way.
 
 Reference frames are in `reference/` (`video1-*`, `video2-*`). Renders of the current state are in `reference/current-*.png`. Look at both before changing visuals.
 
@@ -50,6 +50,11 @@ npm run dev          # rebuild on every change in src/; refresh dist/index.html 
 | `src/showroom/` | `showroom.js`: the three.js scene (car, garage, spotlight, reflective floor, studio lights, post-processing) as `startShowroom()`. `details.js`: the car's realistic materials and details. `parts.js`: carbon fibre, bolt-on aero, exhaust tips, the x-ray view and the controller that applies the configurator. `index.html`: a full-screen preview with drag-to-orbit (`dist/showroom/`) |
 | `vendor/three/` | three.js r170 and the add-ons the showroom imports (glTF and Draco loaders, post-processing, Reflector, OrbitControls) |
 | `assets/site/models/` | The 3D car (split into parts) and its credits |
+| `assets/site/config/` | The photo configurator: per view, the photo in each paint, the option layers, ride-height masks; `clips/` (turning and fly-in films); `manifest.js` (`window.RZ_PHOTOS`) |
+| `assets/generated/config/` | How the configurator photos were made: guides, chosen base photos, ID maps, landmarks, prompts; README |
+| `tools/render-guides.mjs`, `tools/render-ids.mjs` | Render the 3D Evo from the configurator's cameras: layout guides for the photos, and part-ID maps that keep each layer to its part |
+| `tools/config-jobs.py`, `tools/config-gen.py` | The configurator's views, options and prompts; run the Higgsfield edits ten at a time (resumable) |
+| `tools/config-build.py`, `tools/config_layers.py` | Align the edits, cut the option layers and masks, encode the films, write `assets/site/config/` |
 | `assets/source/` | The model as downloaded, input to `tools/split-model.py` (not shipped) |
 | `assets/generated/` | Higgsfield stills, the segment prompts (`prompts/`), `film-plan.json`, and how the shipped files were made |
 | `tools/higgsfield-i2v.sh` | Generate one film segment (image-to-video) and pull its last frame |
@@ -223,6 +228,8 @@ Gloss and metallic paint only read through these reflections, so **any change to
   - `BUILD_VIEWS` holds one camera per configurator category.
   - On portrait screens the camera distance is scaled up by `fit`.
 - **Routing:** `#build` opens the configurator. Any other hash is the home page (in-page anchors).
+- **Photo configurator** (`photoMode`, the "photo configurator" section of app.js): `psCompose()` draws a view into a canvas: the paint's photo, the active layers in a fixed order, then the ride-height shift (body down over the wheels, its reflection up, the empty workshop behind; only in the five orbit views where the empty-workshop edit was clean). A new view crossfades in. `CAT_VIEW` picks the view per category; `psOption()` keeps the current view if it shows the changed option. Films play only while the car looks stock in silver (`psStockLook`). It starts from the stock car. Test hooks: `RZ.photo()`, `RZ.photoShow(view)`.
+  - The photos are generated, so a few parts differ a little between views; the GT wing is solid from behind but smaller and less connected seen from the side and front.
 - **Hotspots:** DOM labels projected from 3D points (`data-pos`) on the turbo, front coilover, front brake and exhaust. They're visible only in the x-ray section.
 - **Rev-counter scroll gauge:** `.tach`. The `--sheen` CSS variable moves a highlight across the chrome headlines as you scroll.
 - **Contact form and "Copy build":** both copy text to the clipboard for an Instagram DM. There is no backend.
@@ -249,6 +256,7 @@ Gloss and metallic paint only read through these reflections, so **any change to
 
 - **All copy is a placeholder.** It was written from the brief "car tuning and performance" because the client's Instagram couldn't be read. Confirm the services, process and tagline.
 - **No address, phone or opening hours.** Bookings point to an Instagram DM.
+- **The configurator photos are AI-generated** (Higgsfield): a likeness of a stock Evo IX, not a real car, with the 3D model's mesh wheels; no badges or plates.
 - **The hero film and still are AI-generated** (Higgsfield). The ending was generated to look like a full-carbon Evo IX photo the client sent (only as a reference: that photo is not in the repo or on the site, and its plate and branding are not reproduced). The car has no number plate at the end; the liquid car before the cure has a blank plate that melts away as the carbon sets. Before the cure the liquid car has an older Evo V/VI-style front and a red badge; the finished car keeps a Mitsubishi grille badge. Confirm with the client that the badge is fine.
 - **3D cars:**
   - The scroll sections, configurator and preview use the CC BY 4.0 Evo IX by 3DCars4U (split into parts for the site, which the licence allows with credit). Its credit is in the footer (`#model-credit`) and on the preview; keep it.

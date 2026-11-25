@@ -190,6 +190,18 @@
 </div>
 
 <div class="builder" id="builder" hidden>
+  <!-- photo configurator: real photos of the stock Evo IX in the workshop, with each option laid over them
+       (assets/config/, made by tools/config-build.py). Without them, the 3D car below is the configurator. -->
+  <div class="ps" id="ps" hidden>
+    <canvas class="ps-bg" id="ps-bg" width="480" height="270" aria-hidden="true"></canvas>
+    <div class="ps-frame" id="ps-frame" role="img" aria-label="Photo of the car with the chosen parts">
+      <canvas class="ps-c" width="1920" height="1080"></canvas>
+      <canvas class="ps-c" width="1920" height="1080"></canvas>
+      <video class="ps-v" id="ps-v" muted playsinline preload="none" aria-hidden="true"></video>
+    </div>
+    <p class="ps-load" id="ps-load" aria-live="polite"></p>
+    <div class="ps-dots" id="ps-dots" aria-hidden="true"></div>
+  </div>
   <div class="b-top">
     <a class="btn btn-ghost btn-small" href="#top"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10 3 5 8l5 5" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>Back to site</a>
     <div class="b-title"><strong>RZER</strong><span>Build yours on the Evo IX</span></div>
@@ -221,11 +233,14 @@
   <div class="b-dock glass">
     <button class="btn btn-ghost" id="hold" type="button">Hold to compare stock</button>
     <button class="btn btn-ghost" id="lights" type="button" aria-pressed="true">Headlights</button>
+    <button class="btn btn-ghost" id="ps-interior" type="button" aria-pressed="false" hidden>Interior</button>
+    <button class="btn btn-ghost" id="ps-engine" type="button" aria-pressed="false" hidden>Engine bay</button>
     <button class="btn btn-ghost" id="preset" type="button">Rzer signature build</button>
     <button class="btn btn-ghost" id="reset" type="button">Reset to stock</button>
   </div>
 </div>
 
+<script src="assets/config/manifest.js"></script>
 <script type="x-shader/x-fragment" id="frag">
 /*__FRAG__*/
 </script>

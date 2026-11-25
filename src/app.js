@@ -11,8 +11,11 @@ const coarse = matchMedia('(pointer: coarse)').matches;
 const canvas3d = $('#stage3d');
 let use3d = location.protocol !== 'file:' && !!canvas3d;
 let stage3d = null;
-// options the 3D car can't show (wheel designs and sizes, widebody) are hidden while it's in use
-const shown = g => !(use3d && g.sdfOnly);
+// the photo configurator's photos and layers (assets/config/manifest.js); without them the 3D car is the configurator
+const PH = window.RZ_PHOTOS && window.RZ_PHOTOS.views && window.RZ_PHOTOS.views.a045 ? window.RZ_PHOTOS : null;
+const photoMode = !!PH;
+// options the 3D car and the photos can't show (wheel designs and sizes, widebody) are hidden while they're in use
+const shown = g => !((use3d || photoMode) && g.sdfOnly);
 const stockHidden = c => { for (const g of GROUPS) if (!shown(g)) c[g.key] = STOCK[g.key]; return c; };
 
 // ------------------------------------------------------------------ math
@@ -35,11 +38,11 @@ const orbitPos = o => { const cp = Math.cos(o.ph); return [o.target[0] + o.r * c
 const CATS = [
   { id: 'paint', label: 'Paint', view: 'paint', groups: [
     { key: 'paint', label: 'Finish', items: [
+      { id: 'silver', name: 'Liquid silver', note: 'The factory high-flake metallic', swatch: '#c9ccd1', u: { uPaint: [0.62, 0.63, 0.65], uPaintRough: 0.2, uPaintMetal: 1 } },
       { id: 'gloss', name: 'Gloss black', note: 'Piano-black lacquer under deep clear coat', swatch: '#060606', u: { uPaint: [0.006, 0.006, 0.007], uPaintRough: 0, uPaintMetal: 0 } },
       { id: 'satin', name: 'Satin black wrap', note: 'Low-sheen vinyl film, paint stays protected', swatch: '#1b1b1c', u: { uPaint: [0.016, 0.016, 0.017], uPaintRough: 0.5, uPaintMetal: 0 } },
       { id: 'grey', name: 'Track grey', note: 'Flat solid grey in gloss', swatch: '#7b7f85', u: { uPaint: [0.17, 0.175, 0.185], uPaintRough: 0.02, uPaintMetal: 0 } },
       { id: 'blue', name: 'Midnight blue', note: 'Deep blue that reads black in shade', swatch: '#0d1838', u: { uPaint: [0.008, 0.016, 0.07], uPaintRough: 0.03, uPaintMetal: 0 } },
-      { id: 'silver', name: 'Liquid silver', note: 'High-flake metallic', swatch: '#c9ccd1', u: { uPaint: [0.62, 0.63, 0.65], uPaintRough: 0.2, uPaintMetal: 1 } },
       { id: 'red', name: 'Redline red', note: 'Solid red in gloss', swatch: '#8e0d08', u: { uPaint: [0.34, 0.012, 0.01], uPaintRough: 0.02, uPaintMetal: 0 } },
     ] } ] },
   { id: 'wheels', label: 'Wheels', view: 'wheels', groups: [
@@ -145,7 +148,7 @@ const item = (key, id) => { const g = GROUPS.find(x => x.key === key); return g.
 const uniformsFor = cfg => { const u = {}; for (const g of GROUPS) Object.assign(u, item(g.key, cfg[g.key]).u); return u; };
 
 let config = Object.assign({}, SIGNATURE);
-if (use3d) stockHidden(config);
+if (use3d || photoMode) stockHidden(config);
 const INTS = new Set(['uWheel', 'uSpoiler', 'uLip', 'uSkirts', 'uDiffuser', 'uExhaust', 'uExFinish', 'uHood', 'uRoof', 'uMirror', 'uZero']);
 
 // ------------------------------------------------------------------ cameras
@@ -395,8 +398,14 @@ function openBuilder() {
   $('#builder').hidden = false;
   $('#home').setAttribute('inert', '');
   [canvas, canvas3d].forEach(el => el && (el.tabIndex = 0));
+  if (photoMode) {
+    body.classList.add('photo-build'); psEl.hidden = false;
+    // the photo configurator starts from the stock car the photos show
+    if (!ps.started) { ps.started = true; config = Object.assign({}, STOCK); renderCard(); }
+  }
   setCategory(activeCat || 'paint', true);
   layoutBuilder();
+  psLayout();
   lastInteract = performance.now();
 }
 function closeBuilder(h) {
@@ -404,8 +413,9 @@ function closeBuilder(h) {
     return;
   }
   mode = 'home';
-  body.classList.remove('in-builder');
+  body.classList.remove('in-builder', 'photo-build');
   $('#builder').hidden = true;
+  if (photoMode) psEl.hidden = true;
   $('#home').removeAttribute('inert');
   [canvas, canvas3d].forEach(el => el && el.removeAttribute('tabindex'));
   measure();
@@ -446,6 +456,7 @@ function setCategory(id, jump) {
   const v = BUILD_VIEWS[cat.view];
   orbitGoal = Object.assign({}, v.orbit, { target: v.orbit.target.slice() });
   if (jump && !userOrbit) cam.orbit = Object.assign({}, cam.orbit);
+  if (photoMode && mode === 'build') psCategory(id);
 }
 optsEl.addEventListener('click', e => {
   const b = e.target.closest('.opt'); if (!b) return;
@@ -454,6 +465,7 @@ optsEl.addEventListener('click', e => {
   renderCard();
   const v = BUILD_VIEWS[CATS.find(c => c.id === activeCat).view];
   orbitGoal = Object.assign({}, v.orbit, { target: v.orbit.target.slice() });
+  if (photoMode) psOption(b.dataset.key);
 });
 
 function buildCode(cfg) {
@@ -496,13 +508,18 @@ cardToggle.addEventListener('click', () => {
   cardToggle.setAttribute('aria-expanded', String(!card.hidden));
   body.classList.toggle('card-open', !card.hidden);
   layoutBuilder();
+  psLayout();
 });
 $('#preset').addEventListener('click', () => { config = stockHidden(Object.assign({}, SIGNATURE)); setCategory(activeCat); renderCard(); });
 $('#reset').addEventListener('click', () => { config = Object.assign({}, STOCK); setCategory(activeCat); renderCard(); });
 const lightsBtn = $('#lights');
-lightsBtn.addEventListener('click', () => { lightsOn = !lightsOn; lightsBtn.setAttribute('aria-pressed', String(lightsOn)); });
+lightsBtn.addEventListener('click', () => { lightsOn = !lightsOn; lightsBtn.setAttribute('aria-pressed', String(lightsOn)); if (photoMode) psShow(ps.view, true); });
 const hold = $('#hold');
-const setCompare = on => { compare = on; hold.classList.toggle('is-down', on); $('#stock-badge').hidden = !on; };
+const setCompare = on => {
+  if (on === compare) return;
+  compare = on; hold.classList.toggle('is-down', on); $('#stock-badge').hidden = !on;
+  if (photoMode && mode === 'build') psShow(ps.view, true);
+};
 hold.addEventListener('pointerdown', e => { hold.setPointerCapture(e.pointerId); setCompare(true); });
 ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(ev => hold.addEventListener(ev, () => setCompare(false)));
 hold.addEventListener('keydown', e => { if ((e.key === ' ' || e.key === 'Enter') && !e.repeat) { e.preventDefault(); setCompare(true); } });
@@ -577,6 +594,235 @@ function touched() { lastInteract = performance.now(); $('#b-hint').classList.ad
 tabsEl.addEventListener('click', () => { userOrbit = null; });
 optsEl.addEventListener('click', () => { userOrbit = null; });
 
+// ------------------------------------------------------------------ photo configurator
+// Real photos of the stock Evo IX in the workshop (assets/config/, made by tools/config-build.py). Each view has the
+// whole photo in every paint; each option is a cropped layer, laid over it in a fixed order. Ride height moves the body
+// down over the wheels and its floor reflection up, using masks of the body, tyres, reflection and floor, with the
+// empty workshop behind. Views: eight around the car (a000 front ... a315, 45 degrees apart towards its right side),
+// close-ups for the wheels, exhaust, headlights and the top, and the interior and engine bay.
+const ORBIT = ['a000', 'a045', 'a090', 'a135', 'a180', 'a225', 'a270', 'a315'];
+const CAT_VIEW = { paint: 'a045', wheels: 'wheel', brakes: 'wheel', aero: 'a135', stance: 'a090', exhaust: 'exhaust', lights: 'headlight', carbon: 'top' };
+const NEAR_ORBIT = { wheel: 'a045', exhaust: 'a135', headlight: 'a045', top: 'a045' };
+const INSIDE = { interior: ['int-front', 'int-dash', 'int-gauges', 'int-rear'], engine: ['eng-bay', 'eng-detail'] };
+// short films of the stock car (assets/config/clips/): turning one step between neighbouring views (and back), and
+// flying in through the driver's door or under the raised bonnet. They only play while the car looks stock in silver.
+const FLY = { interior: { from: 'a090', to: 'int-front', clip: 'fly-interior' }, engine: { from: 'a000', to: 'eng-bay', clip: 'fly-engine' } };
+// which layers each option group lays down (by name prefix), to tell whether a view shows a change
+const GROUP_LAYERS = { spoiler: ['wingdel-', 'wing-'], lip: ['lip-'], skirts: ['skirts-'], diffuser: ['diffuser-'], exhaust: ['ex-'], exfin: ['ex-'],
+  rimfin: ['rim-'], caliper: ['caliper-'], drl: ['drl-', 'lights-off'], tint: ['tint-'], hood: ['hood-'], roof: ['roof-'], mirror: ['mirror-'] };
+const PSW = 1920, PSH = 1080;
+const psEl = $('#ps'), psFrame = $('#ps-frame'), psCanvases = $$('.ps-c', psFrame), psBg = $('#ps-bg'), psLoad = $('#ps-load'), psDots = $('#ps-dots');
+const psIn = $('#ps-interior'), psEn = $('#ps-engine');
+const ps = { view: 'a045', place: 'exterior', front: 0, token: 0, done: 0, shown: '', z: 1, playing: false, queue: 0, started: false };
+const psVideo = $('#ps-v');
+const psImgs = new Map();
+function psPhoto(v, f) {
+  const src = `assets/config/${v}/${f}`;
+  if (!psImgs.has(src)) psImgs.set(src, new Promise(res => { const im = new Image(); im.decoding = 'async'; im.onload = () => res(im); im.onerror = () => res(null); im.src = src; }));
+  return psImgs.get(src);
+}
+const psScratch = [0, 1, 2, 3].map(() => Object.assign(document.createElement('canvas'), { width: PSW, height: PSH }));
+
+function psLayers(v, cfg) {
+  const e = PH.views[v], L = e.layers || {}, names = [];
+  const paint = e.paints.includes(cfg.paint) ? cfg.paint : 'silver';
+  if (e.kind === 'interior') return { paint: 'silver', names };
+  const add = n => { if (L[n]) names.push(n); };
+  if (cfg.spoiler !== 'factory') { add('wingdel-' + paint); if (cfg.spoiler !== 'none') add('wing-' + cfg.spoiler); }
+  if (cfg.lip !== 'factory') add('lip-' + cfg.lip);
+  if (cfg.skirts !== 'factory') add('skirts-' + cfg.skirts);
+  if (cfg.diffuser !== 'factory') add('diffuser-' + cfg.diffuser);
+  if (cfg.exhaust !== 'factory' || cfg.exfin !== 'polished') add(`ex-${cfg.exhaust}-${cfg.exfin}`);
+  if (cfg.rimfin !== 'silver') add('rim-' + cfg.rimfin);
+  if (cfg.caliper !== 'black') add('caliper-' + cfg.caliper);
+  if (cfg.tint !== 'light') add('tint-' + cfg.tint);
+  if (!lightsOn) add('lights-off'); else if (cfg.drl !== 'white') add('drl-' + cfg.drl);
+  if (cfg.hood !== 'factory') add('hood-' + cfg.hood);
+  if (cfg.roof !== 'factory') add('roof-' + cfg.roof);
+  if (cfg.mirror !== 'factory') add('mirror-' + cfg.mirror);
+  return { paint, names };
+}
+
+// draw view v with build cfg into canvas; false if its photo is missing
+async function psCompose(canvas, v, cfg) {
+  const e = PH.views[v];
+  const { paint, names } = psLayers(v, cfg);
+  const drop = e.masks && cfg.ride !== 'factory' && PH.drops[v] ? PH.drops[v][cfg.ride] || 0 : 0;
+  const [base, ...rest] = await Promise.all([psPhoto(v, `paint-${paint}.webp`), ...names.map(n => psPhoto(v, n + '.webp')),
+    ...(drop ? ['plate.webp', 'm-body.png', 'm-tyres.png', 'm-refl.png', 'm-floor.png'].map(f => psPhoto(v, f)) : [])]);
+  if (!base) return false;
+  const lay = rest.slice(0, names.length), masks = rest.slice(names.length);
+  const [car, mb, mr, tmp] = psScratch;
+  const put = (ctx, op, im, box) => { ctx.globalCompositeOperation = op; if (im) { if (box) ctx.drawImage(im, box[0], box[1], box[2], box[3]); else ctx.drawImage(im, 0, 0, PSW, PSH); } };
+  const layers = (ctx, op) => names.forEach((n, i) => put(ctx, op, lay[i], e.layers[n]));
+  const c = car.getContext('2d');
+  put(c, 'source-over', base);
+  layers(c, 'source-over');
+  const out = canvas.getContext('2d');
+  if (!drop || masks.some(m => !m)) { put(out, 'source-over', car); return true; }
+  const [plate, mBody, mTyres, mRefl, mFloor] = masks;
+  // the body: its mask and every part laid on it, minus the floor and the tyres
+  const b = mb.getContext('2d');
+  b.clearRect(0, 0, PSW, PSH); put(b, 'source-over', mBody); layers(b, 'source-over');
+  put(b, 'destination-out', mFloor); put(b, 'destination-out', mTyres);
+  // its reflection: the reflection mask and the parts' reflections, minus the tyres
+  const r = mr.getContext('2d');
+  r.clearRect(0, 0, PSW, PSH); layers(r, 'source-over'); put(r, 'destination-in', mFloor);
+  put(r, 'source-over', mRefl); put(r, 'destination-out', mTyres);
+  const t = tmp.getContext('2d');
+  const cut = mask => { t.globalCompositeOperation = 'source-over'; t.clearRect(0, 0, PSW, PSH); put(t, 'source-over', car); put(t, 'destination-in', mask); return tmp; };
+  put(out, 'source-over', plate);
+  out.drawImage(cut(mr), 0, -drop);      // the reflection rises as the body drops
+  out.drawImage(cut(mTyres), 0, 0);      // the wheels stay on the floor
+  out.drawImage(cut(mb), 0, drop);       // the body comes down over them
+  return true;
+}
+
+async function psShow(v, quick) {
+  if (!PH.views[v]) return;
+  ps.view = v;
+  const token = ++ps.token;
+  const back = psCanvases[1 - ps.front], prev = psCanvases[ps.front];
+  const cfg = compare ? STOCK : config;
+  const slow = setTimeout(() => { if (token === ps.token) psLoad.textContent = 'Loading the photos'; }, 400);
+  const ok = await psCompose(back, v, cfg);
+  clearTimeout(slow);
+  if (token !== ps.token) return;   // a newer view was asked for meanwhile
+  ps.done = token;
+  psLoad.textContent = ok ? '' : 'This photo could not be loaded.';
+  if (!ok) return;
+  back.style.zIndex = String(++ps.z);
+  back.style.transitionDuration = quick || reduceMotion ? '0s' : '';
+  back.classList.add('on');
+  setTimeout(() => { if (ps.token === token) prev.classList.remove('on'); }, quick ? 0 : 420);
+  ps.front = 1 - ps.front;
+  ps.shown = v + ':' + JSON.stringify(psLayers(v, cfg)) + ':' + cfg.ride;
+  psBg.getContext('2d').drawImage(back, 0, 0, psBg.width, psBg.height);
+  psDotsUpdate();
+  psPreload(v);
+}
+function psPreload(v) {
+  const i = ORBIT.indexOf(v);
+  if (i < 0) return;
+  setTimeout(() => {
+    for (const n of [ORBIT[(i + 1) % 8], ORBIT[(i + 7) % 8]]) {
+      if (!PH.views[n]) continue;
+      const { paint, names } = psLayers(n, config);
+      psPhoto(n, `paint-${paint}.webp`); names.forEach(x => psPhoto(n, x + '.webp'));
+    }
+  }, 300);
+}
+function psDotsUpdate() {
+  const list = ps.place === 'exterior' ? ORBIT : INSIDE[ps.place];
+  if (psDots.childElementCount !== list.length) psDots.innerHTML = list.map(() => '<span></span>').join('');
+  [...psDots.children].forEach((d, i) => d.classList.toggle('on', list[i] === ps.view));
+}
+// does view v show the car exactly as the films do (stock, silver, factory height)?
+function psStockLook(v) {
+  if (!PH.views[v]) return false;
+  const cfg = compare ? STOCK : config;
+  const { paint, names } = psLayers(v, cfg);
+  return paint === 'silver' && !names.length && cfg.ride === 'factory';
+}
+// play a film in the frame, then land on view `to` (composed underneath while it plays)
+function psFilm(name, to, rate) {
+  if (!PH.clips || !PH.clips.includes(name) || reduceMotion) return false;
+  ps.playing = true;
+  psVideo.src = `assets/config/clips/${name}.mp4`;
+  psVideo.playbackRate = rate || 1;
+  const land = () => {
+    psVideo.onended = psVideo.onerror = null;
+    psShow(to, true).then(() => {
+      psVideo.classList.remove('on');
+      ps.playing = false;
+      if (ps.queue) { const d = Math.sign(ps.queue); ps.queue -= d; psStep(d); }
+    });
+  };
+  psVideo.onended = land;
+  psVideo.onerror = land;
+  psVideo.onplaying = () => psVideo.classList.add('on');
+  const pr = psVideo.play();
+  if (pr && pr.catch) pr.catch(land);
+  return true;
+}
+function psStep(dir) {
+  if (ps.playing) { ps.queue = Math.max(-2, Math.min(2, ps.queue + dir)); return; }
+  if (ps.place !== 'exterior') {
+    const list = INSIDE[ps.place], i = list.indexOf(ps.view);
+    psShow(list[(i + dir + list.length) % list.length]);
+    return;
+  }
+  // from a close-up, the first step goes to the nearest view around the car
+  if (!ORBIT.includes(ps.view)) { psShow(NEAR_ORBIT[ps.view] || 'a045'); return; }
+  const next = ORBIT[(ORBIT.indexOf(ps.view) + dir + 8) % 8];
+  if (psStockLook(ps.view) && psStockLook(next) && psFilm(`spin-${ps.view}-${next}`, next)) return;
+  psShow(next);
+}
+function psPlace(place) {
+  if (ps.playing) return;
+  ps.place = place;
+  psIn.setAttribute('aria-pressed', String(place === 'interior'));
+  psEn.setAttribute('aria-pressed', String(place === 'engine'));
+  if (place === 'exterior') { psShow(CAT_VIEW[activeCat] || 'a045'); return; }
+  const fly = FLY[place];
+  // fly in from the outside view the film starts at, when the car looks stock
+  if (psStockLook(fly.from) && PH.clips && PH.clips.includes(fly.clip) && !reduceMotion) {
+    psShow(fly.from, true).then(() => psFilm(fly.clip, fly.to));
+    return;
+  }
+  psShow(INSIDE[place][0]);
+}
+function psCategory(id) {
+  if (ps.place !== 'exterior') { ps.place = 'exterior'; psIn.setAttribute('aria-pressed', 'false'); psEn.setAttribute('aria-pressed', 'false'); }
+  psShow(CAT_VIEW[id] || 'a045');
+}
+// an option changed: show it where it can be seen (the current view if it shows that group, else the category's view)
+function psOption(key) {
+  const e = PH.views[ps.view];
+  const visible = ps.place === 'exterior' && (key === 'paint' || (key === 'ride' ? !!e.masks
+    : (GROUP_LAYERS[key] || []).some(pre => Object.keys(e.layers || {}).some(n => n.startsWith(pre)))));
+  if (visible) psShow(ps.view, true); else psCategory(activeCat);
+}
+// the photo sits in the free space between the parts list and the job card (above the parts list on phones),
+// its edges fading into a blurred copy of itself
+function psLayout() {
+  if (!photoMode || mode !== 'build') return;
+  const narrow = innerWidth <= 900;
+  let l = 0, r = innerWidth, t = 56, b = innerHeight - 84;
+  if (narrow) b = innerHeight * 0.56 - 48;
+  else {
+    l = $('.b-panel').getBoundingClientRect().right + 12;
+    const card = $('#jobcard');
+    if (!card.hidden) r = card.getBoundingClientRect().left - 12;
+  }
+  const w = Math.min((r - l) / 0.8, (b - t) * 1.3 * 16 / 9, innerWidth * 1.25);
+  const h = w * 9 / 16;
+  Object.assign(psFrame.style, { width: w.toFixed(1) + 'px', height: h.toFixed(1) + 'px', left: ((l + r - w) / 2).toFixed(1) + 'px', top: ((t + b - h) / 2).toFixed(1) + 'px' });
+  psDots.style.top = ((t + b + h) / 2 + (narrow ? -16 : 10)).toFixed(1) + 'px';
+  psDots.style.left = ((l + r) / 2).toFixed(1) + 'px';
+}
+if (photoMode) {
+  if (PH.views['int-dash']) psIn.hidden = false;
+  if (PH.views['eng-bay']) psEn.hidden = false;
+  $('#b-hint').textContent = 'Drag to turn the car.';
+  psIn.addEventListener('click', () => psPlace(ps.place === 'interior' ? 'exterior' : 'interior'));
+  psEn.addEventListener('click', () => psPlace(ps.place === 'engine' ? 'exterior' : 'engine'));
+  let drag = null;
+  psEl.tabIndex = 0;
+  psEl.addEventListener('pointerdown', e => { drag = { x: e.clientX, acc: 0 }; psEl.setPointerCapture(e.pointerId); touched(); });
+  psEl.addEventListener('pointermove', e => {
+    if (!drag) return;
+    drag.acc += e.clientX - drag.x; drag.x = e.clientX;
+    const step = innerWidth <= 900 ? 48 : 80;
+    while (Math.abs(drag.acc) >= step) { psStep(drag.acc > 0 ? -1 : 1); drag.acc -= Math.sign(drag.acc) * step; }
+  });
+  ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(ev => psEl.addEventListener(ev, () => { drag = null; }));
+  psEl.addEventListener('keydown', e => {
+    const d = { ArrowLeft: 1, ArrowRight: -1 }[e.key];
+    if (d) { e.preventDefault(); psStep(d); touched(); }
+  });
+}
+
 // ------------------------------------------------------------------ contact form
 $('#contact-form').addEventListener('submit', async e => {
   e.preventDefault();
@@ -619,7 +865,8 @@ function frame(now) {
   update(dt, now / 1000);
   // at the top of the home page the hero film covers the stage: draw only now and then to stay warm
   const covered = mode === 'home' && scrollY < 2;
-  if (ready && (!covered || (!stage3d && coveredFrames++ % 30 === 0))) {
+  const photos = mode === 'build' && photoMode;   // the photo configurator covers the stage: nothing to draw
+  if (ready && !photos && (!covered || (!stage3d && coveredFrames++ % 30 === 0))) {
     draw(now / 1000, dt);
     if (!covered) adapt(dt);
   }
@@ -715,7 +962,7 @@ function draw(time, dt) {
 }
 
 // ------------------------------------------------------------------ boot
-addEventListener('resize', () => { measure(); sizeCanvas(); onScroll(); layoutBuilder(); });
+addEventListener('resize', () => { measure(); sizeCanvas(); onScroll(); layoutBuilder(); psLayout(); });
 addEventListener('load', measure);
 document.fonts && document.fonts.ready.then(measure);
 function start3d() {
@@ -756,5 +1003,7 @@ window.RZ = {
   quality,
   quality3d,
   settle: v => { settle = v; },
+  photo: () => (photoMode ? { view: ps.view, place: ps.place, shown: ps.shown, busy: ps.token !== ps.done } : null),
+  photoShow: v => psShow(v, true),
 };
 })();

@@ -1,0 +1,5 @@
+{
+ "_note": "Matching points [guide x, guide y, photo x, photo y] (1920x1080) for views whose photo is framed too differently from its 3D guide for automatic alignment; tools/config-build.py fits a homography to them. Picked by eye on gridded copies, good to about 10 px.",
+ "exhaust": [[1280, 573, 993, 773], [1607, 507, 1540, 710], [500, 375, 375, 600], [1130, 415, 780, 633], [505, 140, 363, 403], [945, 625, 633, 813], [1560, 300, 1420, 507]],
+ "wheel": [[1047, 580, 1033, 700], [33, 527, 344, 700], [1433, 380, 1471, 473], [740, 173, 816, 367], [1767, 597, 1873, 733], [413, 260, 576, 473], [120, 260, 407, 500]]
+}
