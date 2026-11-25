@@ -55,7 +55,7 @@ npm run build
 
 The previous build-up films (liquid → car) and their tools are kept in `../README.md` and `tools/finish-garage-film.sh`.
 
-## The wheel-roll film (preview, not on the site yet)
+## The wheel-roll film (an earlier preview, superseded by the swarm film below)
 
 A second concept, from the client's references (a lone wheel the camera follows, then the car forming around it):
 in the dark workshop a single wheel rolls straight towards the camera from the back wall into a pool of light in the
@@ -96,4 +96,39 @@ blending frames. It writes `roll-motion.json` with the film's beats, which `tool
 python3 tools/roll-keys.py                         # wheel.jpg and start-comp.jpg from the Kling stills
 python3 tools/finish-roll-film.py preview/hero     # or assets/site to ship it
 HERO_MOTION=assets/generated/assembly/roll-motion.json python3 tools/make-hero-audio.py hero.wav
+```
+
+## The swarm film (preview, not on the site yet)
+
+After the client's reference, a 3D car assembly breakdown: one camera, high and in front of the car's front-left
+corner, looking down at the car in a front three-quarter view, pushing in slowly. In the lit workshop a swarm of small
+parts (bolts, bearings, pistons, cams, the turbo) flies in and builds the engine in mid-air, the suspension and brakes
+gather round it; the chassis frame drops in underneath, the suspension and wheels fly to the corners and the bare body
+shell forms; then the carbon panels lock on, doors, roof, bonnet, the front bumper last. The camera then swings down and
+round to the head-on final frame (the client chose to keep the site's ending), the headlights come on, and the engine
+starts as before. 15.6 s, the same beats after the build as the assembly film (fires at 10.0 s).
+
+| Part | Made with | From → to |
+|---|---|---|
+| `keys/swarm/car34.jpg` | Kling edit of the final frame and `keys/empty.jpg`, `prompts/swarm/key-car34.txt` | the same car in the same place, the camera moved high into the front corner by the wheel wall (the first three takes turned the car instead of moving the camera; the prompt spells out how the room looks from there) |
+| `keys/swarm/empty34.jpg` | Kling edit of `car34`, `prompts/swarm/key-empty34.txt` | the car removed: the plate |
+| `keys/swarm/engine34.jpg` | Kling edit of `car34`, `prompts/swarm/key-engine34.txt` | the engine in mid-air with its parts, the suspension and brakes around it |
+| `keys/swarm/chassis34.jpg` | Kling edit of `car34`, `prompts/swarm/key-chassis34.txt` | the rolling chassis with the bare metal body shell |
+| `keys/swarm/car34-push.jpg` | crop of `car34` | the end of the push-in (1.15x towards the car): the swing's first frame |
+| `clips/swarm/engine-b.mp4` | Kling O3 (5 s), `prompts/swarm/clip-engine.txt` | `empty34` → `engine34` |
+| `clips/swarm/chassis-b.mp4` | Kling O3 (5 s), `prompts/swarm/clip-chassis.txt` | `engine34` → `chassis34` |
+| `clips/swarm/body-b.mp4` | Kling O3 (5 s), `prompts/swarm/clip-body.txt` | `chassis34` → `car34` |
+| `clips/swarm/swing-a.mp4` | Kling O3 (5 s), `prompts/swarm/clip-swing.txt` | `car34-push` → the final frame |
+
+Two takes of each clip; the others were worse in a clear way (`engine-a` a blizzard over the whole frame, `chassis-a`
+out of the reference's order, `body-a` panels flapping like sheets, `swing-b` headlights late and marks on the seats).
+
+`tools/finish-swarm-film.py` builds it with `tools/film_lib.py`. The build clips keep the camera locked off and the
+push-in is added afterwards, so the workshop stays the plate's and the clips join cleanly; each frame is steadied onto
+the plate, its tone drift taken out, and only the moving parts (and the car's own place) are laid over the plate. The
+swing keeps Kling's frames (the camera moves) and dissolves into the real final frame. Retimed to 60 fps by optical flow.
+
+```bash
+python3 tools/finish-swarm-film.py preview/hero     # or assets/site to ship it
+HERO_MOTION=assets/generated/assembly/swarm-motion.json python3 tools/make-hero-audio.py hero.wav
 ```
