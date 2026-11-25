@@ -58,26 +58,31 @@ The previous build-up films (liquid → car) and their tools are kept in `../REA
 ## The wheel-roll film (preview, not on the site yet)
 
 A second concept, from the client's references (a lone wheel the camera follows, then the car forming around it):
-in the dark workshop a single wheel, at its real size, rolls out of the shadows at the back on the left into a pool of
-light in the middle, the camera following it and pulling back to the final framing. An axle grows out of its hub, the
-frame rails, the other wheels, the coilovers, then the seats and engine come in; the carbon body folds on around it
-(doors, floor, roof, bumper, bonnet, with sparks) and the headlights come on. The ceiling lights switch on bank by
-bank, back row to front, which lands on the real final frame, and the engine starts as before. 16.6 s.
+in the dark workshop a single wheel rolls straight towards the camera from the back wall into a pool of light in the
+middle, the camera pulling back with it. An axle extends sideways out of its hub, the wheels slide out along it, the
+rear wheels, frame rails and coilovers come in, then the seats and engine; the carbon body folds on around it (doors,
+floor, roof, bumper, bonnet, with sparks) and the headlights come on. The ceiling lights switch on bank by bank, back
+row to front, which lands on the real final frame, and the engine starts as before. 16.6 s.
+
+The client asked for everything to be seen from the front, like the final frame (the wheel never turns to show its
+rim's face, the camera never pans or turns), and for real sizes and proportions throughout. So the wheel is a 235/45
+R17 seen tread-on: 643 mm tall and about 245 mm wide (0.38 of its height), standing on the line of the car's front
+axle, its size in the frame set by the floor's perspective, measured on the final frame (the horizon at 55% of the
+frame's height; a wheel's height is 0.846 x (its contact line's height - 0.55) frame heights).
 
 | Part | Made with | From → to |
 |---|---|---|
 | `keys/roll/dark-final.jpg` | Kling edit of the final frame, `prompts/roll/key-dark-final.txt` | the lights down: one dim light from above, the red neon faint, the headlights on |
 | `keys/roll/dark-empty.jpg` | Kling edit of `dark-final`, `prompts/roll/key-dark-empty.txt` | the car removed (made from the dark frame so the light matches) |
-| `keys/roll/wheel-raw.jpg` | Kling edit of `dark-empty` with `dark-final` as the size reference, `prompts/roll/key-wheel.txt` | one wheel in the pool of light; it came out about 1.5x too big |
-| `keys/roll/wheel.jpg`, `start-comp.jpg` | `tools/roll-keys.py` | the wheel scaled to real size (a 643 mm wheel at the front axle's depth: a quarter of the frame's height, from the floor's perspective measured on the final frame); the first frame: the camera zoomed 1.45x on the back left, the wheel small there |
-| `keys/roll/start.jpg` | Kling edit of `start-comp`, `prompts/roll/key-start.txt` | the small wheel relit in the shadows |
-| `keys/roll/chassis.jpg` | Kling edit of `dark-empty` with `dark-final` and `wheel`, `prompts/roll/key-chassis.txt` | the bare rolling chassis where the car stands |
-| `clips/roll/roll-b.mp4` | Kling O3 (5 s), `prompts/roll/clip-roll.txt` | `start` → `wheel`: the wheel rolls forward, the camera follows it |
-| `clips/roll/chassis-b.mp4` | Kling O3 (5 s), `prompts/roll/clip-chassis.txt` | `wheel` → `chassis` |
+| `keys/roll/wheel-raw.jpg` | Kling edit of `dark-empty` with `dark-final` as the size reference, `prompts/roll/key-wheel-front.txt` | one wheel seen from the front in the pool of light; it came out about 1.4x too big and too wide |
+| `keys/roll/wheel.jpg`, `start-comp.jpg` | `tools/roll-keys.py` | the wheel at real size and proportions on the front axle's line (a quarter of the frame's height); the first frame: the camera zoomed 1.45x straight ahead, the wheel small by the back wall |
+| `keys/roll/chassis.jpg` | Kling edit of `dark-empty` with `dark-final` and a wheel, `prompts/roll/key-chassis.txt` | the bare rolling chassis where the car stands |
+| `clips/roll/roll-fcomp.mp4` | Kling O3 (5 s), `prompts/roll/clip-roll.txt` | `start-comp` → `wheel`: the wheel rolls straight towards the camera, upright, tread on; the camera pulls back |
+| `clips/roll/chassis-fb.mp4` | Kling O3 (5 s), `prompts/roll/clip-chassis.txt` | `wheel` → `chassis`, every wheel kept facing the camera |
 | `clips/roll/body-b.mp4` | Kling O3 (5 s), `prompts/roll/clip-body.txt` | `chassis` → `dark-final` |
 
-Two takes of each clip were made; the `b` takes were kept (`chassis-a` and `body-a` were cleaner in places but their
-wheels splay or their panels flash white).
+Two takes of the chassis and body clips were made (`chassis-fa` turned some wheels sideways; `body-a` flashes its
+panels white). The first version had the wheel roll in diagonally, turned to show its spokes; it was replaced.
 
 `tools/finish-roll-film.py` builds it. The roll keeps Kling's own frames (the camera moves), eased onto the plate over
 its last second. From there the camera is locked off and the frames are laid over the dark plate as before, with two

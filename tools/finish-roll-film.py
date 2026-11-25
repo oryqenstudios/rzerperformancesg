@@ -12,13 +12,13 @@ reading the timing this script writes to assets/generated/assembly/roll-motion.j
 The parts (assets/generated/assembly/, see its README):
   keys/roll/dark-final.jpg  the final frame with the lights down (one dim light from above, the red neon faint)
   keys/roll/dark-empty.jpg  the same, the car removed: the plate the dark part of the film is laid over
-  keys/roll/start.jpg       the first frame: the camera zoomed in on the back left, the wheel small in the shadows
-  keys/roll/wheel.jpg       the wheel at real size standing in the pool of light (tools/roll-keys.py)
+  keys/roll/start-comp.jpg  the first frame: the camera zoomed straight ahead, the wheel small by the back wall
+  keys/roll/wheel.jpg       the wheel at real size, seen from the front, in the pool of light (tools/roll-keys.py)
   keys/roll/chassis.jpg     the bare rolling chassis where the car will stand
-  clips/roll/roll-b.mp4     Kling O3, start -> wheel: the wheel rolls forward into the light; the camera follows it,
-                            panning right and pulling back to the final framing
-  clips/roll/chassis-b.mp4  Kling O3, wheel -> chassis: an axle grows out of the wheel's hub, the frame rails, the
-                            other wheels, the coilovers, then the seats and engine
+  clips/roll/roll-fcomp.mp4 Kling O3, start-comp -> wheel: the wheel rolls straight towards the camera into the light,
+                            upright and tread on; the camera pulls back to the final framing
+  clips/roll/chassis-fb.mp4 Kling O3, wheel -> chassis: an axle extends sideways out of the wheel's hub, the wheels
+                            slide out along it, the rear wheels, frame rails and coilovers, then the seats and engine
   clips/roll/body-b.mp4     Kling O3, chassis -> dark-final: the doors, floor, roof, bumper and bonnet fold on, with
                             sparks; the headlights come on
   clips/idle.mp4            Kling O3, final -> final: the car idling (shared with the assembly film)
@@ -43,7 +43,7 @@ A = 'assets/generated/assembly'
 K = f'{A}/keys/roll'
 OUT = sys.argv[1] if len(sys.argv) > 1 else 'preview/hero'
 W, H, FPS = 1920, 1080, 60
-CLIPS = {'roll': 'roll/roll-b', 'chassis': 'roll/chassis-b', 'body': 'roll/body-b', 'idle': 'idle'}
+CLIPS = {'roll': 'roll/roll-fcomp', 'chassis': 'roll/chassis-fb', 'body': 'roll/body-b', 'idle': 'idle'}
 TIMES = {'roll': (0.0, 3.5), 'chassis': (3.5, 6.6), 'body': (6.6, 9.7)}
 JOIN = 0.2          # roll -> chassis crossfade
 DISSOLVE = 0.25     # the body clip -> the dark final key

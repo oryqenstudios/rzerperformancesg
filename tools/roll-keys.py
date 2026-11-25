@@ -3,13 +3,15 @@
 
   dark-final.jpg  the final frame with the workshop's lights down (one dim light from above, faint red neon)
   dark-empty.jpg  the same with the car removed: the plate every frame before the lights come on is laid over
-  wheel-raw.jpg   a single wheel standing in the pool of light; Kling made it about 1.5x too big
+  wheel-raw.jpg   a single wheel standing in the pool of light, seen from the front like the car's front wheels
+                  (tread to the camera); Kling made it about 1.8x too big
 
 Writes:
   wheel.jpg  the wheel at its real size (a 17-inch wheel, 643 mm, at the depth of the car's front axle: about a
              quarter of the frame's height), on the plate
-  start.jpg  the film's first frame: the camera zoomed in on the back left of the workshop, the same wheel small and
-             in shadow there, about to roll forward into the light (1920x1080; tools/higgsfield-edit.sh then relights it)
+  start-comp.jpg  the film's first frame: the camera zoomed straight ahead at the back of the workshop, the same
+             wheel small and in shadow by the back wall, about to roll straight towards the camera into the light
+             (1920x1080; tools/higgsfield-edit.sh then relights it into start.jpg)
 
 The floor's perspective is measured from the final frame: the horizon sits at 55% of the frame's height and a wheel's
 height in the frame is 0.846 x (its contact line's height - 0.55), in frame heights.
@@ -21,8 +23,10 @@ import numpy as np
 
 K = 'assets/generated/assembly/keys/roll'
 HORIZON, SIZE = 0.55, 0.846          # wheel height (frame heights) = SIZE * (contact y - HORIZON)
-START = (0.31, 0.665)                # where the wheel starts: its contact point, as fractions of the frame
-VIEW = (1.45, 0.37, 0.60)            # the first frame's camera: zoom, and the centre of its view
+ASPECT = 0.38                        # a 235/45 R17 tyre seen from the front: about 245 mm wide, 643 mm tall
+CONTACT = 0.865                      # where it stands: on the line of the car's front axle (as in chassis.jpg)
+START = (0.5, 0.635)                 # where the wheel starts: its contact point, as fractions of the frame
+VIEW = (1.45, 0.5, 0.60)             # the first frame's camera: zoom, and the centre of its view (straight ahead)
 
 e = cv2.imread(f'{K}/dark-empty.jpg')
 w = cv2.imread(f'{K}/wheel-raw.jpg')
@@ -50,43 +54,56 @@ xs = [(a, b) for y, a, b in span if top <= y < contact]
 x0, x1 = min(a for a, _ in xs), max(b for _, b in xs)
 cx = (x0 + x1) / 2
 height = contact - top
-print(f'wheel: x {x0}-{x1}, y {top}-{contact} ({height / H:.3f} of the frame)')
+# Kling draws the tyre too wide for its height: narrow it to a real tyre's proportions
+mid = [b - a for y, a, b in span if top + 0.2 * height <= y < contact - 0.1 * height]
+aspect = float(np.median(mid)) / height
+narrow = min(1.0, ASPECT / aspect)
+print(f'wheel: x {x0}-{x1}, y {top}-{contact} ({height / H:.3f} of the frame), width/height {aspect:.2f} -> x{narrow:.2f}')
 
 body = np.zeros((H, W), np.uint8)
 cv2.ellipse(body, (int(cx), int((top + contact) / 2)), (int((x1 - x0) / 2 + 10), int(height / 2 + 10)), 0, 0, 360, 255, -1)
+body[contact + 4:] = 0
 under = np.zeros((H, W), np.uint8)       # its contact shadow and reflection on the floor
 cv2.ellipse(under, (int(cx), int(contact + 0.06 * height)), (int((x1 - x0) * 0.62), int(0.16 * height)), 0, 0, 360, 255, -1)
 patch = cv2.GaussianBlur(np.maximum(body, under), (0, 0), 6).astype(np.float32) / 255
 
 
 def paste(base, scale, at, gain=1.0, region=patch, reflect=0.0):
-    """The wheel scaled by `scale` about its contact point, moved to `at` (pixels), over `base`."""
-    M = np.float32([[scale, 0, at[0] - scale * cx], [0, scale, at[1] - scale * contact]])
+    """The wheel scaled by `scale` (and narrowed to a real tyre's width) about its contact point, moved to `at`
+    (pixels), over `base`."""
+    sx = scale * narrow
+    M = np.float32([[sx, 0, at[0] - sx * cx], [0, scale, at[1] - scale * contact]])
     src = np.clip(w.astype(np.float32) * gain, 0, 255)
     img = cv2.warpAffine(src, M, (W, H), flags=cv2.INTER_AREA)
     a = cv2.warpAffine(region, M, (W, H), flags=cv2.INTER_LINEAR)[..., None]
     out = base.astype(np.float32) * (1 - a) + img * a
     if reflect:   # a faint mirror image in the glossy floor
-        F = np.float32([[scale, 0, at[0] - scale * cx], [0, -scale, at[1] + scale * contact]])
+        F = np.float32([[sx, 0, at[0] - sx * cx], [0, -scale, at[1] + scale * contact]])
         ref = cv2.GaussianBlur(cv2.warpAffine(src, F, (W, H), flags=cv2.INTER_AREA), (0, 0), 2.5)
         ra = cv2.GaussianBlur(cv2.warpAffine(body.astype(np.float32) / 255, F, (W, H)), (0, 0), 3)[..., None] * reflect
         out = out * (1 - ra) + ref * ra
     return np.clip(out, 0, 255).astype(np.uint8)
 
 
-real = SIZE * (contact / H - HORIZON)
-wheel = paste(e, real / (height / H), (cx, contact))
+def shadow(base, size, at, depth):
+    """A soft contact shadow on the floor under a wheel `size` frame heights tall standing at `at` (pixels)."""
+    sh = np.zeros((H, W), np.float32)
+    cv2.ellipse(sh, (int(at[0]), int(at[1])), (int(size * H * ASPECT * 0.85), int(size * H * 0.05)), 0, 0, 360, 1, -1)
+    sh = cv2.GaussianBlur(sh, (0, 0), size * H * 0.04)[..., None]
+    return (base.astype(np.float32) * (1 - depth * sh)).astype(np.uint8)
+
+
+body_soft = cv2.GaussianBlur(body, (0, 0), 3).astype(np.float32) / 255
+real = SIZE * (CONTACT - HORIZON)
+at = (W / 2, CONTACT * H)
+wheel = paste(shadow(e, real, at, 0.7), real / (height / H), at, region=body_soft, reflect=0.3)
 cv2.imwrite(f'{K}/wheel.jpg', wheel, [cv2.IMWRITE_JPEG_QUALITY, 95])
 print(f'real size {real:.3f} of the frame: scaled by {real / (height / H):.3f}')
 
 # the first frame: the same wheel far back on the left, out of the light (darker), and the camera zoomed in on it
 sx, sy = START
 small = SIZE * (sy - HORIZON)
-shadow = np.zeros((H, W), np.float32)
-cv2.ellipse(shadow, (int(sx * W), int(sy * H)), (int(small * H * 0.62), int(small * H * 0.07)), 0, 0, 360, 1, -1)
-shadow = cv2.GaussianBlur(shadow, (0, 0), small * H * 0.05)[..., None]
-base = (e.astype(np.float32) * (1 - 0.55 * shadow)).astype(np.uint8)
-start = paste(base, small / (height / H), (sx * W, sy * H), gain=0.5, region=cv2.GaussianBlur(body, (0, 0), 3).astype(np.float32) / 255, reflect=0.35)
+start = paste(shadow(e, small, (sx * W, sy * H), 0.55), small / (height / H), (sx * W, sy * H), gain=0.5, region=body_soft, reflect=0.35)
 z, vx, vy = VIEW
 vw, vh = W / z, H / z
 x0, y0 = int(round(vx * W - vw / 2)), int(round(vy * H - vh / 2))
