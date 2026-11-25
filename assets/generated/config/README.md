@@ -33,8 +33,15 @@ shows in one picture. The shipped files are in `assets/site/config/` (`build.mjs
    from the same cameras (stock, and with the add-ons fitted, plus the car's mirror image in the floor), which are
    aligned onto the photo by matching the car's outline (what disappears in the empty-workshop edit; overlap 0.89–0.95).
    Without that, Kling's re-rendered paint reflections came along as silver blotches on cars of other colours. Paint
-   pixels (where the red edit turned the car red, or the black edit darkened it) are dropped from every layer that
-   doesn't replace paint itself, unless the new pixel is dark carbon over bright paint.
+   (and its floor reflection) is every pixel that differs a lot between the six paint photos; it is dropped from every
+   layer, so no silver comes along onto another colour, with these exceptions:
+   - carbon and black parts (bonnet, roof, mirrors, lip, splitter, skirts, diffuser, wings, exhaust) keep paint they
+     cover with something dark, the weave's highlights filled in
+   - rims keep each wheel face whole (the hull of the change), since the paint test also catches rim reflections
+   - calipers keep only strongly coloured pixels, never the spokes in front of them
+   - window tint keeps only glass the edit made darker (one edit turned the windscreen milky)
+   - the wing delete for every paint is cut to the outline of the wing removed from the silver photo (a silver wing
+     on the dark wall gives a clean outline; on dark paints the wing barely differs from the wall and left holes)
 5. **Ride height** is not photographed: the page moves the body down by 30 mm (lowering springs) or 50 mm
    (coilovers), converted to pixels per view from the camera distance, over wheels that stay put, and moves its floor
    reflection up, with the empty workshop behind. The masks (`m-body`, `m-tyres`, `m-refl`, `m-floor`) come from the
@@ -69,6 +76,7 @@ parts list and the job card, its edges fading into a blurred copy of itself.
 
 - The car is a generated likeness of a stock Evo IX with the 3D model's mesh wheels, not a photo of a real car. No
   badges or number plates.
+- `exhaust__diffuser-carbon` was regenerated: Kling wrote "LICENSE PLATE" on the blank plate. Check new edits for text.
 - Option shapes are Kling's own (its race splitter is deep and long; its exhaust layouts and GT wing are its
   interpretation), so they can differ slightly between views.
 - Wheel designs, sizes and the widebody kit are not offered (as with the 3D car).

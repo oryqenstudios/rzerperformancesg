@@ -177,28 +177,96 @@ def photo_paint(base, red, black=None):
     return cv2.dilate(m, disk(2))
 
 
-def layer(base, img, region, path, thr=16, paint=None, keep_paint=None, reach=40, close=4):
+def paint_everywhere(base, paints):
+    """The car's paint (and its reflections) in the photo: pixels that differ a lot between the paint photos.
+    Glass, trim, tyres, lights and the workshop stay nearly the same in all of them."""
+    b = cv2.GaussianBlur(base.astype(np.float32), (0, 0), 1.5)
+    d = np.zeros((H, W), np.float32)
+    for im in paints:
+        d = np.maximum(d, np.abs(cv2.GaussianBlur(im.astype(np.float32), (0, 0), 1.5) - b).max(2))
+    m = (d > 38).astype(np.uint8)
+    m = cv2.morphologyEx(m, cv2.MORPH_OPEN, disk(1))
+    m = cv2.morphologyEx(m, cv2.MORPH_CLOSE, disk(3))
+    return cv2.dilate(m, disk(2))
+
+
+def fill_holes(m, max_area):
+    """Fill the holes in mask m up to max_area pixels."""
+    inv = (1 - m).astype(np.uint8)
+    n, lab, st, _ = cv2.connectedComponentsWithStats(inv, 4)
+    small = [i for i in range(1, n) if st[i, cv2.CC_STAT_AREA] <= max_area
+             and st[i, cv2.CC_STAT_LEFT] > 0 and st[i, cv2.CC_STAT_TOP] > 0
+             and st[i, cv2.CC_STAT_LEFT] + st[i, cv2.CC_STAT_WIDTH] < W and st[i, cv2.CC_STAT_TOP] + st[i, cv2.CC_STAT_HEIGHT] < H]
+    return (m | np.isin(lab, small)).astype(np.uint8)
+
+
+def layer(base, img, region, path, thr=16, paint=None, reach=40, close=4, fill=0, darken_only=False, cover=False,
+          fill_paint=False, colour_only=False):
     """Save the changed part of img (aligned to base) inside region as a cropped RGBA WebP; return its box or None.
-    Paint pixels are dropped (a layer is laid over every colour) unless keep_paint covers them, or the new pixel is
-    dark carbon over bright paint."""
+    A layer is laid over every paint colour, so paint pixels are dropped from it. With cover (carbon and black parts),
+    paint the option covers with something dark is kept, the weave's highlights filled in. fill fills holes up to that
+    many pixels; with fill_paint the filled holes may be paint (inside a wheel, where the paint mask catches
+    reflections). darken_only keeps only pixels the edit made darker (window tint)."""
+    gb, gi = cv2.cvtColor(base, cv2.COLOR_BGR2GRAY).astype(int), cv2.cvtColor(img, cv2.COLOR_BGR2GRAY).astype(int)
+    changed = change_mask(base, img, thr=thr, min_area=60, grow=0, feather=0).astype(np.uint8)
+    if darken_only:
+        changed &= cv2.morphologyEx((gi < gb - 3).astype(np.uint8), cv2.MORPH_OPEN, disk(1))
+    if colour_only:   # a painted caliper: only its colour, never the wheel spokes in front of it
+        hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+        col = ((hsv[..., 1] > 90) & (hsv[..., 2] > 45)).astype(np.uint8)
+        changed &= cv2.dilate(cv2.morphologyEx(col, cv2.MORPH_OPEN, disk(1)), disk(1))
     allowed = np.ones((H, W), np.uint8)
     if paint is not None:
-        dark_over_paint = (cv2.cvtColor(img, cv2.COLOR_BGR2GRAY) < 70) & (cv2.cvtColor(base, cv2.COLOR_BGR2GRAY) > 95)
-        allowed = 1 - (paint & ~dark_over_paint.astype(np.uint8) & (1 if keep_paint is None else 1 - keep_paint))
+        if cover:
+            cov = (changed & (gi < gb - 22) & (gi < 95) & paint).astype(np.uint8)
+            cov = fill_holes(cv2.morphologyEx(cov, cv2.MORPH_CLOSE, disk(5)), 4000)
+            allowed = 1 - (paint & (1 - cov))
+        else:
+            allowed = 1 - paint
+        if fill_paint:   # wheels: each wheel face (the hull of a big change outside the paint) is never paint
+            core = cv2.morphologyEx((changed & allowed).astype(np.uint8), cv2.MORPH_CLOSE, disk(9))
+            n, lab, st, _ = cv2.connectedComponentsWithStats(core, 8)
+            hulls = np.zeros((H, W), np.uint8)
+            for i in range(1, n):
+                if st[i, cv2.CC_STAT_AREA] >= 500 and (region[lab == i] > 0).any():
+                    pts = cv2.findNonZero((lab == i).astype(np.uint8))
+                    cv2.fillConvexPoly(hulls, cv2.convexHull(pts), 1)
+            allowed = np.maximum(allowed, cv2.erode(hulls, disk(2)))
     # the changed regions (outside the paint) that touch the part's rough place: the part comes out whole even where
     # the 3D map is some way off, and changes elsewhere (Kling re-renders patches of the workshop) are left out
-    hard = (change_mask(base, img, thr=thr, min_area=60, grow=0, feather=0) * allowed).astype(np.uint8)
+    hard = (changed * allowed).astype(np.uint8)
     hard = cv2.morphologyEx(hard, cv2.MORPH_CLOSE, disk(close))
-    if close > 4:   # fill holes (dark parts in front of a dark wall barely differ from it)
-        ff = hard.copy()
-        cv2.floodFill(ff, np.zeros((H + 2, W + 2), np.uint8), (0, 0), 1)
-        hard |= (1 - ff)
+    if fill:
+        hard = fill_holes(hard, fill)
     n, lab, stats, _ = cv2.connectedComponentsWithStats(hard, 8)
     touch = np.unique(lab[(region > 0) & (hard > 0)])
     keep = np.isin(lab, [i for i in touch if i and stats[i, cv2.CC_STAT_AREA] >= 60]).astype(np.uint8)
     # a region that sprawls far beyond the part is re-rendered background: keep only its part near the part
     keep &= cv2.dilate(region, disk(reach))
-    a = cv2.GaussianBlur(cv2.dilate(keep, disk(2)).astype(np.float32), (0, 0), 1.5) * allowed
+    a = cv2.GaussianBlur(cv2.dilate(keep, disk(2)).astype(np.float32), (0, 0), 1.5)
+    a *= cv2.erode(allowed, disk(1))
+    ys, xs = np.nonzero(a > 0.02)
+    if len(xs) < 150:
+        return None
+    x0, x1, y0, y1 = max(0, xs.min() - 2), min(W, xs.max() + 3), max(0, ys.min() - 2), min(H, ys.max() + 3)
+    save_webp(path, np.dstack([img[y0:y1, x0:x1], (a[y0:y1, x0:x1] * 255).astype(np.uint8)]), 86)
+    return [int(x0), int(y0), int(x1 - x0), int(y1 - y0)]
+
+
+def wing_mask(base, wd_silver, region):
+    """Where the factory wing was: what the wing delete changed in the silver photo (a silver wing against the dark
+    workshop is a clean outline), near the wing's rough place, holes filled."""
+    ch = change_mask(base, wd_silver, thr=16, min_area=60, grow=0, feather=0).astype(np.uint8)
+    ch = cv2.morphologyEx(ch, cv2.MORPH_CLOSE, disk(5))
+    n, lab, stats, _ = cv2.connectedComponentsWithStats(ch, 8)
+    touch = np.unique(lab[(region > 0) & (ch > 0)])
+    m = np.isin(lab, [i for i in touch if i and stats[i, cv2.CC_STAT_AREA] >= 60]).astype(np.uint8)
+    m &= cv2.dilate(region, disk(60))
+    return cv2.dilate(fill_holes(m, 25000), disk(3))
+
+
+def mask_layer(img, mask, path):
+    a = cv2.GaussianBlur(mask.astype(np.float32), (0, 0), 1.5)
     ys, xs = np.nonzero(a > 0.02)
     if len(xs) < 150:
         return None
@@ -251,9 +319,10 @@ def build_view(v):
     plate = get('plate')
     save_webp(f'{OUT}/{v}/plate.webp', plate)
     photo_car = car_region(base, plate)
-    paint_px = photo_paint(base, get('paint-red'), get('paint-gloss') if have('paint-gloss') else None)
+    paint_red = photo_paint(base, get('paint-red'), get('paint-gloss') if have('paint-gloss') else None)
+    paint_px = paint_red | paint_everywhere(base, [get(f'paint-{p}') for p in J.PAINTS if have(f'paint-{p}')])
     clean_plate = photo_car.mean() < 0.5     # else the edit re-rendered most of the frame
-    ids = Ids(v, photo_car, paint_px, clean_plate)
+    ids = Ids(v, photo_car, paint_red, clean_plate)
     notes.append(f'3D fit by {ids.how}: paint overlap {ids.iou:.2f}')
     paint3d = ids.part('stock', ['paint'], mirror=False)
     if not clean_plate:                      # the car's outline then comes from the 3D car
@@ -285,26 +354,33 @@ def build_view(v):
                 if opt.startswith('ex-') and not opt.startswith('ex-factory'):
                     part |= ids.part('stock', ['tip'], mirror=False)   # the factory tip goes when the layout changes
                     r |= ids.roi('stock', ['tip'], grow)
+                if (opt.startswith('rim-') or opt.startswith('caliper-')) and ids.how != 'outline':
+                    r |= cv2.dilate(part, disk(45))                   # a rougher 3D fit: reach further
                 # paint around a part is only taken right next to it (re-rendered paint elsewhere is noise)
                 return r & (1 - (paint3d & (1 - cv2.dilate(part, disk(5)))))
         return None
 
     opts = [o for o, (views, _) in J.OPTIONS.items() if v in views and o not in ('plate', 'matte')]
-    # options that replace paint keep the paint pixels of their own part
-    PAINTED = {'hood-carbon': ['bonnet'], 'roof-carbon': ['roof'], 'mirror-carbon': ['mirrors'], 'lip-lip': ['lip'], 'lip-splitter': ['lip']}
     for o in opts:
         r = region_for(o)
         if have(o) and r is not None and r.any():
-            kp = cv2.dilate(ids.part('stock', PAINTED[o], mirror=False), disk(4)) if o in PAINTED else None
-            box = layer(base, get(o), r, f'{OUT}/{v}/{o}.webp', paint=paint_px, keep_paint=kp)
+            carbon = o.split('-')[0] in ('hood', 'roof', 'mirror', 'lip', 'skirts', 'diffuser', 'ex')
+            wheel = o.startswith('rim-') or o.startswith('caliper-')
+            rims = o.startswith('rim-')
+            box = layer(base, get(o), r, f'{OUT}/{v}/{o}.webp', paint=paint_px, darken_only=o.startswith('tint-'),
+                        cover=carbon, fill=2500 if rims else 0, fill_paint=rims, colour_only=o.startswith('caliper-'))
             if box:
                 entry['layers'][o] = box
     if v in J.WING_VIEWS:
         r = ids.roi('stock', ['wing'], ROI['wingdel-'][2])
+        wm = wing_mask(base, get('wingdel-silver'), r) if have('wingdel-silver') and r.any() else None
         for pid in ['silver'] + list(J.PAINTS):
             src_paint = base if pid == 'silver' else (aligned.get(f'paint-{pid}') if have(f'paint-{pid}') else None)
-            if src_paint is not None and have(f'wingdel-{pid}') and r.any():
-                box = layer(src_paint, get(f'wingdel-{pid}', src_paint), r, f'{OUT}/{v}/wingdel-{pid}.webp')
+            if src_paint is not None and wm is not None and have(f'wingdel-{pid}'):
+                wd_p = get(f'wingdel-{pid}', src_paint)
+                own = change_mask(src_paint, wd_p, thr=16, min_area=60, grow=0, feather=0).astype(np.uint8)
+                m = fill_holes(wm | (own & cv2.dilate(wm, disk(10))), 25000)
+                box = mask_layer(wd_p, m, f'{OUT}/{v}/wingdel-{pid}.webp')
                 if box:
                     entry['layers'][f'wingdel-{pid}'] = box
         if 'wingdel-silver' in aligned:
@@ -314,7 +390,7 @@ def build_view(v):
                 if rr is not None:   # Kling mounts its wings where the factory wing stood
                     rr = rr | ids.roi('stock', ['wing'], 30)
                 if have(o) and rr is not None and rr.any():
-                    box = layer(wd, get(o, wd), rr, f'{OUT}/{v}/{o}.webp', paint=paint_px, reach=90, thr=9, close=7)
+                    box = layer(wd, get(o, wd), rr, f'{OUT}/{v}/{o}.webp', paint=paint_px, reach=90, thr=9, close=7, fill=4000, cover=True)
                     if box:
                         entry['layers'][o] = box
     manifest['views'][v] = entry
