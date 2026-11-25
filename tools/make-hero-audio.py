@@ -26,28 +26,41 @@ brighter pulses under load. numpy only and deterministic (fixed seed).
 
 Then tools/mux-hero-audio.sh puts the WAV into assets/site/hero-intro.mp4 and .webm.
 """
+import json
+import os
 import sys
 import wave
 
 import numpy as np
 
+# The film's motion per frame, and (for the wheel-roll film, tools/finish-roll-film.py) its beats: when the engine
+# fires, how long it runs, when the wheel rolls, when the car assembles and when each bank of ceiling lights comes on.
+# HERO_MOTION picks the file; without those fields the timings below are the assembly film's.
+MOTION = os.environ.get('HERO_MOTION', 'assets/generated/assembly/motion.json')
+try:
+    MO = json.load(open(MOTION))
+except FileNotFoundError:
+    MO = {}
+
 SR = 48000
-DUR = 15.65
+DUR = MO.get('t_end', 936 / 60) + 0.05
 N = int(SR * DUR)
 T = np.arange(N) / SR
 rng = np.random.default_rng(1729)
 
 # ------------------------------------------------------------------------------------------------ film beats (s)
-T_HEAD = 10.0     # the engine fires as the assembled car settles (T_FIRE in tools/finish-assembly-film.py)
+T_HEAD = MO.get('t_fire', 10.0)   # the engine fires as the assembled car settles (T_FIRE in the film's script)
 T_CRANK = T_HEAD - 0.525   # starter engages
 T_CATCH = T_HEAD
 T_REV = T_HEAD + 1.44      # foot down
 T_LIFT = T_HEAD + 1.79     # throttle shut: blow-off valve
-T_END = 936 / 60  # film ends (15.6 s)
+T_END = MO.get('t_end', 936 / 60)   # film ends (15.6 s; the wheel-roll film 16.6 s)
 T_LOGO = T_END - 0.925   # the logo starts drawing (LOGO_LEAD 0.925 in app.js): 14.675 s
 POPS = [(T_HEAD + d, z) for d, z in [(2.16, 1.0), (2.27, 0.5), (2.335, 0.5), (2.42, 0.85), (2.54, 1.0)]] \
     + [(T_LOGO - 0.105, 1.0)]   # BANG, pap-pap, BANG, BANG ... and the last BANG just before the logo
-MOTION = 'assets/generated/assembly/motion.json'   # the film's motion per frame (tools/finish-assembly-film.py)
+ASSEMBLY = MO.get('assembly', [0.0, T_HEAD])   # when parts move: air rush and clanks only then
+ROLL = MO.get('roll')                          # the wheel rolling in (start, end of its shot), if the film has it
+BANKS = MO.get('banks', [])                    # the ceiling lights switching on, if the film has them
 T_FADE = T_LOGO + 0.1    # idle starts fading out under the logo
 IDLE = 1000.0
 REDLINE = 7000.0
@@ -339,12 +352,13 @@ def latch():
 sfx = np.zeros(N)
 air = np.zeros(N)
 try:
-    import json
-    mo = json.load(open(MOTION))
-    fps, m = mo['fps'], np.asarray(mo['motion'], float)
+    fps, m = MO['fps'], np.asarray(MO['motion'], float)
     tm = np.arange(len(m)) / fps
-    lvl = np.clip(np.interp(T, tm, m) / max(np.percentile(m[tm < T_HEAD - 0.3], 95), 1e-6), 0, 1.4)
-    lvl[T > T_HEAD - 0.25] *= np.clip((T_HEAD - T[T > T_HEAD - 0.25]) / 0.25, 0, 1)
+    a0, a1 = ASSEMBLY[0], min(ASSEMBLY[1], T_HEAD)
+    lvl = np.clip(np.interp(T, tm, m) / max(np.percentile(m[(tm >= a0) & (tm < a1 - 0.3)], 95), 1e-6), 0, 1.4)
+    lvl[T > a1 - 0.25] *= np.clip((a1 - T[T > a1 - 0.25]) / 0.25, 0, 1)
+    if a0 > 0:   # parts only start moving after the wheel's shot
+        lvl *= np.clip((T - a0) / 0.25, 0, 1)
     lvl = smooth(lvl, 0.06)
     lo = unit(filt(noise(N), lambda f: band(f, 120, 900, 2)))
     hi = unit(filt(noise(N), lambda f: band(f, 700, 4000, 2) * peak(f, 1500, 1.0, 1.6)))
@@ -356,7 +370,7 @@ try:
     # than the fly-in, so each stretch is judged against its own busiest moment within a second either side)
     local = np.array([drop[max(0, i - fps):i + fps].max() for i in range(len(drop))])
     cand = [i for i in range(4, len(m) - 4) if drop[i] == drop[max(0, i - 6):i + 7].max()
-            and drop[i] > max(0.35 * local[i], 0.04 * drop.max()) and tm[i] < T_HEAD - 0.45]
+            and drop[i] > max(0.35 * local[i], 0.04 * drop.max()) and (a0 == 0 or tm[i] > a0 + 0.1) and tm[i] < a1 - 0.45]
     last = -1.0
     events = []
     for i in sorted(cand, key=lambda i: -drop[i]):
@@ -378,12 +392,56 @@ try:
         if t0 == big:
             place(sfx, 1.4 * clank(1.0), t0)
     print(f'assembly: {len(kept)} clanks from the film\'s motion')
-except FileNotFoundError:
+except KeyError:
     print('no assembly motion file: no assembly sounds')
+
+# ------------------------------------------------------------------------------------------------ the wheel
+# A lone wheel rolling across the epoxy towards the camera: the tyre's low rumble and tread hum, louder as it comes
+# closer, a squeak as it slows, then the rocking of a wheel settling on its tread, quickening as it stops.
+roll = np.zeros(N)
+if ROLL:
+    r0, r1 = ROLL
+    stop = r0 + 0.83 * (r1 - r0)                 # it comes to rest in the light, the camera still settling
+    a, b = at(r0), at(stop + 0.05)
+    t = T[a:b] - r0
+    speed = np.clip(t / 0.6, 0, 1) * np.clip((stop - r0 - t) / 0.6, 0, 1) ** 0.7   # 0..1
+    near = 0.35 + 0.65 * (t / (stop - r0)) ** 1.5                                     # louder as it comes closer
+    rumble = unit(filt(noise(b - a), lambda f: band(f, 50, 450, 2) * peak(f, 140, 1.5, 2.0)))
+    tread = unit(filt(noise(b - a), lambda f: band(f, 500, 2500, 2)))
+    ph = np.cumsum(55 * speed + 8) / SR                   # tread blocks passing
+    hum = np.sin(2 * np.pi * ph) + 0.4 * np.sin(4 * np.pi * ph)
+    roll[a:b] = near * speed * (0.05 * rumble + 0.008 * tread * (0.6 + 0.4 * np.sin(2 * np.pi * ph / 7)) + 0.012 * hum)
+    sq = int(0.22 * SR)
+    ts = np.arange(sq) / SR
+    squeak = np.sin(2 * np.pi * np.cumsum(1900 - 500 * ts / 0.22) / SR) * np.sin(np.pi * ts / 0.22) ** 2
+    grit = unit(filt(noise(sq), lambda f: band(f, 1200, 3000))) * np.sin(np.pi * ts / 0.22) ** 2
+    place(roll, 0.01 * squeak + 0.003 * grit, stop - 0.28)
+    for k, dt in enumerate(np.cumsum([0.0, 0.16, 0.12, 0.09, 0.07, 0.055])):   # rocking to a stop
+        n = int(0.1 * SR)
+        tk = np.arange(n) / SR
+        tap = np.sin(2 * np.pi * 85 * tk) * np.exp(-tk / 0.03) + 0.3 * unit(filt(noise(n), lambda f: band(f, 200, 1500))) * np.exp(-tk / 0.008)
+        place(roll, 0.05 * 0.8 ** k * tap, stop + dt)
+
+# ------------------------------------------------------------------------------------------------ the lights
+# Each bank of ceiling lights switching on: a heavy contactor clunk, the LED drivers' buzz, and the flicker's click.
+lights = np.zeros(N)
+for k, tb in enumerate(BANKS):
+    n = int(0.4 * SR)
+    t = np.arange(n) / SR
+    thump = np.sin(2 * np.pi * np.cumsum(62 * (1 + 0.5 * np.exp(-t / 0.02))) / SR) * np.exp(-t / 0.07)
+    click = unit(filt(noise(n), lambda f: band(f, 1500, 8000))) * np.exp(-t / 0.004)
+    ring = np.zeros(n)
+    for f0, tau in [(820, .05), (1530, .035), (2710, .02)]:
+        ring += np.sin(2 * np.pi * f0 * rng.uniform(0.95, 1.05) * t) * np.exp(-t / tau)
+    buzz = (np.sign(np.sin(2 * np.pi * 100 * t)) * 0.5 + np.sin(2 * np.pi * 200 * t)) * np.clip(t / 0.01, 0, 1) * np.exp(-t / 0.12)
+    clunk = 0.5 * thump + 0.25 * click + 0.06 * ring / 3 + 0.02 * buzz
+    place(lights, (1.0 - 0.12 * k) * clunk * (1 - np.exp(-t / 0.0006)), tb)
+    place(lights, 0.25 * clunk[:int(0.05 * SR)], tb + 0.055)                 # the flicker
 
 # ------------------------------------------------------------------------------------------------ the workshop
 amb = 0.004 * unit(filt(noise(N), lambda f: band(f, 25, 400)))
-amb += 0.0012 * np.sin(2 * np.pi * 100 * T) + 0.0005 * np.sin(2 * np.pi * 200 * T + 1)   # strip-light hum
+lit = np.ones(N) if not BANKS else sum((T >= tb).astype(float) for tb in BANKS) / len(BANKS)
+amb += lit * (0.0012 * np.sin(2 * np.pi * 100 * T) + 0.0005 * np.sin(2 * np.pi * 200 * T + 1))   # strip-light hum
 amb *= np.clip(T / 0.4, 0, 1)
 
 
@@ -408,8 +466,9 @@ def car_park_ir():
 
 
 engine_bus = (eng + intake) * fade
-dry = 0.55 * engine_bus + turbo * fade + bov + 0.55 * pops + starter + 0.5 * sfx + air
-send = 0.55 * engine_bus * 0.2 + bov * 0.25 + 0.55 * pops * 0.33 + starter * 0.2 + 0.5 * sfx * 0.35 + air * 0.2
+dry = 0.55 * engine_bus + turbo * fade + bov + 0.55 * pops + starter + 0.5 * sfx + air + roll + lights
+send = 0.55 * engine_bus * 0.2 + bov * 0.25 + 0.55 * pops * 0.33 + starter * 0.2 + 0.5 * sfx * 0.35 + air * 0.2 \
+    + roll * 0.25 + lights * 0.4
 wet = [conv(send, car_park_ir()) for _ in range(2)]
 mix = np.stack([dry + 0.5 * wet[0], dry + 0.5 * wet[1]], axis=1) + amb[:, None]
 mix = np.stack([filt(mix[:, ch], lambda f: band(f, 28, 10000, 1)) for ch in range(2)], axis=1)
