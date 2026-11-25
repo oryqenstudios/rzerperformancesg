@@ -435,8 +435,8 @@ for k, tb in enumerate(BANKS):
         ring += np.sin(2 * np.pi * f0 * rng.uniform(0.95, 1.05) * t) * np.exp(-t / tau)
     buzz = (np.sign(np.sin(2 * np.pi * 100 * t)) * 0.5 + np.sin(2 * np.pi * 200 * t)) * np.clip(t / 0.01, 0, 1) * np.exp(-t / 0.12)
     clunk = 0.5 * thump + 0.25 * click + 0.06 * ring / 3 + 0.02 * buzz
-    place(lights, (1.0 - 0.12 * k) * clunk * (1 - np.exp(-t / 0.0006)), tb)
-    place(lights, 0.25 * clunk[:int(0.05 * SR)], tb + 0.055)                 # the flicker
+    place(lights, 0.6 * (1.0 - 0.12 * k) * clunk * (1 - np.exp(-t / 0.0006)), tb)
+    place(lights, 0.15 * clunk[:int(0.05 * SR)], tb + 0.055)                 # the flicker
 
 # ------------------------------------------------------------------------------------------------ the workshop
 amb = 0.004 * unit(filt(noise(N), lambda f: band(f, 25, 400)))
