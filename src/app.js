@@ -147,6 +147,7 @@ const CATS = [
 // from Kling edits of the car with that part fitted); `link` sets the visual options it implies.
 const EX_STEEL = { exhaust: 'factory', exfin: 'polished' };
 const COIL = { ride: 'coilovers' };
+const BONNET = { hood: 'factory' }, WING = { spoiler: 'none' };   // a real bonnet replaces the carbon option; a GT wing goes on the wing-delete
 const PART_TYPES = {
   turbo: ['Turbo kits', 'Turbo'], bov: ['Blow-off valves', 'Blow-off valve'],
   exhaust: ['Exhaust systems', 'Exhaust'], manifold: ['Manifold and heat shield', 'Manifold'], frontpipe: ['Front pipes', 'Front pipe'], cat: ['Catalyst', 'Catalyst'],
@@ -156,6 +157,9 @@ const PART_TYPES = {
   ecu: ['Engine management', 'ECU'], boost: ['Boost control', 'Boost control'], timer: ['Turbo timer', 'Turbo timer'],
   clutch: ['Clutches', 'Clutch'], coilover: ['Coilovers', 'Coilovers'],
   brakef: ['Front brake kits', 'Front brakes'], braker: ['Rear brake kits', 'Rear brakes'], pads: ['Brake pads', 'Pads'], discs: ['Brake discs', 'Discs'], lines: ['Brake lines', 'Brake lines'],
+  wheel: ['Wheels', 'Wheels'], tyre: ['Tyres', 'Tyres'], intercooler: ['Intercoolers', 'Intercooler'], icpipe: ['Intercooler piping', 'Intercooler piping'],
+  bonnet: ['Carbon bonnets', 'Bonnet'], wing: ['GT wings', 'Wing'],
+  seat: ['Seats', 'Seats'], steering: ['Steering wheels', 'Steering wheel'], gauge: ['Gauges', 'Gauge'], harness: ['Harnesses', 'Harness'],
 };
 // the tabs: label, types in order, and where the photo goes when the tab opens (engine: the engine bay)
 const PART_TABS = [
@@ -168,6 +172,11 @@ const PART_TABS = [
   { id: 'pt-clutch', label: 'Clutch', types: ['clutch'] },
   { id: 'pt-coilovers', label: 'Coilovers', types: ['coilover'], view: 'a090' },
   { id: 'pt-brakes', label: 'Brakes', types: ['brakef', 'braker', 'pads', 'discs', 'lines'], view: 'wheel' },
+  { id: 'pt-wheels', label: 'Wheels', types: ['wheel', 'tyre'], view: 'a045' },
+  { id: 'pt-intercooler', label: 'Intercooler', types: ['intercooler', 'icpipe'], view: 'a000' },
+  { id: 'pt-bonnets', label: 'Bonnets', types: ['bonnet'], view: 'a045' },
+  { id: 'pt-wings', label: 'Wings', types: ['wing'], view: 'a135' },
+  { id: 'pt-interior', label: 'Interior', types: ['seat', 'steering', 'gauge', 'harness'], place: 'interior' },
 ];
 const NO_PHOTO = new Set(['hks-hipower-us', 'hks-turbo-timer']);
 const PHOTO_OF = { 'endless-disc-basic-slit-f': 'endless-disc-basic-slit', 'endless-disc-basic-slit-r': 'endless-disc-basic-slit' };
@@ -267,6 +276,78 @@ const PARTS = [
   P('discs', 'ENDLESS', 'endless-disc-basic-slit-r', 'Basic Slit disc (rear)', 'One-piece slotted rear discs at the factory size.', { excl: ['discr'] }),
   P('lines', 'ENDLESS', 'endless-swivel-steel', 'Swivel Steel', 'Stainless braided brake lines with swivel fittings, for a firmer, more consistent pedal.'),
   P('lines', 'ENDLESS', 'endless-swivel-racing', 'Swivel Racing', 'Race braided brake lines with stainless swivel fittings, built for repeated hard braking on track.'),
+  // from the second parts review (tools/parts_more.py)
+  P('wheel', 'Volk Racing', 'volk-te37-saga-s-plus', 'TE37 SAGA S-plus', 'Six wide straight spokes, racing concave, machined VOLK RACING on one spoke.'),
+  P('wheel', 'Volk Racing', 'volk-te37-saga-sl', 'TE37 SAGA SL', 'TE37 six-spoke in dark graphite with a bright cut rim edge, red decal and red valve.'),
+  P('wheel', 'Volk Racing', 'volk-te37-saga-s-plus-ta', 'TE37 SAGA S-plus Time Attack Edition', 'TE37 six-spoke with a deep-red line round the rim edge.'),
+  P('wheel', 'Volk Racing', 'volk-te37-saga-s-plus-30th', 'TE37 SAGA S-plus 30th (Machining / Sticker Ver.)', 'TE37 with original-TE37 decals (Sticker Ver.) or a machined 30th logo; blue valve.'),
+  P('wheel', 'Volk Racing', 'volk-ce28n-plus', 'CE28N-plus', 'Ten slim straight spokes, big teardrop lug pockets, concave face.'),
+  P('wheel', 'Volk Racing', 'volk-ce28n-plus-sl', 'CE28N-plus SL', 'CE28 ten-spoke in dark graphite, red decals, bright rim edge.'),
+  P('wheel', 'Volk Racing', 'volk-ze40', 'ZE40', 'Ten spokes set as five close pairs, concave.'),
+  P('wheel', 'Gram Lights', 'gram-57dr-spec-d', '57DR SPEC D', 'Six thick spokes (TE37-like layout) in matt dark gunmetal with orange stickers.'),
+  P('wheel', 'Gram Lights', 'gram-57dr-2324-limited', '57DR 2324 Limited', '57DR six-spoke in bright yellow.'),
+  P('wheel', 'WORK', 'work-meister-s1-3p', 'Meister S1 3P', 'Classic five fat spokes in a deep polished lip, with a ring of polished pierce bolts.'),
+  P('wheel', 'WORK', 'work-emotion-cr-kiwami', 'Emotion CR Kiwami', 'Twin five-spoke (ten slim spokes in V pairs), concave.'),
+  P('wheel', 'WORK', 'work-emotion-cr-shigoku', 'Emotion CR Shigoku', 'Twin five-spoke with side-machined spokes.'),
+  P('wheel', 'ADVAN Racing', 'advan-rg-d2', 'RG-D2', 'Six gently curved side-cut spokes, step rim with diamond-cut lip.'),
+  P('wheel', 'ADVAN Racing', 'advan-gt-beyond', 'GT BEYOND', 'Five straight spokes, barrel rim, engraved ADVAN Racing GT BEYOND.'),
+  P('wheel', 'ADVAN Racing', 'advan-gt-premium-version', 'GT Premium Version', 'Five spokes, engraved GT logo.'),
+  P('wheel', 'ADVAN Racing', 'advan-gt-beyond-r', 'GT BEYOND-R', 'Five straight spokes, step lip, full diamond-cut face option.'),
+  P('wheel', 'ADVAN Racing', 'advan-rs-ii', 'RS-II', 'Ten thin straight spokes, raised ADVAN Racing letters cast into the rim between the spokes.'),
+  P('wheel', 'ADVAN Racing', 'advan-rs-iii', 'RS-III', 'Ten thinner, sharper spokes with a machined ring.'),
+  P('wheel', 'ADVAN Racing', 'advan-rs-original', 'RS (original)', 'Ten spokes with cast ADVAN Racing letters on the rim.'),
+  P('wheel', 'ENKEI', 'enkei-rpf1', 'RPF1', 'Twin six-spoke (12 slim straight spokes in six close pairs), flat to mildly concave, small exposed hub with the lug nuts showing.'),
+  P('wheel', 'ENKEI', 'enkei-nt03rr', 'NT03RR', 'Twelve slim straight spokes joined near the rim by a thin brace ring, concave, black ’Racing R’ centre cap.'),
+  P('wheel', 'ENKEI', 'enkei-rpf1rs', 'RPF1RS', 'Deep-dish version of the RPF1 twin six-spoke.'),
+  P('wheel', 'SSR', 'ssr-gtx01', 'GTX01', 'Ten slim spokes in V-pairs run right out over the rim flange, dimples at the spoke roots, open centre, cast SSR logo on the rim.'),
+  P('wheel', 'SSR', 'ssr-gtx04', 'GTX04', 'Very thin spokes (twelve, reading as six V-pairs), concave, open centre.'),
+  P('wheel', 'SSR', 'ssr-gtx03', 'GTX03', 'Five broad, slightly curved spokes that flare wide at the rim, machined lip.'),
+  P('wheel', 'SSR', 'ssr-gtx05-dr-edition', 'GTX05 DR Edition', 'Six wide straight spokes (classic six-spoke racing look), deep concave, GTX05 spoke sticker.'),
+  P('wheel', 'SSR', 'ssr-gtv', 'GTV04 / GTV05 / GTV06', 'Three budget designs: mesh-like Y-spokes (GTV04), straight ten-spoke (GTV05), five V-pairs (GTV06).'),
+  P('wheel', 'SSR', 'ssr-professor-sp1', 'Professor SP1 (3-piece)', 'Five-spoke three-piece with a polished stepped lip and a ring of pierce bolts.'),
+  P('wheel', 'SSR', 'ssr-professor-sp7', 'Professor SP7 (3-piece)', 'Six-spoke three-piece with a polished lip and pierce bolts.'),
+  P('wheel', 'WedsSport', 'wedssport-tc105x', 'TC105X', 'Ten slim straight spokes as five V-pairs with a stepped ’N-frame’ edge, open centre, concave; WedsSport rim stickers.'),
+  P('wheel', 'WedsSport', 'wedssport-tc105x-forged', 'TC105X Forged', 'As the TC105X (ten slim spokes), forged and lighter.'),
+  P('wheel', 'WedsSport', 'wedssport-sa-20r', 'SA-20R', 'Ten Y-spokes forming a fine mesh-like face, flat WedsSport cap.'),
+  P('wheel', 'WedsSport', 'wedssport-sa-25r', 'SA-25R', 'Ten slim, slightly curved spokes, centre cap.'),
+  P('wheel', 'WedsSport', 'wedssport-sa-27r', 'SA-27R', 'Split Y-spokes (about seven pairs), concave, black centre cap.'),
+  P('wheel', 'WedsSport', 'wedssport-sa-62r', 'SA-62R', 'Twelve slim spokes, centre cap.'),
+  P('wheel', 'WedsSport', 'wedssport-sa-99r', 'SA-99R', 'Ten slim, slightly twisted spokes, centre cap.'),
+  P('wheel', 'WedsSport', 'wedssport-rn-05m', 'RN-05M', 'Five curved spokes in a deep stepped outer rim (two-piece look from a one-piece wheel), flat centre cap.'),
+  P('wheel', 'BBS', 'bbs-lm', 'LM', 'Two-piece ’Le Mans’ cross-spoke mesh, polished stepped lip with a ring of small rim bolts, black cap with gold BBS emblem.'),
+  P('wheel', 'BBS', 'bbs-re-v7', 'RE-V7', 'Seven Y-spokes (fourteen arms) straight to the rim, slight concave, black cap with gold BBS emblem.'),
+  P('wheel', 'BBS', 'bbs-ri-a', 'RI-A', 'Five split (Y) spokes, ten slim curved arms to the rim edge, black cap with gold BBS emblem.'),
+  P('wheel', 'BBS', 'bbs-rg-r', 'RG-R', 'Eight cross-spokes forming the classic BBS mesh, diamond-cut lip edge, BBS centre cap.'),
+  P('wheel', 'BBS', 'bbs-rf', 'RF', 'Five Y-spokes (ten slim arms), BBS centre cap.'),
+  P('wheel', 'OZ Racing', 'oz-ultraleggera', 'Ultraleggera', 'Six double spokes (twelve slim spokes in pairs joining near the hub), OZ centre cap.'),
+  P('wheel', 'OZ Racing', 'oz-leggera-hlt', 'Leggera HLT', 'Five double spokes (ten slim spokes), concave, OZ cap.'),
+  P('wheel', 'OZ Racing', 'oz-estrema-gt-hlt', 'Estrema GT HLT', 'Five slim split (Y) spokes, concave, OZ cap with a red ring.'),
+  P('wheel', 'OZ Racing', 'oz-rr40', 'RR40 (Rally Racing 40th)', 'Rally Racing style: flat face with many small slots near the rim and large ’O.Z RACING’ lettering printed round the face.'),
+  P('wheel', 'OZ Racing', 'oz-superturismo-aero', 'Superturismo Aero', 'Superturismo fifteen-spoke multi-spoke.'),
+  P('wheel', 'OZ Racing', 'oz-superturismo-magnesio', 'Superturismo Magnesio', 'Multi-spoke racing design in matt black, red OZ marks near the hub, ’magnesio’ on the rim.'),
+  P('tyre', 'Yokohama', 'yoko-neova-ad09', 'Advan Neova AD09', 'Asymmetric, large continuous outer blocks, contrasting sidewall finish and rim-protector bar; raised ADVAN NEOVA lettering.'),
+  P('tyre', 'Yokohama', 'yoko-a052', 'Advan A052', 'Asymmetric with a wide inner groove and an almost slick outer shoulder; raised ADVAN A052 lettering.'),
+  P('tyre', 'Bridgestone', 'bs-re-71rs', 'Potenza RE-71RS', 'Asymmetric; large raised POTENZA lettering.'),
+  P('tyre', 'Bridgestone', 'bs-re-71rz', 'Potenza RE-71RZ', 'IN/OUT tread with slick shoulder blocks and a wide straight inner groove; raised POTENZA lettering.'),
+  P('tyre', 'Toyo', 'toyo-r888r', 'Proxes R888R', 'Near-slick tread with a few deep grooves and shoulder notches; raised PROXES R888R lettering.'),
+  P('turbo', 'Forced Performance', 'fp-fp54-green-73htz', 'FP54 Green 73HTZ', 'Silver as-cast compressor cover with a green ID tag and cast FP logo, silver actuator can, factory-shape turbine housing.'),
+  P('turbo', 'Forced Performance', 'fp-green-73htz', 'Green 73HTZ', 'MHI version: silver cover, green tag, silver actuator. Stainless version: no actuator, external wastegate.'),
+  P('turbo', 'Forced Performance', 'fp-red-76htz', 'Red 76HTZ', 'Silver compressor cover with a red ID tag.'),
+  P('turbo', 'Forced Performance', 'fp-black-82htz', 'Black 82HTZ', 'Silver compressor cover with a black ’BLACK’ ID plate.'),
+  P('intercooler', 'ETS', 'ets-intercooler', 'Evo 8/9 Standard Tank intercooler', 'Full-width core that fills the grille completely.'),
+  P('icpipe', 'ETS', 'ets-ic-piping', 'Upper IC piping, 2.5’ stock route', 'Black wrinkle-finish upper pipe across the bay.'),
+  P('bonnet', 'Seibon', 'seibon-oe', 'OE-style carbon bonnet', 'Factory-shape bonnet in 2×2 twill carbon, factory centre vent kept, no added vents.', { link: BONNET }),
+  P('bonnet', 'Seibon', 'seibon-cw', 'CW-style carbon bonnet', 'Factory centre vent kept; a louvred side vent of about three slats at each rear corner; small slot at the front centre.', { link: BONNET }),
+  P('bonnet', 'Seibon', 'seibon-cwii', 'CWII-style carbon bonnet', 'Centre vent split by horizontal bars; stacked columns of slot vents on both sides; busier, aggressive look.', { link: BONNET }),
+  P('bonnet', 'Seibon', 'seibon-ts-ii', 'TS-II carbon bonnet', 'Centre opening filled with three horizontal fins split by a centre rib; two small slots near the front edge.', { link: BONNET }),
+  P('wing', 'Voltex', 'voltex-type-5', 'Type-5 GT wing, CT9A special mount', 'Swept carbon main plane on twin black pedestal stands, large flat carbon end plates with a Voltex logo.', { link: WING }),
+  P('wing', 'APR Performance', 'apr-gtc-300', 'GTC-300 adjustable wing (61″ / 67″)', '3D carbon airfoil on two triangular black pedestal stands, flat carbon end plates with the APR logo.', { link: WING }),
+  P('seat', 'BRIDE', 'bride-zeta-iv', 'ZETA IV full bucket', 'Deep, high-sided fixed bucket with integrated headrest and two harness slots; black (or red) flame-retardant fabric with quilted centre panels, white BRIDE wordmark…'),
+  P('steering', 'MOMO', 'momo-prototipo', 'Prototipo', 'Classic 1970s wheel: thin black leather rim with white stitching, three flat black spokes pierced with rows of round holes.'),
+  P('steering', 'MOMO', 'momo-mod-69', 'Mod.69', 'Medium-dish black suede rim, three black spokes with round lightening holes.'),
+  P('steering', 'MOMO', 'momo-mod-07', 'Mod.07', 'Deep-dish rally wheel: black rim with a yellow 12 o’clock stripe, black drilled spokes.'),
+  P('gauge', 'GReddy', 'greddy-sirius', 'Sirius Meter turbo boost', 'Large black 3D-layered dial with white scale and red needle on a black pedestal cup; white LED, red on warning.'),
+  P('harness', 'Schroth', 'schroth-rallye-4-asm', 'Rallye 4 asm 4-point harness', 'Black 4-point belt with a V-shaped rear strap.'),
 ];
 const PART = Object.fromEntries(PARTS.map(p => [p.id, p]));
 const PART_GROUPS = PARTS.map(p => ({ key: 'p_' + p.id, label: p.name, card: PART_TYPES[p.type][1], part: p, items: [{ id: 'none', name: 'None', note: '' }, p] }));
@@ -275,8 +356,9 @@ const chosenParts = (cfg = config) => PARTS.filter(p => cfg['p_' + p.id] === p.i
 // which parts sit on a wheel (they stay put when the body drops) and the order their photo layers go down in (by the
 // part's layer, else its type): the turbo after the bay's other parts, as the blow-off valves and intakes were fitted
 // next to the stock turbo and their layers hold a bit of it; inside the engine, from the crank up to the cam gears
-const WHEEL_PART = new Set(PARTS.filter(p => ['brakef', 'braker', 'discs'].includes(p.type)).map(p => p.id));
-const LAYER_ORDER = ['discs', 'braker', 'brakef', 'exhaust', 'oil', 'manifold', 'suction', 'intake', 'bov', 'ignition', 'turbo',
+const WHEEL_PART = new Set(PARTS.filter(p => ['brakef', 'braker', 'discs', 'wheel'].includes(p.type)).map(p => p.id));
+const LAYER_ORDER = ['discs', 'braker', 'brakef', 'wheel', 'exhaust', 'oil', 'intercooler', 'bonnet', 'wing', 'manifold', 'suction', 'icpipe', 'intake', 'bov', 'ignition', 'turbo',
+  'seat', 'harness', 'steering', 'gauge',
   'crank', 'rods', 'pistons', 'gasket', 'studs', 'valvetrain', 'cams', 'camgear'];
 CATS.push({ id: 'parts', label: 'Parts', view: 'exhaust', hidden: true, groups: PART_GROUPS });
 const PT_ORBIT = { 'pt-exhaust': 'exhaust', 'pt-coilovers': 'stance', 'pt-brakes': 'brakes' };
@@ -617,7 +699,7 @@ function setCategory(id, jump) {
   $$('.b-tab', tabsEl).forEach(b => b.setAttribute('aria-selected', String(b.dataset.cat === id)));
   optsEl.setAttribute('aria-labelledby', 'tab-' + id);
   if (cat.ptab) {
-    optsEl.innerHTML = '<p class="p-intro">HKS, TOMEI and ENDLESS parts that fit the Evo IX. Pick a part to fit it; pick it again to take it off.</p>'
+    optsEl.innerHTML = '<p class="p-intro">Real aftermarket parts that fit the Evo IX. Pick a part to fit it; pick it again to take it off.</p>'
       + cat.ptab.types.map(t => [t, PARTS.filter(q => q.type === t)]).filter(([, list]) => list.length)
         .map(([t, list]) => `<fieldset class="og"><legend>${PART_TYPES[t][0]}</legend><div class="og-items">${list.map(partCard).join('')}</div></fieldset>`).join('');
   } else optsEl.innerHTML = cat.groups.filter(shown).map(g => `<fieldset class="og"><legend>${g.label}</legend><div class="og-items">${g.items.map((it, idx) => {
@@ -632,7 +714,7 @@ function setCategory(id, jump) {
   if (photoMode && mode === 'build') psCategory(id);
 }
 // a generic exhaust layout or another ride height takes the real part of that type off
-const LINK_UNDO = { exhaust: 'exhaust', ride: 'coilover' };
+const LINK_UNDO = { exhaust: 'exhaust', ride: 'coilover', hood: 'bonnet', spoiler: 'wing' };
 // fit or take off a part: what can't be fitted alongside it comes off, and the visual options it implies are set
 function pickPart(id) {
   const p = PART[id], key = 'p_' + id, on = config[key] !== id;
@@ -845,7 +927,10 @@ const psScratch = [0, 1, 2, 3, 4].map(() => Object.assign(document.createElement
 function psLayers(v, cfg) {
   const e = PH.views[v], L = e.layers || {}, names = [];
   const paint = e.paints.includes(cfg.paint) ? cfg.paint : 'silver';
-  if (e.kind === 'interior') return { paint: 'silver', names };
+  if (e.kind === 'interior') {   // only the parts fitted inside
+    for (const t of LAYER_ORDER) for (const q of chosenParts(cfg)) if ((q.layer || q.type) === t && L['bp-' + q.id]) names.push('bp-' + q.id);
+    return { paint: 'silver', names };
+  }
   const add = n => { if (L[n]) names.push(n); };
   if (cfg.spoiler !== 'factory') { add('wingdel-' + paint); if (cfg.spoiler !== 'none') add('wing-' + cfg.spoiler); }
   if (cfg.lip !== 'factory') add('lip-' + cfg.lip);
@@ -1030,21 +1115,26 @@ function psCategory(id) {
 // part's own layer moves into place on an overlay with a sweep of light across it, and the full build is drawn under
 // it. A turbo plays its own fitting film when the engine bay is otherwise stock. Coilovers lower the car smoothly.
 const psFx = $('#ps-fx');
-const FIT_VIEW = { exhaust: 'exhaust', brakef: 'wheel', braker: 'a135', oil: 'a000' };
+const FIT_VIEW = { exhaust: 'exhaust', brakef: 'wheel', braker: 'a135', oil: 'a000', wheel: 'a045', bonnet: 'a045', wing: 'a135', intercooler: 'a000',
+  seat: 'int-front', steering: 'int-gauges', gauge: 'int-dash', harness: 'int-front' };
 const FIT_FROM = {   // where the part comes from, as a share of its own size, and its starting scale
   exhaust: [0.35, 0, 1.04], brakef: [0, 0, 1.18], braker: [0, 0, 1.18], discs: [0, 0, 1.12], oil: [0, 0.25, 1.06],
   cams: [0, -0.7, 1.02], valvetrain: [0, -0.5, 1.04], bottom: [0.45, 0, 1.02], gasket: [0.6, 0, 1],
+  wheel: [0, 0, 1.1], bonnet: [0, -0.4, 1.03], wing: [0, -0.9, 1], intercooler: [0, 0.2, 1.06], icpipe: [0, -0.4, 1.04],
+  seat: [0.35, 0, 1.03], steering: [0, 0, 1.18], gauge: [0, -0.4, 1.12], harness: [0, -0.35, 1],
 };
 const wait = ms => new Promise(r => setTimeout(r, ms));
-function psEnterEngine() {
+function psEnterEngine() { return psEnter('engine'); }
+// into the engine bay (through the bonnet) or the cabin (through the door): the stock fly-in film when the car looks stock
+function psEnter(place) {
   return new Promise(res => {
-    ps.place = 'engine';
-    psIn.setAttribute('aria-pressed', 'false'); psEn.setAttribute('aria-pressed', 'true');
-    const fly = FLY.engine;
+    ps.place = place;
+    psIn.setAttribute('aria-pressed', String(place === 'interior')); psEn.setAttribute('aria-pressed', String(place === 'engine'));
+    const fly = FLY[place];
     if (!reduceMotion && psStockLook(fly.from) && PH.clips && PH.clips.includes(fly.clip)) {
       ps.afterFilm = res;
       psShow(fly.from, true).then(() => { if (!psFilm(fly.clip, fly.to)) { ps.afterFilm = null; psShow(fly.to, true).then(res); } });
-    } else psShow(INSIDE.engine[0], true).then(res);
+    } else psShow(INSIDE[place][0], true).then(res);
   });
 }
 function psFitAnim(im, box, drop, type) {
@@ -1191,10 +1281,10 @@ async function psPart(q, on, changed, rideBefore) {
   const inner = views.find(v => INNER.has(v));
   if (inner) return psInner(q, inner);
   if (!views.length) { pulseCard(); if (changed.length) psShow(ps.view, true); return; }
-  const engine = PH.views[views[0]].kind === 'engine';
+  const kind = PH.views[views[0]].kind, engine = kind === 'engine';
   const want = engine ? 'eng-detail' : (q.type === 'discs' ? (q.id.endsWith('-r') || q.id.includes('rear') ? 'a135' : 'wheel') : FIT_VIEW[q.type]);
   const v = views.includes(ps.view) ? ps.view : views.includes(want) ? want : views[0];
-  if (engine) { if (ps.place !== 'engine') { ps.hold = q.id; await psEnterEngine(); } }
+  if (kind !== 'exterior') { if (ps.place !== kind) { ps.hold = q.id; await psEnter(kind); } }
   else psExterior();
   await psFit(v, q);
 }

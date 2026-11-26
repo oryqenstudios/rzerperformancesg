@@ -304,6 +304,11 @@ ENGINE_ROI = {
 ENGINE_KIND = {'hks-gtiii-rs': 'turbo', 'tomei-arms-m7963': 'turbo', 'tomei-expreme-manifold': 'manifold', 'tomei-heat-protector': 'heat',
                'hks-racing-suction': 'intake', 'hks-super-power-flow': 'intake', 'hks-premium-suction': 'intake',
                'tomei-turbo-suction-hose': 'suction', 'hks-ssqv4': 'bov', 'tomei-bov': 'bov', 'hks-coil-pro': 'ignition'}
+ENGINE_KIND.update({m['id']: 'turbo' for m in J.MORE if m['type'] == 'turbo'})
+ENGINE_KIND.update({m['id']: 'icpipe' for m in J.MORE if m['type'] == 'icpipe'})
+ENGINE_ROI['eng-bay']['icpipe'] = (600, 250, 1450, 860)
+ENGINE_ROI['eng-detail']['icpipe'] = (250, 250, 1500, 920)
+MORE_BY = {m['id']: m for m in J.MORE}
 OIL_ROI = {'a000': (1170, 720, 1310, 820)}   # the bumper's corner intake on the car's left
 # inside the engine: the open head (eng-cams) and the cutaway (eng-block), where the parts in J.INSIDE_PARTS go
 INSIDE_ROI = {'eng-cams': (380, 280, 1720, 980), 'eng-block': (440, 380, 1200, 940)}
@@ -403,6 +408,47 @@ def box_mask(b):
     return m
 
 
+def cut_more(v, t, base, img, path, get, have, ids, paint_px, paint3d):
+    """A layer for a part from the second review (tools/parts_more.py), by type:
+      wheel        inside all the wheels the 3D map shows (rim, tyre, brake), never the paint around them
+      bonnet       the factory bonnet's place, its weave kept where it covers paint (like the carbon bonnet option)
+      wing         what changed from the wing-delete photo the edit started from, around the boot (like the GT wing option)
+      intercooler  what clearly changed below the headlights (the bumper's opening)
+      interior     what clearly changed anywhere in the cabin view"""
+    if t == 'wheel' and ids is not None:
+        # the whole wheel is replaced: what clearly changed near the 3D map's wheels (and their floor reflections; the
+        # map can sit tens of pixels off the photo), each piece filled out to its outline (a wheel is an ellipse)
+        near = cv2.dilate(ids.part('stock', ['rim', 'tyre', 'caliper']), disk(80))
+        if not near.any():
+            return None
+        sig = significant(base, img, 16, 150) & near
+        n, lab, st, _ = cv2.connectedComponentsWithStats(sig, 8)
+        m = np.zeros((H, W), np.uint8)
+        for i in range(1, n):
+            if st[i, cv2.CC_STAT_AREA] >= 1200:
+                cv2.fillConvexPoly(m, cv2.convexHull(cv2.findNonZero((lab == i).astype(np.uint8))), 1)
+        return mask_layer(img, cv2.dilate(m, disk(2)), path)
+    if t == 'bonnet' and ids is not None:
+        part = ids.part('stock', ['bonnet'], mirror=False)
+        r = ids.roi('stock', ['bonnet'], 12) & (1 - (paint3d & (1 - cv2.dilate(part, disk(5)))))
+        return layer(base, img, r, path, paint=paint_px, cover=True) if r.any() else None
+    if t == 'wing' and ids is not None and have('wingdel-silver'):
+        wd = get('wingdel-silver')
+        r = ids.roi('stock', ['wing'], 30) | ids.roi('addA', ['gt'], 26)
+        return layer(wd, img, r, path, paint=paint_px, reach=90, thr=9, close=7, fill=4000, cover=True) if r.any() else None
+    if t == 'intercooler':
+        sig = significant(base, img, 22, 300)
+        if ids is not None:
+            hl = ids.part('stock', ['headlight'], mirror=False)
+            if hl.any():
+                sig[:np.nonzero(hl)[0].max()] = 0
+        return layer(base, img, cv2.dilate(sig, disk(3)), path, thr=6, reach=0, close=4, fill=1500)
+    if t in ('seat', 'steering', 'gauge', 'harness'):
+        r = cv2.dilate(significant(base, img, 26, 800), disk(4))
+        return layer(base, img, r, path, thr=6, reach=0, close=5, fill=4000)
+    return None
+
+
 def build_brand_parts(v, base, get, have, entry, ids=None, paint_px=None, paint3d=None):
     for pid in J.BRAND_PARTS:
         name = f'bp-{pid}'
@@ -433,6 +479,8 @@ def build_brand_parts(v, base, get, have, entry, ids=None, paint_px=None, paint3
             else:
                 r = cv2.dilate(significant(base, img), disk(4)) & box_mask(INSIDE_ROI[v])
                 box = layer(base, img, r, path, thr=6, reach=0, close=5, fill=3000)
+        elif pid in MORE_BY and MORE_BY[pid]['type'] in ('wheel', 'bonnet', 'wing', 'intercooler', 'seat', 'steering', 'gauge', 'harness'):
+            box = cut_more(v, MORE_BY[pid]['type'], base, img, path, get, have, ids, paint_px, paint3d)
         elif pid == 'hks-oil-cooler-black' and v in OIL_ROI:
             r = cv2.dilate(significant(base, img, 24, 300), disk(4)) & box_mask(OIL_ROI[v])
             box = layer(base, img, r, path, thr=6, reach=0, close=4, fill=1500)
@@ -527,6 +575,7 @@ def build_view(v):
             save_webp(f'{OUT}/{v}/paint-{pid}.webp', get(f'paint-{pid}'))
             entry['paints'].append(pid)
     if kind == 'interior':
+        build_brand_parts(v, base, get, have, entry)
         manifest['views'][v] = entry
         return notes
     if kind == 'engine':
