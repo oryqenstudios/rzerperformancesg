@@ -277,7 +277,7 @@ const chosenParts = (cfg = config) => PARTS.filter(p => cfg['p_' + p.id] === p.i
 // next to the stock turbo and their layers hold a bit of it; inside the engine, from the crank up to the cam gears
 const WHEEL_PART = new Set(PARTS.filter(p => ['brakef', 'braker', 'discs'].includes(p.type)).map(p => p.id));
 const LAYER_ORDER = ['discs', 'braker', 'brakef', 'exhaust', 'oil', 'manifold', 'suction', 'intake', 'bov', 'ignition', 'turbo',
-  'crank', 'rods', 'pistons', 'studs', 'gasket', 'valvetrain', 'cams', 'camgear'];
+  'crank', 'rods', 'pistons', 'gasket', 'studs', 'valvetrain', 'cams', 'camgear'];
 CATS.push({ id: 'parts', label: 'Parts', view: 'exhaust', hidden: true, groups: PART_GROUPS });
 const PT_ORBIT = { 'pt-exhaust': 'exhaust', 'pt-coilovers': 'stance', 'pt-brakes': 'brakes' };
 for (const t of PART_TABS) CATS.push({ id: t.id, label: t.label, view: PT_ORBIT[t.id] || 'paint', ptab: t, groups: [] });

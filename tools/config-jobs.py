@@ -201,7 +201,8 @@ INSIDE_PARTS = {
     'tomei-procam-evo9': ('eng-cams', 'a pair of aftermarket high-lift camshafts: polished steel with tall, wide lobes', 'in place of both factory camshafts, intake and exhaust, in their bearing caps'),
     'hks-valve-spring': ('eng-cams', 'stiffer aftermarket valve springs', 'in place of the factory valve springs under the rocker arms, along both sides of the head, their coils clearly visible'),
     'tomei-valve-spring': ('eng-cams', 'stiffer aftermarket valve springs in oval wire', 'in place of the factory valve springs under the rocker arms, along both sides of the head, their coils clearly visible'),
-    'tomei-ti-retainer': ('eng-cams', 'titanium valve spring retainers with a gold-grey sheen', 'on top of every valve spring, in place of the factory steel retainers'),
+    'tomei-ti-retainer': ('eng-cams', 'small titanium valve spring retainers: round discs with a dull gold-grey sheen',
+                          'only on the small round retainers at the top of each valve spring, where the spring meets the valve stem under the rocker arms; the camshafts, bearing caps, rockers and springs keep exactly their own colour'),
     'hks-cam-pulley': ('eng-cams', 'an adjustable aluminium cam pulley anodised purple', 'on the end of each camshaft at the timing-belt end, in place of the factory cam gears'),
     'tomei-cam-gear': ('eng-cams', 'an adjustable aluminium cam gear anodised bright red', 'on the end of each camshaft at the timing-belt end, in place of the factory cam gears'),
     'hks-forged-pistons': ('eng-block', 'forged aluminium pistons with a nickel-plated crown and dark moly-coated skirts', 'in place of the four factory pistons in the cut-away bores'),
@@ -209,11 +210,11 @@ INSIDE_PARTS = {
     'hks-conrods': ('eng-block', 'H-beam steel connecting rods', 'in place of the four factory connecting rods between the pistons and the crankshaft'),
     'tomei-conrods': ('eng-block', 'forged chrome-moly H-beam connecting rods', 'in place of the four factory connecting rods between the pistons and the crankshaft'),
     'tomei-billet-crank': ('eng-block', 'a billet steel crankshaft with full, machined counterweights', 'in place of the factory crankshaft in the cut-away crankcase'),
-    'tomei-stroker-kits': ('eng-block', 'a stroker kit: a billet crankshaft with full counterweights, H-beam rods and forged pistons', 'in place of the factory crankshaft, connecting rods and pistons in the cutaway'),
-    'tomei-studs-bearings': ('eng-block', 'black chrome-moly head studs with polished nuts and new main bearings', 'in place of the factory head bolts through the cut-away block and head, and at the crankshaft main bearings'),
-    'hks-head-gasket': ('eng-block', 'a multi-layer stainless steel head gasket', 'in place of the factory head gasket between the block and the head, its layers clearly visible at the cut'),
-    'tomei-head-gasket': ('eng-block', 'a stainless steel metal head gasket', 'in place of the factory head gasket between the block and the head, its layers clearly visible at the cut'),
-    'tomei-slicing-baffle': ('eng-block', 'an oil pan baffle: a stainless steel plate with cutter plates and flaps', 'inside the cut-away oil pan, above the oil and around the oil pickup'),
+    'tomei-stroker-kits': ('eng-block', 'a stroker kit: a billet crankshaft with full counterweights, H-beam rods and forged pistons', 'in place of the factory crankshaft, connecting rods and pistons inside the cutaway; the block, the head and their bright red cut faces stay exactly as they are'),
+    'tomei-studs-bearings': ('eng-block', 'black chrome-moly head studs with polished nuts', 'where the cut passes through the head bolts: long black studs run straight down through the cut block and head, seen in the red cut face, with polished nuts on top of the head; the red cut faces and everything else stay exactly as they are'),
+    'hks-head-gasket': ('eng-block', 'a multi-layer stainless steel head gasket', 'at the joint between the block and the cylinder head, which stays bolted on: along the red cut face the gasket shows as a thin bright stainless steel line a few millimetres thick; the red cut faces and everything else stay exactly as they are'),
+    'tomei-head-gasket': ('eng-block', 'a stainless steel metal head gasket', 'at the joint between the block and the cylinder head, which stays bolted on: along the red cut face the gasket shows as a thin bright stainless steel line a few millimetres thick; the red cut faces and everything else stay exactly as they are'),
+    'tomei-slicing-baffle': ('eng-block', 'an oil pan baffle: a small flat stainless steel plate with cutter flaps', 'low inside the cut-away oil pan at the very bottom of the engine, lying flat just above the oil, small next to the crankshaft; the crankshaft, rods and pistons above it stay fully visible, and the red cut faces and everything else stay exactly as they are'),
 }
 INSIDE_FILMS = {   # films inside the engine: name -> (first view, last view or edit, prompt)
     'open-head': ('eng-head', 'eng-cams', "The dark cam cover lifts straight up off the engine and away out of the frame, revealing the "

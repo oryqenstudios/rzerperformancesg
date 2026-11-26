@@ -308,6 +308,36 @@ OIL_ROI = {'a000': (1170, 720, 1310, 820)}   # the bumper's corner intake on the
 # inside the engine: the open head (eng-cams) and the cutaway (eng-block), where the parts in J.INSIDE_PARTS go
 INSIDE_ROI = {'eng-cams': (380, 280, 1720, 980), 'eng-block': (440, 380, 1200, 940)}
 ALIGN_TO = {'eng-cams': 'eng-head'}   # a base made by editing another view's photo, laid back onto it
+# parts that look much like the factory ones (camshafts, springs, pistons, rods, the crank, gaskets) change too little for
+# significant(): their layer is the edit inside the shape of where they sit. Shapes in photo pixels: ('band', end, end,
+# half width, end radius) along a camshaft with its gears, or ('poly', points).
+INSIDE_SHAPES = {
+    'eng-cams': {'ex': ('band', (540, 505), (1255, 740), 60, 78), 'in': ('band', (770, 390), (1550, 615), 52, 72),
+                 'head': ('poly', [(460, 670), (450, 600), (500, 430), (730, 350), (1600, 530), (1560, 700), (1250, 860), (900, 820)])},
+    'eng-block': {'pistons': ('poly', [(705, 500), (775, 500), (780, 568), (985, 585), (985, 690), (745, 690), (705, 600)]),
+                  'rods': ('poly', [(735, 600), (990, 640), (990, 770), (900, 800), (735, 720)]),
+                  'crank': ('poly', [(500, 620), (640, 600), (760, 700), (940, 715), (955, 800), (880, 865), (700, 875), (560, 805), (500, 720)]),
+                  'deck': ('poly', [(697, 452), (1125, 476), (980, 566), (697, 505)])},
+}
+INSIDE_SHAPE = {'hks-cam-ex': ['ex'], 'hks-cam-in-step2': ['in'], 'tomei-poncam-evo9': ['ex', 'in'], 'tomei-procam-evo9': ['ex', 'in'],
+                'hks-valve-spring': ['head'], 'tomei-valve-spring': ['head'], 'tomei-ti-retainer': ['head'],
+                'hks-forged-pistons': ['pistons'], 'tomei-forged-pistons': ['pistons'], 'hks-conrods': ['rods'], 'tomei-conrods': ['rods'],
+                'tomei-billet-crank': ['crank'], 'tomei-stroker-kits': ['crank', 'rods', 'pistons'],
+                'hks-head-gasket': ['deck'], 'tomei-head-gasket': ['deck']}
+
+
+def inside_shape(v, names):
+    m = np.zeros((H, W), np.uint8)
+    for n in names:
+        sh = INSIDE_SHAPES[v][n]
+        if sh[0] == 'band':
+            _, a, b, w, r = sh
+            cv2.line(m, a, b, 1, 2 * w)
+            cv2.circle(m, a, r, 1, -1)
+            cv2.circle(m, b, r, 1, -1)
+        else:
+            cv2.fillPoly(m, [np.array(sh[1], np.int32)], 1)
+    return m
 
 
 def project(v, pts):
@@ -398,8 +428,11 @@ def build_brand_parts(v, base, get, have, entry, ids=None, paint_px=None, paint3
             r = cv2.dilate(significant(base, img), disk(4)) & box_mask(ENGINE_ROI[v][ENGINE_KIND[pid]])
             box = layer(base, img, r, path, thr=6, reach=0, close=5, fill=3000)
         elif pid in J.INSIDE_PARTS and v == J.INSIDE_PARTS[pid][0]:
-            r = cv2.dilate(significant(base, img), disk(4)) & box_mask(INSIDE_ROI[v])
-            box = layer(base, img, r, path, thr=6, reach=0, close=5, fill=3000)
+            if pid in INSIDE_SHAPE:
+                box = mask_layer(img, inside_shape(v, INSIDE_SHAPE[pid]), path)
+            else:
+                r = cv2.dilate(significant(base, img), disk(4)) & box_mask(INSIDE_ROI[v])
+                box = layer(base, img, r, path, thr=6, reach=0, close=5, fill=3000)
         elif pid == 'hks-oil-cooler-black' and v in OIL_ROI:
             r = cv2.dilate(significant(base, img, 24, 300), disk(4)) & box_mask(OIL_ROI[v])
             box = layer(base, img, r, path, thr=6, reach=0, close=4, fill=1500)
