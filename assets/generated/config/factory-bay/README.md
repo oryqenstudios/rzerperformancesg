@@ -1,0 +1,22 @@
+# Factory engine bay (not in use yet)
+
+The client sent a photo of a real Evo IX engine bay and asked for the configurator's stock engine to match it: the red
+crinkle cam cover with its black centre strip, the heat shield that hides the turbo at the front of the engine, the
+polished intercooler pipe rising beside the engine, the black air box and corrugated intake hose, the strut brace.
+These are the chosen takes (Kling Image 4.0 edits of the current `base/silver-factory-eng-bay.jpg` and `-eng-detail.jpg`):
+
+- `eng-bay.jpg`: take a of three, from the prompt below.
+- `eng-detail.jpg`: take c of three, from the second prompt, given `eng-bay.jpg` as image 2 so both views show the same engine.
+
+The client chose not to switch yet (it means rebuilding every engine-bay part, the inside-the-engine views and their
+films on these photos, about US$12-14). **When it is done, the cam cover gets the Mitsubishi three-diamond logo on
+its black strip and MIVEC TURBO lettering on the red sides, as in the client's photo** (the client's choice, an exception
+to the no-text brief); these takes have neither yet.
+
+## Prompt, eng-bay
+
+Image 1 is the photo to edit. Image 1 shows the car from the front with the bonnet raised, looking down into the whole engine bay; the car's left side is on the right of the picture. Replace everything inside the engine bay with the factory Mitsubishi Lancer Evolution IX engine bay, exactly as it leaves the factory: the transverse 4G63 turbo engine with a red crinkle-finish cam cover, a black strip running along the middle of the cover between its two red halves over the coil packs, and a round black oil filler cap at the timing-belt end, beside the black timing belt cover; no lettering and no logo on the cover. Below the cam cover, across the front of the engine, a dark grey ribbed metal heat shield covers the exhaust manifold and the turbocharger, so the turbo itself is hidden. A dark grey strut brace runs across the bay between the two strut towers, which have black rubber caps. On the car's left side of the bay: a big black plastic air filter box with a flat lid, a black plastic air duct running from it down to the front of the radiator support, a black corrugated rubber intake hose from the air box down to the turbo at the front of the engine, and a polished aluminium intercooler pipe rising beside the engine up to the throttle body behind it; behind the air box the battery with a red terminal cover and plain yellow labels with no readable text, a black fuse box beside it and a white washer bottle cap. On the car's right side: a white coolant expansion tank low down and black hoses and pipes along the inner wing. At the front: the top of the radiator with its round radiator cap and the black radiator support with the bonnet latch. The inner wings and strut towers are the car's liquid silver paint. Clean and well kept, completely stock, no aftermarket parts. Keep the camera, the framing, the raised bonnet, the front of the car, the wings, the headlights and the whole workshop exactly as they are. Photorealistic automotive photography, sharp focus, lit by the hexagon LED ceiling. No text, no lettering, no logos, no badges.
+
+## Prompt, eng-detail (image 2: eng-bay.jpg)
+
+Image 1 is the photo to edit: a close view into the engine bay from the car's front right corner. Image 2 shows the same car's engine bay from straight in front: the factory Evo IX engine bay. Replace everything inside the engine bay in image 1 with exactly the engine bay of image 2, seen from this angle: the same red crinkle-finish cam cover with the black strip along its middle (the coil packs are hidden under that strip, no separate coils on top) and the round black oil filler cap, the black timing belt cover at the end of the engine nearest the camera on the right, the compact dark grey ribbed heat shield over the exhaust manifold low at the front of the engine below the cam cover, the polished aluminium intercooler pipe rising beside the engine on the far side, the black corrugated intake hose and the black air filter box on the far side at the left, the battery behind it, the strut brace across the top between the strut towers, the coolant expansion tank and the radiator cap. Keep the camera, the framing, the raised bonnet, the front of the car, the wings, the headlights and the whole workshop of image 1 exactly as they are. Photorealistic automotive photography, sharp focus, lit by the hexagon LED ceiling. No text, no lettering, no logos, no badges.
