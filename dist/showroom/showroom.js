@@ -1,4 +1,5 @@
-// The 3D Evo as a photoreal product asset: isolated on a plain solid background in neutral, even studio light.
+// The 3D Evo in the tuning garage from the hero film (garage.js): glossy black epoxy floor with a real reflection,
+// the white hexagonal LED ceiling, red neon, the wheel wall and the tool chests, lit from the honeycomb overhead.
 // World: metres, y up, car front at +x, floor at y = 0 (same as the old shader scene).
 //
 //   startShowroom({ canvas, interactive, external, onReady, onError }) -> api
@@ -17,6 +18,7 @@ import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { dressCar } from './details.js';
 import { buildAddons, buildInternals, carbonMaterial, carController, ghostMaterial, worldPoints } from './parts.js';
+import { buildGarage } from './garage.js';
 
 // ---------------------------------------------------------------- the car
 // lancer-evolution-rzer.glb is the CC BY model with its body split into named parts (tools/split-model.py).
@@ -58,59 +60,37 @@ renderer.shadowMap.needsUpdate = true;
 
 const scene = new THREE.Scene();
 
-// ---------------------------------------------------------------- studio: neutral even light on a plain background
-// The car is isolated on a plain solid background (dark, so the page's white copy stays readable) in soft, even
-// studio light. There is no set and no visible floor: an invisible shadow catcher and a soft contact shadow keep
-// the car on the ground.
-scene.background = new THREE.Color(0x101113);
+// ---------------------------------------------------------------- the garage (garage.js)
+// The same tuning garage as the hero film, built around the car. Its honeycomb of LED tubes is the main light: the
+// paint mirrors it (the garage's environment map, set per car material: scene.environment ignores envMapIntensity),
+// a key light from straight above casts the car's shadow, and the red neon gives a faint red rim from either side.
+scene.background = new THREE.Color(0x050506);
+const garage = buildGarage({ renderer });
+scene.add(garage.group);
+const ENV = garage.env;
 
-// reflections: a neutral studio for the paint to mirror, with a long soft box overhead, strip lights either side,
-// front and rear fill panels and a dim floor. Set per car material (scene.environment ignores envMapIntensity).
-function studioEnvironment() {
-  const env = new THREE.Scene();
-  const basic = (v, side) => new THREE.MeshBasicMaterial({ color: new THREE.Color(v, v, v), side: side || THREE.FrontSide });
-  const room = new THREE.Mesh(new THREE.BoxGeometry(30, 12, 30), basic(0.03, THREE.BackSide));
-  room.position.y = 5.4;   // PMREM looks from the origin: about the car's mid-height
-  env.add(room);
-  const floor = new THREE.Mesh(new THREE.PlaneGeometry(30, 30), basic(0.018));
-  floor.rotation.x = -Math.PI / 2; floor.position.y = -0.6; env.add(floor);
-  const panel = (w, h, v, pos, rot) => {
-    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), basic(v, THREE.DoubleSide));
-    m.position.set(...pos); m.rotation.set(...rot); env.add(m);
-  };
-  panel(7, 2.4, 3.0, [0, 4.2, 0], [Math.PI / 2, 0, 0]);                       // long soft box overhead
-  for (const s of [-1, 1]) panel(9, 1.0, 1.5, [0, 1.5, s * 6.5], [0, 0, 0]);   // strip lights either side
-  panel(4, 2.2, 0.8, [8, 1.3, 0], [0, -Math.PI / 2, 0]);                     // front fill
-  panel(4, 2.2, 0.55, [-8, 1.3, 0], [0, Math.PI / 2, 0]);                    // rear fill
-  const pmrem = new THREE.PMREMGenerator(renderer);
-  const tex = pmrem.fromScene(env, 0.03).texture;
-  pmrem.dispose();
-  return tex;
-}
-const ENV = studioEnvironment();
-
-// direct light: a soft key that casts the car's shadow, fill, rim and top lights, and a neutral sky fill
-const hemi = new THREE.HemisphereLight(0xf0f2f6, 0x141517, 0.5);
-const key = new THREE.DirectionalLight(0xffffff, 1.6);
-key.position.set(3.2, 6.5, 3.6);
+const hemi = new THREE.HemisphereLight(0xe6e9ef, 0x140909, 0.55);
+const key = new THREE.DirectionalLight(0xffffff, 1.75);
+key.position.set(0.6, 7.5, 0.9);
 key.castShadow = true;
 key.shadow.mapSize.set(2048, 2048);
 Object.assign(key.shadow.camera, { left: -3.6, right: 3.6, top: 3.6, bottom: -3.6, near: 2, far: 16 });
 key.shadow.bias = -0.0003;
 key.shadow.normalBias = 0.02;
-key.shadow.radius = 6;
-const fill = new THREE.DirectionalLight(0xf4f6ff, 0.6);
-fill.position.set(-4, 3, -3.5);
-const rim = new THREE.DirectionalLight(0xffffff, 0.8);
-rim.position.set(-5, 4.5, 4);
-const top = new THREE.DirectionalLight(0xffffff, 0.5);
-top.position.set(0, 8, 0.01);
+key.shadow.radius = 8;
+const fill = new THREE.DirectionalLight(0xf4f6ff, 0.35);
+fill.position.set(5, 3, 0.5);
+const rim = new THREE.DirectionalLight(0xff3424, 0.12);   // the red neon on the left
+rim.position.set(-1, 1.6, 6);
+const top = new THREE.DirectionalLight(0xff3424, 0.1);    // and on the right (the wheel wall)
+top.position.set(1.5, 1.6, -6);
 scene.add(hemi, key, fill, rim, top);
 const KEY = key.intensity;
 
-// the floor: invisible, it only takes the car's shadow
-const catcher = new THREE.Mesh(new THREE.PlaneGeometry(40, 40), new THREE.ShadowMaterial({ color: 0x000000, opacity: 0.45 }));
+// the car's shadow on the floor
+const catcher = new THREE.Mesh(new THREE.PlaneGeometry(14, 10), new THREE.ShadowMaterial({ color: 0x000000, opacity: 0.5 }));
 catcher.rotation.x = -Math.PI / 2;
+catcher.position.y = 0.001;
 catcher.receiveShadow = true;
 scene.add(catcher);
 
@@ -164,6 +144,7 @@ function resize() {
   renderer.setSize(w, h, false);
   composer.setPixelRatio(DPR * pixelScale);
   composer.setSize(w, h);
+  garage.resize(w * DPR * pixelScale, h * DPR * pixelScale);
   applyView();
 }
 
@@ -270,7 +251,7 @@ function prepareCar(model) {
 }
 
 const api = {
-  ready: false, credit: CAR.credit, setActive, camera, controls, scene, renderer, composer, lights: { hemi, key, fill, rim, top },
+  ready: false, credit: CAR.credit, setActive, camera, controls, scene, renderer, composer, garage, lights: { hemi, key, fill, rim, top },
   // external mode: { pos: [x,y,z], target: [x,y,z], fov, shift: [x,y] } from app.js's camera
   setView({ pos, target, fov, shift }) {
     camera.position.set(...pos);
@@ -283,9 +264,10 @@ const api = {
   setState(s) {
     if (controller) controller.set(s);
     key.intensity = KEY * (1 + 0.12 * (s.bay ?? 0));
+    if (s.reflect !== undefined) garage.setReflect(s.reflect);
   },
   setPixelScale(s) { if (Math.abs(s - pixelScale) > 0.01) { pixelScale = s; resize(); } },
-  render() { composer.render(); },
+  render() { garage.update(camera); composer.render(); },
 };
 const draco = new DRACOLoader().setDecoderPath(new URL('../vendor/three/addons/libs/draco/gltf/', import.meta.url).href);
 new GLTFLoader().setDRACOLoader(draco).load(CAR.url, gltf => {
