@@ -8,6 +8,8 @@ Stages:
             assets/generated/config/base/silver-factory-<view>.jpg)
   edits     every option edit whose base photo exists (paints, empty-garage plates, matte floors, part options)
   wing      the wing-delete edit of every paint photo, then the lip spoiler and GT wing on the silver wing-delete
+  parts     the brand parts (HKS, TOMEI, ENDLESS; PART_SLOTS in src/app.js) fitted to the car in every view they show
+            in, each edit given the part's product photo as image 2 (assets/generated/config/parts-ref/)
 Jobs whose output already exists are skipped by config-gen.py, so a stage can be run again after more bases exist.
 
 Views: a000..a315 orbit the car at 45 degree steps from the front towards its right side (tools/render-guides.mjs);
@@ -165,6 +167,91 @@ BASES = {
 }
 
 
+# ---------------------------------------------------------------- brand parts fitted to the car
+# id -> (views, what it is, how it looks / where it goes). Every edit starts from the view's silver factory photo, with
+# the part's product photo (on light grey) as image 2. Names are <view>__bp-<id>.
+REF = lambda pid: f'{C}/parts-ref/{pid}.jpg'
+REAR = ['a135', 'a180', 'a225', 'exhaust']
+FRONT_WHEELS = ['a045', 'a090', 'a270', 'a315', 'wheel', 'headlight']
+REAR_WHEELS = ['a090', 'a135', 'a225', 'a270', 'exhaust']
+EXHAUSTS = {
+    'hks-super-turbo-muffler': 'a polished stainless cat-back with a rounded-oval silencer and one large 124 mm straight-cut round tip with a blue-purple heat tint on its end',
+    'hks-silent-hipower': 'a polished stainless cat-back with an oval silencer and one plain polished 120 mm straight-cut round tip',
+    'hks-hipower-spec-r': 'a full titanium cat-back with a cylindrical silencer and one 120 mm round titanium tip in a dark burnt-titanium finish with a blue tint',
+    'hks-hipower-us': 'a stainless cat-back with a round silencer and one 120 mm polished round tip',
+    'hks-legal': 'a cat-back with a matte black silencer and black piping, ending in one polished 106 mm round tip',
+    'hks-carbon-ti': 'a cat-back with a carbon-fibre-wrapped silencer and one large double-wall round tip in a burnt titanium finish, blue and purple',
+    'tomei-expreme-ti': 'a full titanium cat-back with a round titanium silencer and one large 115 mm straight-cut round tip, heat-blued blue and purple at its end',
+}
+FRONT_KITS = {
+    'endless-racing-mono6': ('a forged monoblock six-piston caliper in hard-anodised dark gunmetal grey', 'a large 370 mm slotted two-piece disc'),
+    'endless-racing-mono4': ('a forged monoblock four-piston caliper in hard-anodised dark gunmetal grey', 'a large 355 mm slotted disc'),
+    'endless-mono6-sports-ta': ('a monoblock six-piston caliper in bright metallic blue', 'a large slotted disc'),
+    'endless-racing6': ('a large two-piece six-piston caliper in bright blue anodise', 'a large 370 mm slotted disc'),
+    'endless-6pot': ('a two-piece six-piston caliper in bright blue anodise', 'a slotted disc'),
+    'endless-chibi6': ('a compact six-piston caliper in bright blue anodise', 'a slotted disc'),
+    'endless-m4': ('a two-piece four-piston caliper in bright blue anodise', 'a slotted disc'),
+}
+REAR_KITS = {
+    'endless-racing-mono4r': ('a forged monoblock four-piston caliper in hard-anodised dark gunmetal grey', 'a 332 mm slotted disc'),
+    'endless-racing4-rear': ('a two-piece four-piston caliper in bright blue anodise', 'a 332 mm slotted disc'),
+    'endless-s2-rear': ('a two-piston caliper in bright blue anodise', 'a slotted disc'),
+}
+ENGINE_PARTS = {   # (what, where in the bay)
+    'hks-gtiii-rs': ('an aftermarket ball-bearing turbocharger with a polished compressor housing, a cast turbine housing and its actuator',
+                     'in place of the factory turbocharger and its heat shield at the front of the engine, bolted to the exhaust manifold, with its compressor housing and actuator clearly visible'),
+    'tomei-arms-m7963': ('an aftermarket turbocharger with a polished compressor housing, a cast turbine housing and a blue actuator',
+                         'in place of the factory turbocharger and its heat shield at the front of the engine, bolted to the exhaust manifold, with its compressor housing and blue actuator clearly visible'),
+    'tomei-expreme-manifold': ('a polished stainless steel tubular exhaust manifold: four equal-length tubes merging into a collector',
+                               'in place of the factory exhaust manifold and its heat shield at the front of the engine, uncovered so its polished tubes are visible'),
+    'tomei-heat-protector': ('a polished stainless steel heat shield', 'over the exhaust manifold at the front of the engine, in place of the factory heat shield'),
+    'hks-racing-suction': ('a big red cone air filter on a polished aluminium intake pipe', 'in place of the factory air filter box, connected to the intake pipe leading to the turbocharger'),
+    'hks-super-power-flow': ('a big green mushroom-shaped air filter', 'in place of the factory air filter box, connected to the intake pipe leading to the turbocharger'),
+    'hks-premium-suction': ('a black enclosed air box intake with a short black intake pipe', 'in place of the factory air filter box, connected to the intake pipe leading to the turbocharger'),
+    'tomei-turbo-suction-hose': ('a smooth bright blue silicone intake hose with steel clamps', 'replacing the black rubber intake hose that runs from the air filter box to the turbocharger'),
+    'hks-ssqv4': ('a silver die-cast aluminium blow-off valve with a finned trumpet-shaped outlet', 'on the intercooler pipe, in place of the factory blow-off valve, clearly visible'),
+    'tomei-bov': ('a silver aluminium blow-off valve', 'on the intercooler pipe, in place of the factory blow-off valve, clearly visible'),
+    'hks-coil-pro': ('black coil-on-plug ignition coils with long white boots', 'on top of the cam cover, replacing the factory ignition coils over the four spark plugs'),
+}
+BRAND_PARTS = {}
+for pid, what in EXHAUSTS.items():
+    BRAND_PARTS[pid] = (REAR, edit(
+        f'Image 2 shows an aftermarket exhaust: {what}. Fit it to the car: at the factory exit under the right of the rear bumper, '
+        'the factory tip is replaced by this exhaust\'s single round tip at its real size, and where the silencer can be seen below '
+        'the bumper it is this exhaust\'s silencer. Keep the rear bumper and everything else exactly as it is.'))
+for pid, (cal, disc) in FRONT_KITS.items():
+    BRAND_PARTS[pid] = (FRONT_WHEELS, edit(
+        f'Image 2 shows an aftermarket brake caliper: {cal}. Fit it to the car\'s front wheels only: behind the spokes of each front '
+        f'wheel, the factory brake caliper and disc are replaced by this caliper on {disc}, at their real size. Keep the wheel spokes, '
+        'rims and tyres exactly as they are, in front of the brakes. The rear brakes stay exactly as they are.'))
+for pid, (cal, disc) in REAR_KITS.items():
+    BRAND_PARTS[pid] = (REAR_WHEELS, edit(
+        f'Image 2 shows an aftermarket brake caliper: {cal}. Fit it to the car\'s rear wheels only: behind the spokes of each rear '
+        f'wheel, the factory brake caliper and disc are replaced by this caliper on {disc}, at their real size. Keep the wheel spokes, '
+        'rims and tyres exactly as they are, in front of the brakes. The front brakes stay exactly as they are.'))
+BRAND_PARTS['hks-brake-system'] = (sorted(set(FRONT_WHEELS + REAR_WHEELS)), edit(
+    'Image 2 shows an aftermarket brake kit: large silver-anodised aluminium calipers on two-piece slotted discs with gold-coloured '
+    'centre bells. Fit it to all four wheels: behind the spokes of each wheel, the factory brake caliper and disc are replaced by a '
+    'silver caliper on a large slotted disc, at their real size. Keep the wheel spokes, rims and tyres exactly as they are, in front of the brakes.'))
+for pid, axle, desc in [('endless-disc-racing-front', 'front', 'two-piece slotted discs with curved slots and an anodised blue centre bell'),
+                        ('endless-disc-basic-slit-f', 'front', 'one-piece slotted discs with curved slots across the friction face'),
+                        ('endless-disc-eslit-rear', 'rear', 'slotted discs with curved E-shaped slots across the friction face'),
+                        ('endless-disc-basic-slit-r', 'rear', 'one-piece slotted discs with curved slots across the friction face')]:
+    views = ['wheel', 'a045', 'a315'] if axle == 'front' else ['exhaust', 'a135', 'a225']
+    BRAND_PARTS[pid] = (views, edit(
+        f'Image 2 shows aftermarket brake discs. Replace the {axle} brake discs, seen behind the wheel spokes, with {desc}, at the '
+        'factory size. Keep the factory calipers, the wheel spokes, rims and tyres exactly as they are.'))
+for pid, (what, where) in ENGINE_PARTS.items():
+    BRAND_PARTS[pid] = (ENGINE, edit(
+        f'Image 1 shows the engine bay with the bonnet raised. Image 2 shows an aftermarket part: {what}. Fit this part in the engine '
+        f'bay {where}, at its real size, looking as it does in image 2. Everything else in the engine bay stays exactly as it is.'))
+BRAND_PARTS['hks-oil-cooler-black'] = (['a000'], edit(
+    'Image 2 shows an aftermarket oil cooler with a silver-finned core. Fit it behind the opening at the front of the car\'s left side '
+    '(on the right in this picture), low in the front bumper, so its silver-finned core shows through the bumper opening. Keep the '
+    'bumper and everything else exactly as it is.'))
+BRAND_REF = {'endless-disc-basic-slit-f': 'endless-disc-basic-slit', 'endless-disc-basic-slit-r': 'endless-disc-basic-slit'}
+
+
 def jobs(stage):
     out = []
     if stage == 'bases':
@@ -201,6 +288,12 @@ def jobs(stage):
             if os.path.exists(src(f'{v}__wingdel-silver')):
                 for opt, prompt in WING_ADD.items():
                     out.append({'name': f'{v}__{opt}', 'images': [src(f'{v}__wingdel-silver')], 'prompt': prompt})
+    elif stage == 'parts':
+        for pid, (views, prompt) in BRAND_PARTS.items():
+            ref = REF(BRAND_REF.get(pid, pid))
+            for v in views:
+                if os.path.exists(base(v)):
+                    out.append({'name': f'{v}__bp-{pid}', 'images': [base(v)] + ([ref] if os.path.exists(ref) else []), 'prompt': prompt})
     else:
         sys.exit(f'unknown stage {stage}')
     return out

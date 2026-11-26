@@ -65,6 +65,31 @@ pip install opencv-python-headless
 python3 tools/config-build.py                      # assets/site/config/ and manifest.js
 ```
 
+## Brand parts fitted to the car
+
+The configurator's HKS, TOMEI and ENDLESS parts (`PARTS` in `src/app.js`) that show on the car each have photo
+layers made the same way as the options: `python3 tools/config-jobs.py parts` lists one Kling edit per part and view,
+each given the part's product photo (on light grey, `parts-ref/`, from `assets/site/parts/`) as image 2:
+
+| Parts | Views | Cut to (`build_brand_parts()` in `tools/config-build.py`) |
+|---|---|---|
+| 7 exhausts | `a135`, `a180`, `a225`, `exhaust` | around the factory tip and where the 3D car's added tips sit, with its floor reflection |
+| 7 front brake kits, 2 front discs | `a045`, `a090`, `a270`, `a315`, `wheel`, `headlight` (discs: `wheel`, `a045`, `a315`) | inside the front wheels: each wheel the 3D map shows is front or rear by the nearest axle projected through the view's camera; around the factory caliper and disc, out to the rim, minus the spokes |
+| 3 rear brake kits, 2 rear discs | `a090`, `a135`, `a225`, `a270`, `exhaust` (discs: `exhaust`, `a135`, `a225`) | the same, inside the rear wheels |
+| HKS Brake System | all of the above | inside all four wheels |
+| turbos, manifold, heat shield, 3 intakes, intake hose, 2 blow-off valves, Coil Pro | `eng-bay`, `eng-detail` | a box per view around where that kind of part sits (`ENGINE_ROI`) |
+| oil cooler | `a000` | a box around the bumper's lower opening on the car's left |
+
+The turbo fitting films (`clips/fit-<id>.mp4`) are Kling O3 first-last-frame clips from the stock `eng-bay` photo to
+its edit with that turbo fitted, sped up to about 3 s by `build_clips()`.
+
+```bash
+python3 tools/config-jobs.py parts > jobs.json && python3 tools/config-gen.py jobs.json
+python3 tools/config-build.py a135 a180 a225 exhaust a045 a090 a270 a315 wheel headlight a000 eng-bay eng-detail
+```
+
+Building only some views keeps the rest of the existing manifest.
+
 ## In the page
 
 `assets/config/manifest.js` sets `window.RZ_PHOTOS` (views, their paints and layer boxes, ride-height drops, films).

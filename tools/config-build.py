@@ -39,6 +39,9 @@ GUIDES = json.load(open(f'{J.C}/guides/views.json'))
 ID = json.load(open(f'{IDDIR}/ids.json')) if os.path.exists(f'{IDDIR}/ids.json') else {}
 RIDE_MM = {'springs': 30, 'coilovers': 50}
 manifest = {'views': {}, 'drops': {}}
+# building only some views keeps the rest of the existing manifest
+if len(sys.argv) > 1 and os.path.exists(f'{OUT}/manifest.js'):
+    manifest = json.loads(open(f'{OUT}/manifest.js').read().split('=', 1)[1].strip().rstrip(';'))
 if os.path.exists(f'{OUT}/manifest.js'):
     manifest = json.loads(open(f'{OUT}/manifest.js').read().split('=', 1)[1].rstrip(';\n'))
 
@@ -279,6 +282,110 @@ def mask_layer(img, mask, path):
     return [int(x0), int(y0), int(x1 - x0), int(y1 - y0)]
 
 
+# ---------------------------------------------------------------- brand parts fitted to the car (config-jobs.py 'parts')
+# Each Kling edit of a view with one part fitted becomes that part's layer, 'bp-<id>', cut to where the part goes:
+#   exhausts    around the factory tip (and where the added tips of the 3D car sit), like the exhaust options
+#   brakes      inside the wheels on the part's axle (front or rear, from where the view's camera sees each axle),
+#               around the factory caliper and disc, leaving out the spokes in front (from the 3D part map)
+#   engine bay  and the oil cooler: inside a box drawn per view around where the part sits (ENGINE_ROI)
+FRONT_AXLE, REAR_AXLE = 1.31, -1.315          # the 3D car's axles (x, metres), wheel centres 0.33 m up, 0.755 m out
+DISC_FRONT = {'endless-disc-racing-front', 'endless-disc-basic-slit-f'}
+DISC_REAR = {'endless-disc-eslit-rear', 'endless-disc-basic-slit-r'}
+# box (x0, y0, x1, y1) per engine view and part kind, in photo pixels
+ENGINE_ROI = {
+    'eng-bay': {'turbo': (930, 380, 1330, 820), 'manifold': (760, 420, 1330, 840), 'intake': (520, 260, 1000, 760),
+                'suction': (620, 260, 1250, 760), 'bov': (560, 300, 1300, 860), 'ignition': (700, 260, 1150, 560)},
+    'eng-detail': {'turbo': (850, 200, 1700, 900), 'manifold': (700, 250, 1700, 950), 'intake': (300, 120, 1200, 800),
+                   'suction': (400, 120, 1650, 850), 'bov': (300, 150, 1700, 950), 'ignition': (550, 120, 1300, 600)},
+}
+ENGINE_KIND = {'hks-gtiii-rs': 'turbo', 'tomei-arms-m7963': 'turbo', 'tomei-expreme-manifold': 'manifold', 'tomei-heat-protector': 'manifold',
+               'hks-racing-suction': 'intake', 'hks-super-power-flow': 'intake', 'hks-premium-suction': 'intake',
+               'tomei-turbo-suction-hose': 'suction', 'hks-ssqv4': 'bov', 'tomei-bov': 'bov', 'hks-coil-pro': 'ignition'}
+OIL_ROI = {'a000': (1180, 690, 1560, 960)}
+
+
+def project(v, pts):
+    """3D points (metres, the 3D car's frame) -> pixels in view v's photo, with the guide camera it was generated from."""
+    g = GUIDES[v]
+    pos, tgt = np.array(g['pos'], float), np.array(g['target'], float)
+    fwd = (tgt - pos) / np.linalg.norm(tgt - pos)
+    right = np.cross(fwd, [0, 1, 0]); right /= np.linalg.norm(right)
+    up = np.cross(right, fwd)
+    f = (H / 2) / np.tan(np.radians(g['fov']) / 2)
+    out = []
+    for p_ in pts:
+        d = np.array(p_, float) - pos
+        z = d @ fwd
+        out.append((W / 2 + f * (d @ right) / z, H / 2 - f * (d @ up) / z) if z > 0.1 else (np.nan, np.nan))
+    return out
+
+
+def wheel_masks(v, ids):
+    """Each wheel the photo shows (rim, tyre and brake in the 3D map), as 'front' or 'rear' by the nearest projected axle."""
+    wheel = ids.part('stock', ['rim', 'tyre', 'caliper'], mirror=False)
+    n, lab, st, cen = cv2.connectedComponentsWithStats(cv2.morphologyEx(wheel, cv2.MORPH_CLOSE, disk(7)), 8)
+    axles = {'front': [(FRONT_AXLE, 0.33, z) for z in (0.755, -0.755)], 'rear': [(REAR_AXLE, 0.33, z) for z in (0.755, -0.755)]}
+    pix = {k: [q for q in project(v, pts) if not np.isnan(q[0])] for k, pts in axles.items()}
+    out = {'front': np.zeros((H, W), np.uint8), 'rear': np.zeros((H, W), np.uint8)}
+    for i in range(1, n):
+        if st[i, cv2.CC_STAT_AREA] < 400:
+            continue
+        cx, cy = cen[i]
+        best = min(((np.hypot(cx - x, cy - y), k) for k, qs in pix.items() for x, y in qs), default=(0, None))[1]
+        if best:
+            out[best] |= (lab == i).astype(np.uint8)
+    return out
+
+
+def brake_region(ids, wheels, grow):
+    """Inside the given wheels: around the factory caliper and disc, out to the rim, without the spokes in front."""
+    rim = ids.part('stock', ['rim'], mirror=False)
+    cal = ids.part('stock', ['caliper'], mirror=False)
+    inside = np.zeros((H, W), np.uint8)
+    n, lab, st, _ = cv2.connectedComponentsWithStats((rim | cal) & wheels, 8)
+    for i in range(1, n):
+        if st[i, cv2.CC_STAT_AREA] >= 300:
+            cv2.fillConvexPoly(inside, cv2.convexHull(cv2.findNonZero((lab == i).astype(np.uint8))), 1)
+    inside = cv2.erode(inside, disk(5))
+    return cv2.dilate(cal, disk(grow)) & inside & (1 - cv2.erode(rim, disk(1)))
+
+
+def box_mask(b):
+    m = np.zeros((H, W), np.uint8)
+    m[b[1]:b[3], b[0]:b[2]] = 1
+    return m
+
+
+def build_brand_parts(v, base, get, have, entry, ids=None, paint_px=None, paint3d=None):
+    for pid in J.BRAND_PARTS:
+        name = f'bp-{pid}'
+        if not have(name):
+            continue
+        img = get(name)
+        path = f'{OUT}/{v}/{name}.webp'
+        box = None
+        if pid in J.EXHAUSTS and ids is not None:
+            part = ids.part('stock', ['tip'], mirror=False)
+            r = ids.roi('stock', ['tip'], 40) | ids.roi('addA', ['tip'], 30)
+            r &= 1 - (paint3d & (1 - cv2.dilate(part, disk(5))))
+            box = layer(base, img, r, path, paint=paint_px, cover=True)
+        elif ids is not None and (pid in J.FRONT_KITS or pid in J.REAR_KITS or pid == 'hks-brake-system' or pid in DISC_FRONT | DISC_REAR):
+            wm = wheel_masks(v, ids)
+            axle = ('front' if pid in J.FRONT_KITS or pid in DISC_FRONT else 'rear' if pid in J.REAR_KITS or pid in DISC_REAR else 'both')
+            wheels = wm['front'] | wm['rear'] if axle == 'both' else wm[axle]
+            disc = pid in DISC_FRONT | DISC_REAR
+            r = brake_region(ids, wheels, 12 if disc else 30)
+            if r.any():
+                box = layer(base, img, r, path, thr=14, reach=3, close=2)
+        elif pid in ENGINE_KIND and v in ENGINE_ROI:
+            r = box_mask(ENGINE_ROI[v][ENGINE_KIND[pid]])
+            box = layer(base, img, r, path, thr=18, reach=0, close=5, fill=3000)
+        elif pid == 'hks-oil-cooler-black' and v in OIL_ROI:
+            box = layer(base, img, box_mask(OIL_ROI[v]), path, thr=16, reach=0, close=4, fill=1500)
+        if box:
+            entry['layers'][name] = box
+
+
 def build_view(v):
     os.makedirs(f'{OUT}/{v}', exist_ok=True)
     base = load(J.base(v))
@@ -315,6 +422,7 @@ def build_view(v):
             box = layer(base, var, cv2.dilate(region, disk(6)), f'{OUT}/{v}/hood-carbon.webp')
             if box:
                 entry['layers']['hood-carbon'] = box
+        build_brand_parts(v, base, get, have, entry)
         manifest['views'][v] = entry
         return notes
     if not (have('plate') and have('paint-red') and os.path.exists(f'{IDDIR}/{v}-stock.png')):
@@ -417,6 +525,7 @@ def build_view(v):
                     box = layer(wd, get(o, wd), rr, f'{OUT}/{v}/{o}.webp', paint=paint_px, reach=90, thr=9, close=7, fill=4000, cover=True)
                     if box:
                         entry['layers'][o] = box
+    build_brand_parts(v, base, get, have, entry, ids, paint_px, paint3d)
     manifest['views'][v] = entry
     return notes
 
@@ -438,6 +547,8 @@ def build_clips():
             jobs = [(f'spin-{a}-{b}', 'setpts=PTS/5'), (f'spin-{b}-{a}', 'reverse,setpts=PTS/5')]
         elif name.startswith('fly-'):
             jobs = [(name, 'setpts=PTS/2')]
+        elif name.startswith('fit-'):
+            jobs = [(name, 'setpts=PTS/1.6')]
         for out_name, speed in jobs:
             dst = f'{out_dir}/{out_name}.mp4'
             if not os.path.exists(dst) or os.path.getmtime(dst) < os.path.getmtime(f'{src_dir}/{f}'):

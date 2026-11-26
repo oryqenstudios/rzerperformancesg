@@ -371,7 +371,7 @@ fieldset.field { border: 0; margin: 0; padding: 0; }
 .opt .stock-tag { font-size: 0.6875rem; color: var(--graphite); margin-left: 6px; font-weight: 500; }
 /* brand parts: a tab per brand under a label, the brand's parts as cards with the cut-out product photo */
 .b-tabs-label { grid-column: 1 / -1; padding: 8px 4px 2px; font-size: 0.6875rem; color: var(--graphite); letter-spacing: 0.06em; text-transform: uppercase; }
-.b-tab-brand { letter-spacing: 0.06em; }
+.b-tabs-parts { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
 .p-intro { margin: 0; font-size: 0.8125rem; color: var(--steel); line-height: 1.45; }
 .popt { grid-template-columns: 1fr auto; gap: 2px 10px; padding: 0 0 12px; align-items: start; overflow: hidden; }
 .popt .p-img {
@@ -392,8 +392,8 @@ fieldset.field { border: 0; margin: 0; padding: 0; }
 }
 .b-card[hidden] { display: none; }
 .jc-head { padding: 16px 18px 12px; border-bottom: 1px dashed rgba(232, 235, 238, 0.2); display: grid; gap: 4px; }
-.jc-head h2 { margin: 0; font-size: 1rem; font-weight: 700; display: flex; justify-content: space-between; gap: 12px; }
-.jc-code { font-variant-numeric: tabular-nums; color: var(--steel); font-weight: 600; letter-spacing: 0.02em; }
+.jc-head h2 { margin: 0; font-size: 1rem; font-weight: 700; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 2px 12px; }
+.jc-code { font-variant-numeric: tabular-nums; color: var(--steel); font-weight: 600; letter-spacing: 0.02em; font-size: 0.8125rem; overflow-wrap: anywhere; }
 .jc-sub { font-size: 0.8125rem; color: var(--steel); }
 .jc-list { list-style: none; margin: 0; padding: 8px 18px; overflow-y: auto; }
 .jc-list li { display: grid; grid-template-columns: 6.5rem 1fr; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--hair); font-size: 0.875rem; }
@@ -423,6 +423,12 @@ fieldset.field { border: 0; margin: 0; padding: 0; }
 .ps-c, .ps-v { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; transition: opacity 0.4s ease; }
 .ps-c.on, .ps-v.on { opacity: 1; }
 .ps-v { object-fit: cover; z-index: 100000; transition: none; }
+/* a part fitting into place is drawn over the photo here (psFitAnim) */
+.ps-fx { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 90000; pointer-events: none; opacity: 0; }
+.ps-fx.on { opacity: 1; }
+/* the job card button pulses when a part goes on that the photo can't show */
+.b-card-toggle.pulse { animation: card-pulse 0.9s ease; }
+@keyframes card-pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(232, 235, 238, 0); } 30% { box-shadow: 0 0 0 6px rgba(232, 235, 238, 0.28); background: rgba(255, 255, 255, 0.12); } }
 .ps-load { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); margin: 0; font-size: 0.875rem; color: var(--steel); pointer-events: none; }
 .ps-dots { position: absolute; display: flex; gap: 7px; transform: translateX(-50%); pointer-events: none; }
 .ps-dots span { width: 6px; height: 6px; border-radius: 50%; background: rgba(232, 235, 238, 0.25); transition: background-color 0.3s ease, transform 0.3s ease; }
@@ -464,6 +470,7 @@ body:not(.in-builder) .loading { display: none; }
   .b-tabs { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; }
   .b-tab { flex: none; padding: 9px 14px; scroll-snap-align: start; }
   .b-tabs-label { flex: none; align-self: center; padding: 0 2px 0 10px; border-left: 1px solid var(--hair); margin-left: 4px; }
+  .b-tabs-parts { display: contents; }
   .b-options { padding: 12px; }
   .b-card { left: 12px; right: 12px; width: auto; top: 70px; max-height: calc(56vh - 90px); }
   .b-dock { bottom: calc(44vh + 10px); left: 12px; right: 12px; transform: none; justify-content: flex-start; overflow-x: auto; padding: 0; background: none; border: 0; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; }

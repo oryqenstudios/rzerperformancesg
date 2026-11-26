@@ -385,7 +385,7 @@ fieldset.field { border: 0; margin: 0; padding: 0; }
 .opt .stock-tag { font-size: 0.6875rem; color: var(--graphite); margin-left: 6px; font-weight: 500; }
 /* brand parts: a tab per brand under a label, the brand's parts as cards with the cut-out product photo */
 .b-tabs-label { grid-column: 1 / -1; padding: 8px 4px 2px; font-size: 0.6875rem; color: var(--graphite); letter-spacing: 0.06em; text-transform: uppercase; }
-.b-tab-brand { letter-spacing: 0.06em; }
+.b-tabs-parts { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
 .p-intro { margin: 0; font-size: 0.8125rem; color: var(--steel); line-height: 1.45; }
 .popt { grid-template-columns: 1fr auto; gap: 2px 10px; padding: 0 0 12px; align-items: start; overflow: hidden; }
 .popt .p-img {
@@ -406,8 +406,8 @@ fieldset.field { border: 0; margin: 0; padding: 0; }
 }
 .b-card[hidden] { display: none; }
 .jc-head { padding: 16px 18px 12px; border-bottom: 1px dashed rgba(232, 235, 238, 0.2); display: grid; gap: 4px; }
-.jc-head h2 { margin: 0; font-size: 1rem; font-weight: 700; display: flex; justify-content: space-between; gap: 12px; }
-.jc-code { font-variant-numeric: tabular-nums; color: var(--steel); font-weight: 600; letter-spacing: 0.02em; }
+.jc-head h2 { margin: 0; font-size: 1rem; font-weight: 700; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 2px 12px; }
+.jc-code { font-variant-numeric: tabular-nums; color: var(--steel); font-weight: 600; letter-spacing: 0.02em; font-size: 0.8125rem; overflow-wrap: anywhere; }
 .jc-sub { font-size: 0.8125rem; color: var(--steel); }
 .jc-list { list-style: none; margin: 0; padding: 8px 18px; overflow-y: auto; }
 .jc-list li { display: grid; grid-template-columns: 6.5rem 1fr; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--hair); font-size: 0.875rem; }
@@ -437,6 +437,12 @@ fieldset.field { border: 0; margin: 0; padding: 0; }
 .ps-c, .ps-v { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; transition: opacity 0.4s ease; }
 .ps-c.on, .ps-v.on { opacity: 1; }
 .ps-v { object-fit: cover; z-index: 100000; transition: none; }
+/* a part fitting into place is drawn over the photo here (psFitAnim) */
+.ps-fx { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 90000; pointer-events: none; opacity: 0; }
+.ps-fx.on { opacity: 1; }
+/* the job card button pulses when a part goes on that the photo can't show */
+.b-card-toggle.pulse { animation: card-pulse 0.9s ease; }
+@keyframes card-pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(232, 235, 238, 0); } 30% { box-shadow: 0 0 0 6px rgba(232, 235, 238, 0.28); background: rgba(255, 255, 255, 0.12); } }
 .ps-load { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); margin: 0; font-size: 0.875rem; color: var(--steel); pointer-events: none; }
 .ps-dots { position: absolute; display: flex; gap: 7px; transform: translateX(-50%); pointer-events: none; }
 .ps-dots span { width: 6px; height: 6px; border-radius: 50%; background: rgba(232, 235, 238, 0.25); transition: background-color 0.3s ease, transform 0.3s ease; }
@@ -478,6 +484,7 @@ body:not(.in-builder) .loading { display: none; }
   .b-tabs { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; }
   .b-tab { flex: none; padding: 9px 14px; scroll-snap-align: start; }
   .b-tabs-label { flex: none; align-self: center; padding: 0 2px 0 10px; border-left: 1px solid var(--hair); margin-left: 4px; }
+  .b-tabs-parts { display: contents; }
   .b-options { padding: 12px; }
   .b-card { left: 12px; right: 12px; width: auto; top: 70px; max-height: calc(56vh - 90px); }
   .b-dock { bottom: calc(44vh + 10px); left: 12px; right: 12px; transform: none; justify-content: flex-start; overflow-x: auto; padding: 0; background: none; border: 0; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
@@ -679,6 +686,7 @@ body:not(.in-builder) .loading { display: none; }
     <div class="ps-frame" id="ps-frame" role="img" aria-label="Photo of the car with the chosen parts">
       <canvas class="ps-c" width="1920" height="1080"></canvas>
       <canvas class="ps-c" width="1920" height="1080"></canvas>
+      <canvas class="ps-fx" id="ps-fx" width="1920" height="1080" aria-hidden="true"></canvas>
       <video class="ps-v" id="ps-v" muted playsinline preload="none" aria-hidden="true"></video>
     </div>
     <p class="ps-load" id="ps-load" aria-live="polite"></p>
@@ -1694,86 +1702,147 @@ const CATS = [
       { id: 'carbon', name: 'Carbon caps', note: 'Exposed twill weave', mark: 'C', u: { uMirror: 1 } },
     ] } ] },
 ];
-// ------------------------------------------------------------------ brand parts (HKS, TOMEI, ENDLESS)
-// Real parts that fit the Evo IX (CT9A), chosen by the client from the research in reports/. Each slot is an option
-// group whose first item is 'none' (stock), so the job card, build code and copy-build treat them like any other
-// option. The configurator shows them in a tab per brand, grouped by type; picking a part again removes it. Photos
-// are the makers' product shots cut out onto a transparent background (assets/parts/, see assets/parts/README.md).
-// `link` sets the matching visual options, so the photo shows what the part looks like where a layer exists.
-const PART_BRANDS = ['HKS', 'TOMEI', 'ENDLESS'];
-const P = (brand, id, name, note, link) => ({ id, brand, name, note, img: id === 'hks-hipower-us' ? null : `assets/parts/${id}.webp`, link });
-const EX_STEEL = { exhaust: 'factory', exfin: 'polished' }, EX_TI = { exhaust: 'factory', exfin: 'titanium' };
-const PART_SLOTS = [
-  { key: 'p_exhaust', label: 'Exhaust', card: 'Exhaust system', icon: 'exhaust', items: [
-    P('HKS', 'hks-super-turbo-muffler', 'Super Turbo Muffler', 'Polished stainless cat-back with a rounded-oval silencer, a ring of slots on its end cap and one 124 mm round tip with a blue heat tint.', EX_STEEL),
-    P('HKS', 'hks-silent-hipower', 'silent Hi-Power (TYPE-S)', 'The quieter HKS cat-back: polished stainless oval silencer and one plain 120 mm round tip at the factory exit.', EX_STEEL),
-    P('HKS', 'hks-hipower-spec-r', 'Hi-Power SPEC-R', 'Full titanium cat-back, much lighter than the factory system, with a cylindrical silencer and one 120 mm blue-tinted tip.', EX_TI),
-    P('HKS', 'hks-hipower-us', 'Hi-Power (US market)', 'Stainless cat-back from the Hi-Power range with one 120 mm round tip, made for the US-market Evo VIII and IX.', EX_STEEL),
-    P('HKS', 'hks-legal', 'LEGAL (US market)', 'Street cat-back with a matte black silencer and piping, finished with one polished 106 mm round tip.', EX_STEEL),
-    P('HKS', 'hks-carbon-ti', 'Carbon-Ti (US market)', 'Cat-back with a carbon-wrapped silencer, polished stainless piping and a double-wall burnt-titanium tip.', EX_TI),
-    P('TOMEI', 'tomei-expreme-ti', 'EXPREME Ti titanium muffler', 'Full titanium cat-back at under a third of the factory system\'s weight, with a round silencer and one 115 mm heat-blued tip.', EX_TI),
-  ] },
-  { key: 'p_manifold', label: 'Exhaust manifold', card: 'Manifold', icon: 'manifold', items: [
-    P('TOMEI', 'tomei-expreme-manifold', 'EXPREME Exhaust Manifold', 'Polished stainless tubular manifold for the 4G63, supplied with heat wrap and gaskets.'),
-  ] },
-  { key: 'p_heat', label: 'Heat protector', card: 'Heat shield', icon: 'manifold', items: [
-    P('TOMEI', 'tomei-heat-protector', 'EXPREME Heat Protector', 'Stainless heat shield over the exhaust manifold; fits the EXPREME manifold or the factory one.'),
-  ] },
-  { key: 'p_frontpipe', label: 'Turbo outlet and front pipe', card: 'Front pipe', icon: 'pipe', items: [
-    P('HKS', 'hks-gt-extension', 'GT Extension Kit', 'Stainless turbo outlet extension and front pipe in one piece, for freer flow from the turbo.'),
-    P('HKS', 'hks-front-pipe', 'Front Pipe', 'Polished stainless front pipe from the turbo outlet back to the catalyst.'),
-    P('TOMEI', 'tomei-outlet-component', 'EXPREME Outlet Component Ver.2', 'Turbine outlet and 3-inch stainless front pipe with a flexible section, supplied with gaskets.'),
-  ] },
-  { key: 'p_cat', label: 'Catalyst pipe', card: 'Catalyst', icon: 'pipe', items: [
-    P('HKS', 'hks-metal-catalyzer', 'Metal Catalyzer', 'High-flow 70 mm metal-core catalytic converter in stainless steel, supplied with gaskets and bolts.'),
-    P('TOMEI', 'tomei-ti-cat-straight', 'EXPREME Ti Cat Straight Pipe', 'Titanium straight pipe that takes the place of the catalytic converter section.'),
-  ] },
-  { key: 'p_turbo', label: 'Turbo', card: 'Turbo', icon: 'turbo', items: [
-    P('HKS', 'hks-gtiii-rs', 'GT III Sports Turbine Kit (GTIII-RS)', 'Bolt-on turbo upgrade for the 4G63 that replaces the factory turbo, supplied with oil and water lines and gaskets.'),
-    P('TOMEI', 'tomei-arms-m7963', 'ARMS M7963 Turbo Kit', 'Bolt-on ARMS turbo kit for the 4G63 with its own actuator, oil and water lines and gaskets.'),
-  ] },
-  { key: 'p_coilover', label: 'Coilovers', card: 'Coilovers', icon: 'coilover', items: [
-    P('ENDLESS', 'endless-function-ps', 'FUNCTION-PS', 'Street coilovers from the current FUNCTION range on X COILS PLUS springs (8 kg/mm front, 5 rear), with reinforced rubber top mounts.', { ride: 'coilovers' }),
-    P('ENDLESS', 'endless-function-sc', 'FUNCTION-SC', 'The softest FUNCTION setup, tuned for the street: X COILS springs (8 kg/mm front, 5 rear) on rubber top mounts.', { ride: 'coilovers' }),
-    P('ENDLESS', 'endless-function-tc', 'FUNCTION-TC', 'Track coilovers with firmer X COILS R springs (12 kg/mm front, 10 rear) plus helpers, on spherical top mounts.', { ride: 'coilovers' }),
-    P('ENDLESS', 'endless-zeal-function-x-plus', 'ZEAL Function X Plus', 'Blue-bodied, height-adjustable coilovers with yellow springs, in a soft or a hard spring set.', { ride: 'coilovers' }),
-    P('ENDLESS', 'endless-zeal-super-function', 'ZEAL Super Function Racing', 'Circuit coilovers with red springs and race spring rates, for track days and time attack.', { ride: 'coilovers' }),
-  ] },
-  { key: 'p_brakef', label: 'Brake kit (front)', card: 'Front brakes', icon: 'caliper', items: [
-    P('ENDLESS', 'endless-racing-mono6', 'Racing MONO6', 'Forged monoblock six-piston front calipers in hard-anodised gunmetal with a red logo, on 370 mm discs.'),
-    P('ENDLESS', 'endless-racing-mono4', 'Racing MONO4', 'Forged monoblock four-piston front calipers in hard-anodised gunmetal, on 355 mm discs.'),
-    P('ENDLESS', 'endless-mono6-sports-ta', 'MONO6 Sports TA', 'Monoblock six-piston front calipers in blue, with discs from the factory size up to 370 mm.', { caliper: 'blue' }),
-    P('ENDLESS', 'endless-racing6', 'Racing6', 'Two-piece six-piston front calipers in blue anodise, on 370 mm discs.', { caliper: 'blue' }),
-    P('ENDLESS', 'endless-6pot', '6POT', 'Two-piece six-piston front calipers in blue anodise, with discs from the factory size up to 370 mm.', { caliper: 'blue' }),
-    P('ENDLESS', 'endless-chibi6', '6POT Compact Mini (Chibi6)', 'Compact six-piston front calipers in blue anodise, for the factory-size or 320 mm discs.', { caliper: 'blue' }),
-    P('ENDLESS', 'endless-m4', 'M4', 'Two-piece four-piston front calipers in blue anodise, for the factory-size or 320 mm discs.', { caliper: 'blue' }),
-  ] },
-  { key: 'p_braker', label: 'Brake kit (rear)', card: 'Rear brakes', icon: 'caliper', items: [
-    P('ENDLESS', 'endless-racing-mono4r', 'Racing MONO4r', 'Forged monoblock four-piston rear calipers in hard-anodised gunmetal, on 332 mm discs.'),
-    P('ENDLESS', 'endless-racing4-rear', 'Racing4', 'Two-piece four-piston rear calipers in blue anodise, on 332 mm discs.', { caliper: 'blue' }),
-    P('ENDLESS', 'endless-s2-rear', 'S2', 'Two-piston rear calipers in blue anodise, for the factory-size or 300 mm discs.', { caliper: 'blue' }),
-  ] },
-  { key: 'p_pads', label: 'Brake pads', card: 'Pads', icon: 'pad', items: [
-    P('ENDLESS', 'endless-pads-street', 'Street and sport pads', 'Pads for the factory Brembo calipers, front and rear, in ENDLESS street and sport compounds such as SS-S, MX72 and MX72 Plus.'),
-  ] },
-  { key: 'p_discf', label: 'Brake discs (front)', card: 'Front discs', icon: 'disc', items: [
-    P('ENDLESS', 'endless-disc-racing-front', 'Racing 2-piece disc', 'Two-piece front discs at the factory size, with E-slit or curving-slit grooves and an anodised bell.'),
-    Object.assign(P('ENDLESS', 'endless-disc-basic-slit', 'Basic Slit disc', 'One-piece slotted front discs at the factory size.'), { id: 'endless-disc-basic-slit-f' }),
-  ] },
-  { key: 'p_discr', label: 'Brake discs (rear)', card: 'Rear discs', icon: 'disc', items: [
-    P('ENDLESS', 'endless-disc-eslit-rear', 'E-Slit disc', 'Rear discs at the factory size with ENDLESS\'s E-slit groove pattern.'),
-    Object.assign(P('ENDLESS', 'endless-disc-basic-slit', 'Basic Slit disc', 'One-piece slotted rear discs at the factory size.'), { id: 'endless-disc-basic-slit-r' }),
-  ] },
-  { key: 'p_lines', label: 'Brake lines', card: 'Brake lines', icon: 'line', items: [
-    P('ENDLESS', 'endless-swivel-steel', 'Swivel Steel', 'Stainless braided brake lines with swivel fittings, for a firmer, more consistent pedal.'),
-    P('ENDLESS', 'endless-swivel-racing', 'Swivel Racing', 'Race braided brake lines with stainless swivel fittings, built for repeated hard braking on track.'),
-  ] },
+// ------------------------------------------------------------------ performance parts (HKS, TOMEI, ENDLESS)
+// Real parts that fit the Evo IX (CT9A), chosen by the client from the research in reports/, shown by type in the
+// "Performance parts" tabs (PART_TABS), never by brand. Each part is its own option group (key 'p_' + id, first item
+// 'none'), so the job card and copy-build list it like any option. Parts that can't be fitted together share an
+// `excl` name: picking one takes the others off (two turbos, two exhausts, a stroker kit and separate pistons...).
+// Photos are the makers' product shots cut out onto a transparent background (assets/parts/, see its README). A part
+// that shows on the car has its own photo layer per view ('bp-' + id in the manifest, made by tools/config-build.py
+// from Kling edits of the car with that part fitted); `link` sets the visual options it implies.
+const EX_STEEL = { exhaust: 'factory', exfin: 'polished' };
+const COIL = { ride: 'coilovers' };
+const PART_TYPES = {
+  turbo: ['Turbo kits', 'Turbo'], bov: ['Blow-off valves', 'Blow-off valve'],
+  exhaust: ['Exhaust systems', 'Exhaust'], manifold: ['Manifold and heat shield', 'Manifold'], frontpipe: ['Front pipes', 'Front pipe'], cat: ['Catalyst', 'Catalyst'],
+  intake: ['Intakes and filters', 'Intake'], suction: ['Intake hose', 'Intake hose'],
+  cams: ['Camshafts', 'Camshafts'], valvetrain: ['Valve springs, retainers and cam gears', 'Valvetrain'], bottom: ['Pistons, rods and crank', 'Bottom end'], gasket: ['Head gaskets', 'Head gasket'], oil: ['Oil and cooling', 'Oil'],
+  fuel: ['Fuel', 'Fuel'], ignition: ['Ignition', 'Ignition'],
+  ecu: ['Engine management', 'ECU'], boost: ['Boost control', 'Boost control'], timer: ['Turbo timer', 'Turbo timer'],
+  clutch: ['Clutches', 'Clutch'], coilover: ['Coilovers', 'Coilovers'],
+  brakef: ['Front brake kits', 'Front brakes'], braker: ['Rear brake kits', 'Rear brakes'], pads: ['Brake pads', 'Pads'], discs: ['Brake discs', 'Discs'], lines: ['Brake lines', 'Brake lines'],
+};
+// the tabs: label, types in order, and where the photo goes when the tab opens (engine: the engine bay)
+const PART_TABS = [
+  { id: 'pt-turbo', label: 'Turbo', types: ['turbo', 'bov'], place: 'engine' },
+  { id: 'pt-exhaust', label: 'Exhaust', types: ['exhaust', 'manifold', 'frontpipe', 'cat'], view: 'exhaust' },
+  { id: 'pt-intake', label: 'Intake', types: ['intake', 'suction'], place: 'engine' },
+  { id: 'pt-engine', label: 'Engine', types: ['cams', 'valvetrain', 'bottom', 'gasket', 'oil'], place: 'engine' },
+  { id: 'pt-fuel', label: 'Fuel', types: ['fuel'], place: 'engine' },
+  { id: 'pt-electronics', label: 'Electronics', types: ['ecu', 'boost', 'timer', 'ignition'] },
+  { id: 'pt-clutch', label: 'Clutch', types: ['clutch'] },
+  { id: 'pt-coilovers', label: 'Coilovers', types: ['coilover'], view: 'a090' },
+  { id: 'pt-brakes', label: 'Brakes', types: ['brakef', 'braker', 'pads', 'discs', 'lines'], view: 'wheel' },
 ];
-for (const g of PART_SLOTS) g.items.unshift({ id: 'none', name: 'None', note: 'Factory part' });
-CATS.push({ id: 'parts', label: 'Parts', view: 'exhaust', hidden: true, groups: PART_SLOTS });
-// one tab per brand: the slots that brand fills, with only its parts
-const BRAND_VIEW = { HKS: 'exhaust', TOMEI: 'exhaust', ENDLESS: 'brakes' };
-for (const b of PART_BRANDS) CATS.push({ id: b.toLowerCase(), label: b, view: BRAND_VIEW[b], brand: b, groups: [] });
+const NO_PHOTO = new Set(['hks-hipower-us', 'hks-turbo-timer']);
+const PHOTO_OF = { 'endless-disc-basic-slit-f': 'endless-disc-basic-slit', 'endless-disc-basic-slit-r': 'endless-disc-basic-slit' };
+const P = (type, brand, id, name, note, more = {}) => Object.assign({
+  id, type, brand, name, note, img: NO_PHOTO.has(id) ? null : `assets/parts/${PHOTO_OF[id] || id}.webp`, excl: [type],
+}, more);
+const ANY = { excl: [] };   // fits alongside anything of its type
+const PARTS = [
+  // turbo
+  P('turbo', 'HKS', 'hks-gtiii-rs', 'GT III Sports Turbine Kit (GTIII-RS)', 'Bolt-on ball-bearing turbo upgrade that replaces the factory turbo, supplied with oil and water lines and gaskets.'),
+  P('turbo', 'TOMEI', 'tomei-arms-m7963', 'ARMS M7963 Turbo Kit', 'Bolt-on ARMS turbo kit with its own actuator, oil and water lines and gaskets, sized for a strong street 4G63.'),
+  P('bov', 'HKS', 'hks-ssqv4', 'Super SQV4 kit', 'Sequential blow-off valve in silver die-cast aluminium with a finned trumpet outlet, as a kit for the Evo IX.'),
+  P('bov', 'HKS', 'hks-suction-return', 'Suction Return Kit', 'Return pipework that feeds the Super SQV4\'s vented air back into the intake.', ANY),
+  P('bov', 'TOMEI', 'tomei-bov', 'Blow Off Valve (strengthened)', 'Strengthened replacement for the factory blow-off valve in silver aluminium, holding boost better than the original.'),
+  // exhaust
+  P('exhaust', 'HKS', 'hks-super-turbo-muffler', 'Super Turbo Muffler', 'Polished stainless cat-back with a rounded-oval silencer, a ring of slots on its end cap and one 124 mm round tip with a blue heat tint.', { link: EX_STEEL }),
+  P('exhaust', 'HKS', 'hks-silent-hipower', 'silent Hi-Power (TYPE-S)', 'The quieter HKS cat-back: polished stainless oval silencer and one plain 120 mm round tip at the factory exit.', { link: EX_STEEL }),
+  P('exhaust', 'HKS', 'hks-hipower-spec-r', 'Hi-Power SPEC-R', 'Full titanium cat-back, much lighter than the factory system, with a cylindrical silencer and one 120 mm blue-tinted tip.', { link: EX_STEEL }),
+  P('exhaust', 'HKS', 'hks-hipower-us', 'Hi-Power (US market)', 'Stainless cat-back from the Hi-Power range with one 120 mm round tip, made for the US-market Evo VIII and IX.', { link: EX_STEEL }),
+  P('exhaust', 'HKS', 'hks-legal', 'LEGAL (US market)', 'Street cat-back with a matte black silencer and piping, finished with one polished 106 mm round tip.', { link: EX_STEEL }),
+  P('exhaust', 'HKS', 'hks-carbon-ti', 'Carbon-Ti (US market)', 'Cat-back with a carbon-wrapped silencer, polished stainless piping and a double-wall burnt-titanium tip.', { link: EX_STEEL }),
+  P('exhaust', 'TOMEI', 'tomei-expreme-ti', 'EXPREME Ti titanium muffler', 'Full titanium cat-back at under a third of the factory system\'s weight, with a round silencer and one 115 mm heat-blued tip.', { link: EX_STEEL }),
+  P('manifold', 'TOMEI', 'tomei-expreme-manifold', 'EXPREME Exhaust Manifold', 'Polished stainless tubular manifold for the 4G63, supplied with heat wrap and gaskets.', { excl: ['manifold'] }),
+  P('manifold', 'TOMEI', 'tomei-heat-protector', 'EXPREME Heat Protector', 'Stainless heat shield over the exhaust manifold; fits the EXPREME manifold or the factory one.', { excl: ['heat'] }),
+  P('frontpipe', 'HKS', 'hks-gt-extension', 'GT Extension Kit', 'Stainless turbo outlet extension and front pipe in one piece, for freer flow from the turbo.'),
+  P('frontpipe', 'HKS', 'hks-front-pipe', 'Front Pipe', 'Polished stainless front pipe from the turbo outlet back to the catalyst.'),
+  P('frontpipe', 'TOMEI', 'tomei-outlet-component', 'EXPREME Outlet Component Ver.2', 'Turbine outlet and 3-inch stainless front pipe with a flexible section, supplied with gaskets.'),
+  P('cat', 'HKS', 'hks-metal-catalyzer', 'Metal Catalyzer', 'High-flow 70 mm metal-core catalytic converter in stainless steel, supplied with gaskets and bolts.'),
+  P('cat', 'TOMEI', 'tomei-ti-cat-straight', 'EXPREME Ti Cat Straight Pipe', 'Titanium straight pipe that takes the place of the catalytic converter section.'),
+  // intake
+  P('intake', 'HKS', 'hks-racing-suction', 'Racing Suction', 'Red cone filter on a polished intake pipe in place of the factory air box, with a sharper induction sound.'),
+  P('intake', 'HKS', 'hks-super-power-flow', 'Super Power Flow', 'Green mushroom-shaped filter that replaces the factory air box for more airflow.'),
+  P('intake', 'HKS', 'hks-premium-suction', 'Premium Suction', 'Enclosed black intake box that keeps the filter away from engine heat while flowing more air than stock.'),
+  P('intake', 'HKS', 'hks-super-air-filter', 'Super Air Filter', 'Drop-in panel filter that replaces the factory filter inside the stock air box.'),
+  P('suction', 'TOMEI', 'tomei-turbo-suction-hose', 'Turbo Suction Hose', 'Smooth blue silicone hose from the air filter to the turbo, larger than stock and without the factory bellows.'),
+  // engine
+  P('cams', 'HKS', 'hks-cam-ex', 'Camshaft EX 278°', 'Exhaust camshaft with 278° duration and 11.0 mm lift, used with the HKS valve springs.', { excl: ['camex'] }),
+  P('cams', 'HKS', 'hks-cam-in-step2', 'Camshaft IN STEP2 274°', 'STEP2 intake camshaft with 274° duration and 11.0 mm lift.', { excl: ['camin'] }),
+  P('cams', 'TOMEI', 'tomei-poncam-evo9', 'PONCAM EVO9 (intake and exhaust)', 'Intake and exhaust camshaft set made for the Evo IX\'s MIVEC engine, a bolt-in upgrade on the factory valve springs.', { excl: ['camex', 'camin'] }),
+  P('cams', 'TOMEI', 'tomei-procam-evo9', 'PROCAM EVO9', 'Single intake or exhaust camshafts in a range of durations for built engines, in hydraulic or solid-lifter versions.', { excl: ['camex', 'camin'] }),
+  P('valvetrain', 'HKS', 'hks-valve-spring', 'Valve Spring', 'Strengthened valve springs to suit HKS camshafts.', { excl: ['springs'] }),
+  P('valvetrain', 'HKS', 'hks-cam-pulley', 'Cam Pulley (adjustable)', 'Adjustable aluminium cam pulley, anodised purple, for fine-tuning cam timing.', { excl: ['camgear'] }),
+  P('valvetrain', 'TOMEI', 'tomei-valve-spring', 'Valve Spring', 'Strengthened oval-wire valve springs for up to 11.5 mm of valve lift.', { excl: ['springs'] }),
+  P('valvetrain', 'TOMEI', 'tomei-ti-retainer', 'Titanium Valve Spring Retainers', 'Titanium retainers, nearly 40% lighter than stock, made for the TOMEI valve springs.', ANY),
+  P('valvetrain', 'TOMEI', 'tomei-cam-gear', 'Adjustable Cam Gear', 'Red-anodised duralumin cam gear for fine-tuning cam timing.', { excl: ['camgear'] }),
+  P('bottom', 'HKS', 'hks-forged-pistons', 'Forged Piston Kit', 'Forged pistons with nickel plating and moly-coated skirts, slightly oversized, for a rebuilt 4G63.', { excl: ['pistons'] }),
+  P('bottom', 'HKS', 'hks-conrods', 'Connecting Rod Set (H-beam)', 'H-beam connecting rods made to go with the HKS forged pistons.', { excl: ['rods'] }),
+  P('bottom', 'TOMEI', 'tomei-stroker-kits', '2.2 L / 2.3 L stroker kit', 'Complete stroker kits with crank, rods, pistons and rings that take the 4G63 to 2.2 or 2.3 litres.', { excl: ['pistons', 'rods', 'crank'] }),
+  P('bottom', 'TOMEI', 'tomei-forged-pistons', 'Forged Piston Kit', 'Forged pistons made for the TOMEI stroker crankshaft.', { excl: ['pistons'] }),
+  P('bottom', 'TOMEI', 'tomei-conrods', 'Forged H-Beam Conrods', 'Forged H-beam connecting rods in chrome-moly steel, in 147 mm and 150 mm lengths.', { excl: ['rods'] }),
+  P('bottom', 'TOMEI', 'tomei-billet-crank', 'Billet Full Counter Crank', 'Billet, fully counterweighted stroker crankshaft for 2.2-litre or 2.3-litre builds.', { excl: ['crank'] }),
+  P('bottom', 'TOMEI', 'tomei-studs-bearings', 'Studs, bolts and bearings', 'Head and main studs, bolts and bearings for a built 4G63.', ANY),
+  P('gasket', 'HKS', 'hks-head-gasket', 'Stopper Type Head Gasket', 'Multi-layer metal head gasket with an opposed-bead stopper, in several thicknesses.'),
+  P('gasket', 'TOMEI', 'tomei-head-gasket', 'Metal Head Gasket', 'Metal head gasket with a stainless bead layer for an 86.5 mm bore, in several thicknesses.'),
+  P('oil', 'HKS', 'hks-oil-cooler-black', 'Oil Cooler Kit Black', 'Extra oil cooler behind the front bumper that works alongside the factory cooler, with braided lines.', ANY),
+  P('oil', 'TOMEI', 'tomei-thermostat-killer', 'Oil Thermostat Killer', 'Replaces the oil thermostat so oil always flows through the cooler.', ANY),
+  P('oil', 'TOMEI', 'tomei-slicing-baffle', 'Slicing Baffle', 'Oil pan baffle and cutter plates that stop oil surging away from the pickup under hard cornering.', ANY),
+  // fuel and ignition
+  P('fuel', 'HKS', 'hks-fuel-regulator', 'Fuel Regulator', 'Adjustable fuel pressure regulator with its bracket and fittings.', { excl: ['fpr'] }),
+  P('fuel', 'TOMEI', 'tomei-fuel-pump', 'Fuel Pump', 'High-flow in-tank fuel pump in 255 L/h or 350 L/h versions.', { excl: ['pump'] }),
+  P('fuel', 'TOMEI', 'tomei-fpr', 'Fuel Pressure Regulator', 'Adjustable fuel pressure regulator in hard-anodised billet aluminium with blue fittings.', { excl: ['fpr'] }),
+  P('ignition', 'HKS', 'hks-coil-pro', 'Super Fire Racing Coil Pro', 'Coil-on-plug ignition coils that give a stronger spark than the factory coils.', { excl: ['coils'] }),
+  P('ignition', 'HKS', 'hks-spark-plugs', 'Super Fire Racing M-iL spark plugs', 'Iridium racing spark plugs in a range of heat ranges.', { excl: ['plugs'] }),
+  // electronics
+  P('ecu', 'HKS', 'hks-fcon-is', 'F-CON iS', 'Piggy-back computer that adjusts fuel and ignition, tuned by an HKS dealer.'),
+  P('ecu', 'HKS', 'hks-fcon-vpro', 'F-CON V Pro', 'Full stand-alone engine management, set up by an HKS dealer.'),
+  P('boost', 'HKS', 'hks-evc7-mr', 'EVC7-MR', 'Electronic boost controller with a compact colour display and a lit control dial.'),
+  P('boost', 'HKS', 'hks-evc-s2', 'EVC-S2', 'Electronic boost controller with a large numeric display and four buttons.'),
+  P('timer', 'HKS', 'hks-turbo-timer', 'Turbo Timer', 'Keeps the engine idling for a set time after you switch off, so the turbo cools down.'),
+  // clutch
+  P('clutch', 'HKS', 'hks-la-clutch', 'LA Clutch', 'Single-plate clutch with a light 5.1 kg flywheel, rated for 450 PS.'),
+  P('clutch', 'HKS', 'hks-la-clutch-twin', 'LA Clutch Twin', 'Twin-plate clutch with a light flywheel, for more power than a single plate holds.'),
+  // coilovers
+  P('coilover', 'HKS', 'hks-hipermax-s', 'HIPERMAX S', 'Street coilovers with 30-step damping, black bodies and white springs; about 34 mm lower at the front and 16 mm at the rear.', { link: COIL }),
+  P('coilover', 'HKS', 'hks-hipermax-r', 'HIPERMAX R', 'Track coilovers with pillow-ball top mounts and 30-step damping; about 43 mm lower at the front and 25 mm at the rear.', { link: COIL }),
+  P('coilover', 'ENDLESS', 'endless-function-ps', 'FUNCTION-PS', 'Street coilovers from the current FUNCTION range on X COILS PLUS springs (8 kg/mm front, 5 rear), with reinforced rubber top mounts.', { link: COIL }),
+  P('coilover', 'ENDLESS', 'endless-function-sc', 'FUNCTION-SC', 'The softest FUNCTION setup, tuned for the street: X COILS springs (8 kg/mm front, 5 rear) on rubber top mounts.', { link: COIL }),
+  P('coilover', 'ENDLESS', 'endless-function-tc', 'FUNCTION-TC', 'Track coilovers with firmer X COILS R springs (12 kg/mm front, 10 rear) plus helpers, on spherical top mounts.', { link: COIL }),
+  P('coilover', 'ENDLESS', 'endless-zeal-function-x-plus', 'ZEAL Function X Plus', 'Blue-bodied, height-adjustable coilovers with yellow springs, in a soft or a hard spring set.', { link: COIL }),
+  P('coilover', 'ENDLESS', 'endless-zeal-super-function', 'ZEAL Super Function Racing', 'Circuit coilovers with red springs and race spring rates, for track days and time attack.', { link: COIL }),
+  // brakes
+  P('brakef', 'ENDLESS', 'endless-racing-mono6', 'Racing MONO6', 'Forged monoblock six-piston front calipers in hard-anodised gunmetal with a red logo, on 370 mm discs.'),
+  P('brakef', 'ENDLESS', 'endless-racing-mono4', 'Racing MONO4', 'Forged monoblock four-piston front calipers in hard-anodised gunmetal, on 355 mm discs.'),
+  P('brakef', 'ENDLESS', 'endless-mono6-sports-ta', 'MONO6 Sports TA', 'Monoblock six-piston front calipers in blue, with discs from the factory size up to 370 mm.'),
+  P('brakef', 'ENDLESS', 'endless-racing6', 'Racing6', 'Two-piece six-piston front calipers in blue anodise, on 370 mm discs.'),
+  P('brakef', 'ENDLESS', 'endless-6pot', '6POT', 'Two-piece six-piston front calipers in blue anodise, with discs from the factory size up to 370 mm.'),
+  P('brakef', 'ENDLESS', 'endless-chibi6', '6POT Compact Mini (Chibi6)', 'Compact six-piston front calipers in blue anodise, for the factory-size or 320 mm discs.'),
+  P('brakef', 'ENDLESS', 'endless-m4', 'M4', 'Two-piece four-piston front calipers in blue anodise, for the factory-size or 320 mm discs.'),
+  P('brakef', 'HKS', 'hks-brake-system', 'HKS Brake System (front and rear)', 'Silver-anodised aluminium calipers front and rear on large two-piece slotted discs with gold-coloured bells.', { excl: ['brakef', 'braker'] }),
+  P('braker', 'ENDLESS', 'endless-racing-mono4r', 'Racing MONO4r', 'Forged monoblock four-piston rear calipers in hard-anodised gunmetal, on 332 mm discs.'),
+  P('braker', 'ENDLESS', 'endless-racing4-rear', 'Racing4', 'Two-piece four-piston rear calipers in blue anodise, on 332 mm discs.'),
+  P('braker', 'ENDLESS', 'endless-s2-rear', 'S2', 'Two-piston rear calipers in blue anodise, for the factory-size or 300 mm discs.'),
+  P('pads', 'ENDLESS', 'endless-pads-street', 'Street and sport pads', 'Pads for the factory Brembo calipers, front and rear, in ENDLESS street and sport compounds such as SS-S, MX72 and MX72 Plus.'),
+  P('discs', 'ENDLESS', 'endless-disc-racing-front', 'Racing 2-piece disc (front)', 'Two-piece front discs at the factory size, with E-slit or curving-slit grooves and an anodised bell.', { excl: ['discf'] }),
+  P('discs', 'ENDLESS', 'endless-disc-basic-slit-f', 'Basic Slit disc (front)', 'One-piece slotted front discs at the factory size.', { excl: ['discf'] }),
+  P('discs', 'ENDLESS', 'endless-disc-eslit-rear', 'E-Slit disc (rear)', 'Rear discs at the factory size with ENDLESS\'s E-slit groove pattern.', { excl: ['discr'] }),
+  P('discs', 'ENDLESS', 'endless-disc-basic-slit-r', 'Basic Slit disc (rear)', 'One-piece slotted rear discs at the factory size.', { excl: ['discr'] }),
+  P('lines', 'ENDLESS', 'endless-swivel-steel', 'Swivel Steel', 'Stainless braided brake lines with swivel fittings, for a firmer, more consistent pedal.'),
+  P('lines', 'ENDLESS', 'endless-swivel-racing', 'Swivel Racing', 'Race braided brake lines with stainless swivel fittings, built for repeated hard braking on track.'),
+];
+const PART = Object.fromEntries(PARTS.map(p => [p.id, p]));
+const PART_GROUPS = PARTS.map(p => ({ key: 'p_' + p.id, label: p.name, card: PART_TYPES[p.type][1], part: p, items: [{ id: 'none', name: 'None', note: '' }, p] }));
+const partOn = id => config['p_' + id] === id;
+const chosenParts = (cfg = config) => PARTS.filter(p => cfg['p_' + p.id] === p.id);
+// which parts sit on a wheel (they stay put when the body drops) and the order their photo layers go down in
+const WHEEL_PART = new Set(PARTS.filter(p => ['brakef', 'braker', 'discs'].includes(p.type)).map(p => p.id));
+const LAYER_ORDER = ['discs', 'braker', 'brakef', 'exhaust', 'oil', 'manifold', 'turbo', 'suction', 'intake', 'bov', 'ignition'];
+CATS.push({ id: 'parts', label: 'Parts', view: 'exhaust', hidden: true, groups: PART_GROUPS });
+const PT_ORBIT = { 'pt-exhaust': 'exhaust', 'pt-coilovers': 'stance', 'pt-brakes': 'brakes' };
+for (const t of PART_TABS) CATS.push({ id: t.id, label: t.label, view: PT_ORBIT[t.id] || 'paint', ptab: t, groups: [] });
 const GROUPS = CATS.flatMap(c => c.groups.map(g => Object.assign(g, { cat: c })));
 const STOCK = Object.fromEntries(GROUPS.map(g => [g.key, g.items[0].id]));
 // the Rzer showcase build, styled on the client's Evo IX: silver, carbon bonnet, black wheels, splitter
@@ -2072,10 +2141,10 @@ addEventListener('hashchange', route);
 const tabsEl = $('#b-tabs'), optsEl = $('#b-options');
 let activeCat = null;
 const TICK = '<svg class="tick" viewBox="0 0 18 18" aria-hidden="true"><path d="M4 9.5l3.2 3L14 5.5" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>';
-const tabBtn = c => `<button class="b-tab${c.brand ? ' b-tab-brand' : ''}" role="tab" type="button" id="tab-${c.id}" data-cat="${c.id}" aria-selected="false" aria-controls="b-options">${c.label}</button>`;
-tabsEl.innerHTML = TABS.filter(c => !c.brand).map(tabBtn).join('')
+const tabBtn = c => `<button class="b-tab${c.ptab ? ' b-tab-part' : ''}" role="tab" type="button" id="tab-${c.id}" data-cat="${c.id}" aria-selected="false" aria-controls="b-options">${c.label}</button>`;
+tabsEl.innerHTML = TABS.filter(c => !c.ptab).map(tabBtn).join('')
   + '<span class="b-tabs-label" aria-hidden="true">Performance parts</span>'
-  + TABS.filter(c => c.brand).map(tabBtn).join('');
+  + `<div class="b-tabs-parts" role="presentation">${TABS.filter(c => c.ptab).map(tabBtn).join('')}</div>`;
 tabsEl.addEventListener('click', e => { const b = e.target.closest('.b-tab'); if (b) setCategory(b.dataset.cat); });
 tabsEl.addEventListener('keydown', e => {
   if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
@@ -2091,24 +2160,28 @@ const PART_ICON = {
   turbo: '<circle cx="30" cy="30" r="13"/><circle cx="30" cy="30" r="4"/>', coilover: '<path d="M26 10v40M34 10v40M22 16l16 6-16 6 16 6-16 6 16 6" />',
   caliper: '<path d="M14 40a18 18 0 0 1 32 0" /><path d="M18 40h24" />', disc: '<circle cx="30" cy="30" r="18"/><circle cx="30" cy="30" r="6"/>',
   pad: '<rect x="14" y="22" width="32" height="16" rx="4"/>', line: '<path d="M8 40c10-20 34 4 44-16" />',
+  unit: '<rect x="12" y="18" width="36" height="24" rx="3"/><path d="M18 26h14M18 32h8" /><circle cx="41" cy="30" r="3"/>',
 };
-function partCard(g, it) {
-  const pic = it.img
-    ? `<img src="${it.img}" alt="" loading="lazy" decoding="async">`
-    : `<svg viewBox="0 0 60 60" aria-hidden="true">${PART_ICON[g.icon] || PART_ICON.pipe}</svg>`;
-  return `<button class="opt popt" type="button" data-key="${g.key}" data-id="${it.id}" aria-pressed="${config[g.key] === it.id}">`
-    + `<span class="p-img${it.img ? '' : ' p-noimg'}">${pic}</span><span class="p-brand">${it.brand}</span>`
-    + `<span class="opt-name">${it.name}</span><span class="opt-note">${it.note}</span>${TICK}</button>`;
+const TYPE_ICON = { exhaust: 'exhaust', manifold: 'manifold', turbo: 'turbo', coilover: 'coilover', brakef: 'caliper', braker: 'caliper',
+  discs: 'disc', pads: 'pad', lines: 'line', ecu: 'unit', boost: 'unit', timer: 'unit' };
+function partCard(p) {
+  const key = 'p_' + p.id;
+  const pic = p.img
+    ? `<img src="${p.img}" alt="" loading="lazy" decoding="async">`
+    : `<svg viewBox="0 0 60 60" aria-hidden="true">${PART_ICON[TYPE_ICON[p.type]] || PART_ICON.pipe}</svg>`;
+  return `<button class="opt popt" type="button" data-key="${key}" data-id="${p.id}" aria-pressed="${config[key] === p.id}">`
+    + `<span class="p-img${p.img ? '' : ' p-noimg'}">${pic}</span><span class="p-brand">${p.brand}</span>`
+    + `<span class="opt-name">${p.name}</span><span class="opt-note">${p.note}</span>${TICK}</button>`;
 }
 function setCategory(id, jump) {
   activeCat = id;
   const cat = CATS.find(c => c.id === id);
   $$('.b-tab', tabsEl).forEach(b => b.setAttribute('aria-selected', String(b.dataset.cat === id)));
   optsEl.setAttribute('aria-labelledby', 'tab-' + id);
-  if (cat.brand) {
-    optsEl.innerHTML = `<p class="p-intro">${cat.brand} parts that fit the Evo IX. Pick one per type; pick it again to take it off.</p>`
-      + PART_SLOTS.map(g => [g, g.items.filter(it => it.brand === cat.brand)]).filter(([, its]) => its.length)
-        .map(([g, its]) => `<fieldset class="og"><legend>${g.label}</legend><div class="og-items">${its.map(it => partCard(g, it)).join('')}</div></fieldset>`).join('');
+  if (cat.ptab) {
+    optsEl.innerHTML = '<p class="p-intro">HKS, TOMEI and ENDLESS parts that fit the Evo IX. Pick a part to fit it; pick it again to take it off.</p>'
+      + cat.ptab.types.map(t => [t, PARTS.filter(q => q.type === t)]).filter(([, list]) => list.length)
+        .map(([t, list]) => `<fieldset class="og"><legend>${PART_TYPES[t][0]}</legend><div class="og-items">${list.map(partCard).join('')}</div></fieldset>`).join('');
   } else optsEl.innerHTML = cat.groups.filter(shown).map(g => `<fieldset class="og"><legend>${g.label}</legend><div class="og-items">${g.items.map((it, idx) => {
     const lead = it.swatch ? `<span class="sw" style="--sw:${it.swatch}"></span>` : `<span class="mark">${it.mark || ''}</span>`;
     const tag = idx === 0 ? '<span class="stock-tag">stock</span>' : '';
@@ -2120,49 +2193,59 @@ function setCategory(id, jump) {
   if (jump && !userOrbit) cam.orbit = Object.assign({}, cam.orbit);
   if (photoMode && mode === 'build') psCategory(id);
 }
-// the visual options a brand part sets (its `link`), and the brand part a visual option takes off again: a generic
-// exhaust layout replaces the real exhaust, another ride height the coilovers
-const LINK_UNDO = { exhaust: 'p_exhaust', ride: 'p_coilover' };
-function pickPart(key, id) {
-  const before = config[key];
-  config[key] = before === id ? 'none' : id;   // picking the chosen part again takes it off
-  const now = item(key, config[key]), was = item(key, before);
+// a generic exhaust layout or another ride height takes the real part of that type off
+const LINK_UNDO = { exhaust: 'exhaust', ride: 'coilover' };
+// fit or take off a part: what can't be fitted alongside it comes off, and the visual options it implies are set
+function pickPart(id) {
+  const p = PART[id], key = 'p_' + id, on = config[key] !== id;
+  const off = [];
+  if (on) for (const q of PARTS) if (q !== p && partOn(q.id) && q.excl.some(x => p.excl.includes(x))) { config['p_' + q.id] = 'none'; off.push(q); }
+  config[key] = on ? id : 'none';
   const changed = [];
-  if (now.link) for (const [k, v] of Object.entries(now.link)) { if (config[k] !== v) { config[k] = v; changed.push(k); } }
-  // taking a part off returns what it set to stock, unless another chosen part still sets it
-  if (was.link && !now.link) for (const [k, v] of Object.entries(was.link)) {
-    const still = PART_SLOTS.some(g => g.key !== key && (item(g.key, config[g.key]).link || {})[k] === v);
-    if (k !== 'exhaust' && k !== 'exfin' && config[k] === v && !still) { config[k] = STOCK[k]; changed.push(k); }
+  if (on && p.link) for (const [k, v] of Object.entries(p.link)) if (config[k] !== v) { config[k] = v; changed.push(k); }
+  // a part taken off returns what it set to stock (the exhaust layout stays), unless another chosen part still sets it
+  for (const q of on ? off : [p]) if (q.link) for (const [k, v] of Object.entries(q.link)) {
+    if (k === 'exhaust' || k === 'exfin') continue;
+    if (config[k] === v && !chosenParts().some(r => (r.link || {})[k] === v)) { config[k] = STOCK[k]; changed.push(k); }
   }
-  return changed;
+  return { on, changed };
 }
 optsEl.addEventListener('click', e => {
   const b = e.target.closest('.opt'); if (!b) return;
-  const key = b.dataset.key, part = key.startsWith('p_');
-  let changed = [key];
-  if (part) changed = pickPart(key, b.dataset.id);
-  else {
-    config[key] = b.dataset.id;
-    const undo = LINK_UNDO[key];
-    if (undo && config[undo] !== 'none' && (item(undo, config[undo]).link || {})[key] !== config[key]) config[undo] = 'none';
+  const key = b.dataset.key;
+  if (key.startsWith('p_')) {
+    const rideBefore = config.ride;
+    const { on, changed } = pickPart(b.dataset.id);
+    $$('.popt', optsEl).forEach(o => o.setAttribute('aria-pressed', String(config[o.dataset.key] === o.dataset.id)));
+    renderCard();
+    if (photoMode && mode === 'build') psPart(PART[b.dataset.id], on, changed, rideBefore);
+    else pulseCard();
+    return;
   }
+  config[key] = b.dataset.id;
+  const undo = LINK_UNDO[key];
+  if (undo) for (const q of chosenParts()) if (q.type === undo && (q.link || {})[key] !== config[key]) config['p_' + q.id] = 'none';
   $$(`.opt[data-key="${key}"]`, optsEl).forEach(o => o.setAttribute('aria-pressed', String(o.dataset.id === config[key])));
   renderCard();
   const v = BUILD_VIEWS[CATS.find(c => c.id === activeCat).view];
   orbitGoal = Object.assign({}, v.orbit, { target: v.orbit.target.slice() });
-  if (!photoMode || !changed.length) return;
-  // show the change where it can be seen: lowering on a view with ride-height masks, others as usual
-  if (changed.includes('ride') && !(PH.views[ps.view] || {}).masks) { psShow('a090'); return; }
-  psOption(changed.includes('caliper') ? 'caliper' : changed[0]);
+  if (photoMode) psOption(key);
 });
-
-function buildCode(cfg) {
-  let v = 0n;
-  for (const g of GROUPS) { v = v * BigInt(g.items.length) + BigInt(Math.max(0, g.items.findIndex(i => i.id === cfg[g.key]))); }
-  return 'RZ-' + v.toString(36).toUpperCase().padStart(6, '0');
+// the job card button pulses when a part goes on that the photo can't show
+function pulseCard() {
+  const btn = $('#card-toggle');
+  btn.classList.remove('pulse'); void btn.offsetWidth; btn.classList.add('pulse');
 }
-// a visual option set by a chosen brand part (e.g. the ride height its coilovers give): the part's own line covers it
-const implied = g => PART_SLOTS.some(s => (item(s.key, config[s.key]).link || {})[g.key] === config[g.key]);
+
+// the visual options as a mixed-radix number, then the chosen parts as a bit mask
+function buildCode(cfg) {
+  let v = 0n, m = 0n;
+  for (const g of GROUPS) if (!g.part) v = v * BigInt(g.items.length) + BigInt(Math.max(0, g.items.findIndex(i => i.id === cfg[g.key])));
+  PARTS.forEach((p, i) => { if (cfg['p_' + p.id] === p.id) m |= 1n << BigInt(i); });
+  return 'RZ-' + v.toString(36).toUpperCase().padStart(6, '0') + (m ? '-' + m.toString(36).toUpperCase() : '');
+}
+// a visual option set by a chosen part (e.g. the ride height its coilovers give): the part's own line covers it
+const implied = g => !g.part && chosenParts().some(p => (p.link || {})[g.key] === config[g.key]);
 function renderCard() {
   const changed = GROUPS.filter(shown).filter(g => config[g.key] !== STOCK[g.key] && !implied(g));
   $('#card-count').textContent = String(changed.length);
@@ -2292,8 +2375,8 @@ optsEl.addEventListener('click', () => { userOrbit = null; });
 // empty workshop behind. Views: eight around the car (a000 front ... a315, 45 degrees apart towards its right side),
 // close-ups for the wheels, exhaust, headlights and the top, and the interior and engine bay.
 const ORBIT = ['a000', 'a045', 'a090', 'a135', 'a180', 'a225', 'a270', 'a315'];
-const CAT_VIEW = { paint: 'a045', wheels: 'wheel', brakes: 'wheel', aero: 'a135', stance: 'a090', exhaust: 'exhaust', lights: 'headlight', carbon: 'top',
-  hks: 'exhaust', tomei: 'exhaust', endless: 'wheel' };
+const CAT_VIEW = { paint: 'a045', wheels: 'wheel', brakes: 'wheel', aero: 'a135', stance: 'a090', exhaust: 'exhaust', lights: 'headlight', carbon: 'top' };
+for (const t of PART_TABS) if (t.view) CAT_VIEW[t.id] = t.view;
 const NEAR_ORBIT = { wheel: 'a045', exhaust: 'a135', headlight: 'a045', top: 'a045' };
 const INSIDE = { interior: ['int-front', 'int-dash', 'int-gauges', 'int-rear'], engine: ['eng-bay', 'eng-detail'] };
 // short films of the stock car (assets/config/clips/): turning one step between neighbouring views (and back), and
@@ -2305,7 +2388,8 @@ const GROUP_LAYERS = { spoiler: ['wingdel-', 'wing-'], lip: ['lip-'], skirts: ['
 const PSW = 1920, PSH = 1080;
 const psEl = $('#ps'), psFrame = $('#ps-frame'), psCanvases = $$('.ps-c', psFrame), psBg = $('#ps-bg'), psLoad = $('#ps-load'), psDots = $('#ps-dots');
 const psIn = $('#ps-interior'), psEn = $('#ps-engine');
-const ps = { view: 'a045', place: 'exterior', front: 0, token: 0, done: 0, shown: '', z: 1, playing: false, queue: 0, started: false };
+const ps = { view: 'a045', place: 'exterior', front: 0, token: 0, done: 0, shown: '', z: 1, playing: false, queue: 0, started: false,
+  hold: null, ride: null, afterFilm: null };   // hold: a part left out while it animates in; ride: a height to show instead
 const psVideo = $('#ps-v');
 const psImgs = new Map();
 function psPhoto(v, f) {
@@ -2332,20 +2416,23 @@ function psLayers(v, cfg) {
   if (cfg.hood !== 'factory') add('hood-' + cfg.hood);
   if (cfg.roof !== 'factory') add('roof-' + cfg.roof);
   if (cfg.mirror !== 'factory') add('mirror-' + cfg.mirror);
+  const chosen = chosenParts(cfg);
+  for (const t of LAYER_ORDER) for (const q of chosen) if (q.type === t) add('bp-' + q.id);
   return { paint, names };
 }
 
 // draw view v with build cfg into canvas; false if its photo is missing
-async function psCompose(canvas, v, cfg) {
+const rideDrop = (v, ride) => (PH.views[v].masks && ride !== 'factory' && PH.drops[v] ? PH.drops[v][ride] || 0 : 0);
+async function psCompose(canvas, v, cfg, dropPx) {
   const e = PH.views[v];
   const { paint, names } = psLayers(v, cfg);
-  const drop = e.masks && cfg.ride !== 'factory' && PH.drops[v] ? PH.drops[v][cfg.ride] || 0 : 0;
+  const drop = dropPx !== undefined ? dropPx : rideDrop(v, cfg.ride);
   const [base, ...rest] = await Promise.all([psPhoto(v, `paint-${paint}.webp`), ...names.map(n => psPhoto(v, n + '.webp')),
-    ...(drop ? ['plate.webp', 'm-body.png', 'm-tyres.png', 'm-refl.png', 'm-floor.png'].map(f => psPhoto(v, f)) : [])]);
+    ...(drop || (e.masks && dropPx !== undefined) ? ['plate.webp', 'm-body.png', 'm-tyres.png', 'm-refl.png', 'm-floor.png'].map(f => psPhoto(v, f)) : [])]);
   if (!base) return false;
   const lay = rest.slice(0, names.length), masks = rest.slice(names.length);
   const [car, mb, mr, tmp, wheels] = psScratch;
-  const onWheel = n => n.startsWith('rim-') || n.startsWith('caliper-');
+  const onWheel = n => n.startsWith('rim-') || n.startsWith('caliper-') || (n.startsWith('bp-') && WHEEL_PART.has(n.slice(3)));
   const put = (ctx, op, im, box) => { ctx.globalCompositeOperation = op; if (im) { if (box) ctx.drawImage(im, box[0], box[1], box[2], box[3]); else ctx.drawImage(im, 0, 0, PSW, PSH); } };
   const layers = (ctx, op) => names.forEach((n, i) => put(ctx, op, lay[i], e.layers[n]));
   const c = car.getContext('2d');
@@ -2353,6 +2440,7 @@ async function psCompose(canvas, v, cfg) {
   layers(c, 'source-over');
   const out = canvas.getContext('2d');
   if (!drop || masks.some(m => !m)) { put(out, 'source-over', car); return true; }
+  out.clearRect(0, 0, PSW, PSH);
   const [plate, mBody, mTyres, mRefl, mFloor] = masks;
   // the body: its mask minus the tyres, plus every part laid on it (a splitter or skirt in front of a wheel drops with
   // the body), minus the floor below where the tyres meet it
@@ -2377,12 +2465,21 @@ async function psCompose(canvas, v, cfg) {
   return true;
 }
 
+// the build the photo shows: the stock car while comparing; without a part that is about to animate in
+const psCfg = () => {
+  if (compare) return STOCK;
+  if (!ps.hold && !ps.ride) return config;
+  const c = Object.assign({}, config);
+  if (ps.hold) c['p_' + ps.hold] = 'none';
+  if (ps.ride) c.ride = ps.ride;
+  return c;
+};
 async function psShow(v, quick) {
   if (!PH.views[v]) return;
   ps.view = v;
   const token = ++ps.token;
   const back = psCanvases[1 - ps.front], prev = psCanvases[ps.front];
-  const cfg = compare ? STOCK : config;
+  const cfg = psCfg();
   const slow = setTimeout(() => { if (token === ps.token) psLoad.textContent = 'Loading the photos'; }, 400);
   const ok = await psCompose(back, v, cfg);
   clearTimeout(slow);
@@ -2434,7 +2531,9 @@ function psFilm(name, to, rate) {
     psShow(to, true).then(() => {
       psVideo.classList.remove('on');
       ps.playing = false;
-      if (ps.queue) { const d = Math.sign(ps.queue); ps.queue -= d; psStep(d); }
+      const after = ps.afterFilm; ps.afterFilm = null;
+      if (after) after();
+      else if (ps.queue) { const d = Math.sign(ps.queue); ps.queue -= d; psStep(d); }
     });
   };
   psVideo.onended = land;
@@ -2462,7 +2561,7 @@ function psPlace(place) {
   ps.place = place;
   psIn.setAttribute('aria-pressed', String(place === 'interior'));
   psEn.setAttribute('aria-pressed', String(place === 'engine'));
-  if (place === 'exterior') { psShow(CAT_VIEW[activeCat] || 'a045'); return; }
+  if (place === 'exterior') { psShow(CAT_VIEW[activeCat] && PH.views[CAT_VIEW[activeCat]].kind === 'exterior' ? CAT_VIEW[activeCat] : 'a045'); return; }
   const fly = FLY[place];
   // fly in from the outside view the film starts at, when the car looks stock
   if (psStockLook(fly.from) && PH.clips && PH.clips.includes(fly.clip) && !reduceMotion) {
@@ -2471,9 +2570,143 @@ function psPlace(place) {
   }
   psShow(INSIDE[place][0]);
 }
-function psCategory(id) {
+function psExterior() {
   if (ps.place !== 'exterior') { ps.place = 'exterior'; psIn.setAttribute('aria-pressed', 'false'); psEn.setAttribute('aria-pressed', 'false'); }
+}
+function psCategory(id) {
+  const t = (CATS.find(c => c.id === id) || {}).ptab;
+  if (t && t.place === 'engine') { if (ps.place !== 'engine' && !ps.playing) psPlace('engine'); return; }
+  if (t && !t.view) return;   // nothing of this type shows on the car: the photo stays as it is
+  psExterior();
   psShow(CAT_VIEW[id] || 'a045');
+}
+
+// ------------------------------------------------------------------ fitting a part on the photo
+// A part that shows on the car fits into place: the photo goes to a view that shows it (into the engine bay through
+// the bonnet for engine parts, the stock fly-in film when it can play), the car is shown without the part, then the
+// part's own layer moves into place on an overlay with a sweep of light across it, and the full build is drawn under
+// it. A turbo plays its own fitting film when the engine bay is otherwise stock. Coilovers lower the car smoothly.
+const psFx = $('#ps-fx');
+const FIT_VIEW = { exhaust: 'exhaust', brakef: 'wheel', braker: 'exhaust', oil: 'a000' };
+const FIT_FROM = {   // where the part comes from, as a share of its own size, and its starting scale
+  exhaust: [0.35, 0, 1.04], brakef: [0, 0, 1.18], braker: [0, 0, 1.18], discs: [0, 0, 1.12], oil: [0, 0.25, 1.06],
+};
+const wait = ms => new Promise(r => setTimeout(r, ms));
+function psEnterEngine() {
+  return new Promise(res => {
+    ps.place = 'engine';
+    psIn.setAttribute('aria-pressed', 'false'); psEn.setAttribute('aria-pressed', 'true');
+    const fly = FLY.engine;
+    if (!reduceMotion && psStockLook(fly.from) && PH.clips && PH.clips.includes(fly.clip)) {
+      ps.afterFilm = res;
+      psShow(fly.from, true).then(() => { if (!psFilm(fly.clip, fly.to)) { ps.afterFilm = null; psShow(fly.to, true).then(res); } });
+    } else psShow(INSIDE.engine[0], true).then(res);
+  });
+}
+function psFitAnim(im, box, drop, type) {
+  return new Promise(res => {
+    const ctx = psFx.getContext('2d');
+    const [x, y, w, h] = box, cy = y + drop;
+    const [fx, fy, fs] = FIT_FROM[type] || [0, -0.45, 1.06];
+    const glint = Object.assign(document.createElement('canvas'), { width: w, height: h });
+    const g = glint.getContext('2d');
+    const t0 = performance.now(), D = 950;
+    psFx.classList.add('on');
+    const frame = now => {
+      const t = Math.min(1, (now - t0) / D);
+      const m = Math.min(1, t / 0.7), k = 1 - Math.pow(1 - m, 3);   // the move eases out over the first 70%
+      ctx.clearRect(0, 0, PSW, PSH);
+      ctx.save();
+      ctx.globalAlpha = Math.min(1, t * 3);
+      ctx.translate(x + w / 2 + fx * w * (1 - k), cy + h / 2 + fy * h * (1 - k));
+      const sc = 1 + (fs - 1) * (1 - k);
+      ctx.scale(sc, sc);
+      ctx.drawImage(im, -w / 2, -h / 2, w, h);
+      if (t > 0.5) {   // then a band of light sweeps across the part, only where the part is
+        const u = (t - 0.5) / 0.5;
+        g.globalCompositeOperation = 'source-over'; g.clearRect(0, 0, w, h); g.drawImage(im, 0, 0, w, h);
+        g.globalCompositeOperation = 'source-atop';
+        const bx = -0.4 * w + u * 1.8 * w, band = g.createLinearGradient(bx, 0, bx + 0.35 * w, h * 0.4);
+        band.addColorStop(0, 'rgba(255,255,255,0)'); band.addColorStop(0.5, 'rgba(255,255,255,0.55)'); band.addColorStop(1, 'rgba(255,255,255,0)');
+        g.fillStyle = band; g.fillRect(0, 0, w, h);
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.globalAlpha = Math.sin(Math.PI * u) * 0.9;
+        ctx.drawImage(glint, -w / 2, -h / 2, w, h);
+      }
+      ctx.restore();
+      if (t < 1) requestAnimationFrame(frame); else res();
+    };
+    requestAnimationFrame(frame);
+  });
+}
+async function psFit(v, q) {
+  const layer = 'bp-' + q.id, e = PH.views[v];
+  ps.hold = q.id;
+  await psShow(v, ps.view === v);   // the car without the part
+  ps.hold = null;
+  const im = await psPhoto(v, layer + '.webp');
+  if (!im || reduceMotion || !e.layers[layer]) { await psShow(v, true); return; }
+  const drop = WHEEL_PART.has(q.id) ? 0 : rideDrop(v, config.ride);
+  await psFitAnim(im, e.layers[layer], drop, q.type);
+  await psShow(v, true);
+  psFx.getContext('2d').clearRect(0, 0, PSW, PSH);
+  psFx.classList.remove('on');
+}
+// the car settles from one ride height to another on a view that can show it
+async function psRide(from, to) {
+  let v = ps.view;
+  if (ps.place !== 'exterior' || !PH.views[v].masks) { psExterior(); v = 'a090'; }
+  if (reduceMotion) { await psShow(v, true); return; }
+  ps.ride = from;
+  await psShow(v, ps.view === v);   // at the old height first
+  ps.ride = null;
+  const d0 = rideDrop(v, from), d1 = rideDrop(v, to), canvas = psCanvases[ps.front];
+  const t0 = performance.now(), D = 700;
+  for (;;) {
+    const t = Math.min(1, (performance.now() - t0) / D);
+    const k = t < 1 ? 1 - Math.pow(1 - t, 3) * Math.cos(t * 7) : 1;   // settles with a small bounce
+    await psCompose(canvas, v, psCfg(), d0 + (d1 - d0) * k);
+    if (t >= 1) break;
+    await new Promise(r => requestAnimationFrame(r));
+  }
+  psBg.getContext('2d').drawImage(canvas, 0, 0, psBg.width, psBg.height);
+}
+async function psTurbo(q) {
+  ps.hold = q.id;
+  if (ps.place !== 'engine') await psEnterEngine();
+  const v = 'eng-bay';
+  if (ps.view !== v) await psShow(v, true);
+  const clip = 'fit-' + q.id;
+  const rest = psLayers(v, psCfg());
+  ps.hold = null;
+  if (!reduceMotion && !rest.names.length && rest.paint === 'silver' && PH.clips && PH.clips.includes(clip)) {
+    await new Promise(res => { ps.afterFilm = res; if (!psFilm(clip, v)) { ps.afterFilm = null; res(); } });
+    return;
+  }
+  await psFit(v, q);
+}
+async function psPart(q, on, changed, rideBefore) {
+  if (ps.playing) { psShow(ps.view, true); return; }
+  if (changed.includes('ride')) {   // coilovers on or off: the car settles first
+    ps.hold = on ? q.id : null;
+    await psRide(rideBefore, config.ride);
+    ps.hold = null;
+    if (!on) { await psShow(ps.view, true); return; }
+  }
+  const layer = 'bp-' + q.id;
+  const views = Object.keys(PH.views).filter(v => (PH.views[v].layers || {})[layer]);
+  if (!on) {   // taken off: redraw the view if it showed the part, else nothing changes on the photo
+    if (views.includes(ps.view) || changed.length) await psShow(ps.view); else pulseCard();
+    return;
+  }
+  if (q.type === 'turbo' && views.length) return psTurbo(q);
+  if (!views.length) { pulseCard(); if (changed.length) psShow(ps.view, true); return; }
+  const engine = PH.views[views[0]].kind === 'engine';
+  const want = engine ? 'eng-detail' : (q.type === 'discs' ? (q.id.endsWith('-r') || q.id.includes('rear') ? 'exhaust' : 'wheel') : FIT_VIEW[q.type]);
+  const v = views.includes(ps.view) ? ps.view : views.includes(want) ? want : views[0];
+  if (engine) { if (ps.place !== 'engine') { ps.hold = q.id; await psEnterEngine(); } }
+  else psExterior();
+  await psFit(v, q);
 }
 // an option changed: show it where it can be seen (the current view if it shows that group, else the category's view)
 function psOption(key) {
