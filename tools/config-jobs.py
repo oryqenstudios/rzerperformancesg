@@ -8,8 +8,12 @@ Stages:
             assets/generated/config/base/silver-factory-<view>.jpg)
   edits     every option edit whose base photo exists (paints, empty-garage plates, matte floors, part options)
   wing      the wing-delete edit of every paint photo, then the lip spoiler and GT wing on the silver wing-delete
-  parts     the brand parts (HKS, TOMEI, ENDLESS; PART_SLOTS in src/app.js) fitted to the car in every view they show
+  parts     the brand parts (HKS, TOMEI, ENDLESS; PARTS in src/app.js) fitted to the car in every view they show
             in, each edit given the part's product photo as image 2 (assets/generated/config/parts-ref/)
+  inside    the views inside the engine: eng-head (the cam cover close-up cut from eng-detail, HEAD_CROP, enlarged; it
+            is about as sharp as the page shows it, and the zoom into it is seamless), eng-cams (eng-head with the cam
+            cover off) and eng-block (eng-detail as a sectioned cutaway engine); takes a, b, c each, pick one into base/
+            as for the bases.
 Jobs whose output already exists are skipped by config-gen.py, so a stage can be run again after more bases exist.
 
 Views: a000..a315 orbit the car at 45 degree steps from the front towards its right side (tools/render-guides.mjs);
@@ -27,7 +31,8 @@ ORBIT = ['a000', 'a045', 'a090', 'a135', 'a180', 'a225', 'a270', 'a315']
 CLOSE = ['wheel', 'exhaust', 'headlight', 'top']
 EXTERIOR = ORBIT + CLOSE
 INTERIOR = ['int-dash', 'int-front', 'int-rear', 'int-gauges']
-ENGINE = ['eng-bay', 'eng-detail']
+ENGINE = ['eng-bay', 'eng-detail', 'eng-cams', 'eng-block']
+HEAD_CROP = (737, 363, 1813, 969)   # the cam cover close-up in eng-detail's photo (2720 x 1536): eng-head is its re-render
 
 base = lambda v: f'{C}/base/silver-factory-{v}.jpg'
 src = lambda name: f'{SRC}/{name}.png'
@@ -170,6 +175,61 @@ BASES = {
 # ---------------------------------------------------------------- brand parts fitted to the car
 # id -> (views, what it is, how it looks / where it goes). Every edit starts from the view's silver factory photo, with
 # the part's product photo (on light grey) as image 2. Names are <view>__bp-<id>.
+# ---------------------------------------------------------------- inside the engine
+INSIDE_BASES = {
+    'eng-cams': ([base('eng-head')], edit(
+        "The dark cam cover is taken off the top of the engine, so the open cylinder head shows: two polished steel camshafts run "
+        "along the length of the head side by side, the intake camshaft at the back and the exhaust camshaft at the front, their "
+        "lobes clearly visible, held down by machined aluminium bearing caps; roller rocker arms and the tops of the valve springs "
+        "sit under the lobes, the spark plug wells run down the middle, and the two cam gears stand at the timing-belt end. The head "
+        "is machined aluminium with a thin film of clean oil. The cover's bolts are gone; the hoses, pipes and everything around "
+        "the engine stay exactly as they are.")),
+    'eng-block': ([base('eng-detail')], edit(
+        "Show the engine as a sectioned cutaway, like a display engine, while it stays in place in the car: the front half of the "
+        "engine block and cylinder head is cut away along one vertical plane, the cut faces painted bright red, so the inside "
+        "shows: the four pistons in their bores, the connecting rods below them, the crankshaft with its counterweights in the "
+        "crankcase, the oil pan with oil at the bottom, the metal head gasket as a thin layer between the block and the head, and "
+        "the valves and camshafts in the head. The silver intercooler pipe and the hoses in front of the engine are taken away so "
+        "the cutaway is clear. The rest of the engine bay, the car, the raised bonnet and the workshop stay exactly as they are.")),
+}
+# parts inside the engine: id -> (view, what it is, where it goes). Cams and valvetrain in the open head, the bottom end,
+# head gaskets and the oil pan baffle in the cutaway.
+INSIDE_PARTS = {
+    'hks-cam-ex': ('eng-cams', 'an aftermarket exhaust camshaft: polished steel with tall, sharply ground lobes', 'in place of the factory exhaust camshaft, the front one of the two, in its bearing caps'),
+    'hks-cam-in-step2': ('eng-cams', 'an aftermarket intake camshaft: polished steel with tall, sharply ground lobes', 'in place of the factory intake camshaft, the back one of the two, in its bearing caps'),
+    'tomei-poncam-evo9': ('eng-cams', 'a pair of aftermarket camshafts: polished steel with taller lobes', 'in place of both factory camshafts, intake and exhaust, in their bearing caps'),
+    'tomei-procam-evo9': ('eng-cams', 'a pair of aftermarket high-lift camshafts: polished steel with tall, wide lobes', 'in place of both factory camshafts, intake and exhaust, in their bearing caps'),
+    'hks-valve-spring': ('eng-cams', 'stiffer aftermarket valve springs', 'in place of the factory valve springs under the rocker arms, along both sides of the head, their coils clearly visible'),
+    'tomei-valve-spring': ('eng-cams', 'stiffer aftermarket valve springs in oval wire', 'in place of the factory valve springs under the rocker arms, along both sides of the head, their coils clearly visible'),
+    'tomei-ti-retainer': ('eng-cams', 'titanium valve spring retainers with a gold-grey sheen', 'on top of every valve spring, in place of the factory steel retainers'),
+    'hks-cam-pulley': ('eng-cams', 'an adjustable aluminium cam pulley anodised purple', 'on the end of each camshaft at the timing-belt end, in place of the factory cam gears'),
+    'tomei-cam-gear': ('eng-cams', 'an adjustable aluminium cam gear anodised bright red', 'on the end of each camshaft at the timing-belt end, in place of the factory cam gears'),
+    'hks-forged-pistons': ('eng-block', 'forged aluminium pistons with a nickel-plated crown and dark moly-coated skirts', 'in place of the four factory pistons in the cut-away bores'),
+    'tomei-forged-pistons': ('eng-block', 'forged aluminium pistons with a flat crown', 'in place of the four factory pistons in the cut-away bores'),
+    'hks-conrods': ('eng-block', 'H-beam steel connecting rods', 'in place of the four factory connecting rods between the pistons and the crankshaft'),
+    'tomei-conrods': ('eng-block', 'forged chrome-moly H-beam connecting rods', 'in place of the four factory connecting rods between the pistons and the crankshaft'),
+    'tomei-billet-crank': ('eng-block', 'a billet steel crankshaft with full, machined counterweights', 'in place of the factory crankshaft in the cut-away crankcase'),
+    'tomei-stroker-kits': ('eng-block', 'a stroker kit: a billet crankshaft with full counterweights, H-beam rods and forged pistons', 'in place of the factory crankshaft, connecting rods and pistons in the cutaway'),
+    'tomei-studs-bearings': ('eng-block', 'black chrome-moly head studs with polished nuts and new main bearings', 'in place of the factory head bolts through the cut-away block and head, and at the crankshaft main bearings'),
+    'hks-head-gasket': ('eng-block', 'a multi-layer stainless steel head gasket', 'in place of the factory head gasket between the block and the head, its layers clearly visible at the cut'),
+    'tomei-head-gasket': ('eng-block', 'a stainless steel metal head gasket', 'in place of the factory head gasket between the block and the head, its layers clearly visible at the cut'),
+    'tomei-slicing-baffle': ('eng-block', 'an oil pan baffle: a stainless steel plate with cutter plates and flaps', 'inside the cut-away oil pan, above the oil and around the oil pickup'),
+}
+INSIDE_FILMS = {   # films inside the engine: name -> (first view, last view or edit, prompt)
+    'open-head': ('eng-head', 'eng-cams', "The dark cam cover lifts straight up off the engine and away out of the frame, revealing the "
+                  "camshafts and the open cylinder head underneath. Smooth, steady, mechanical motion; the camera stays still. "
+                  "Everything else stays exactly as it is."),
+    'open-block': ('eng-detail', 'eng-block', "The pipes in front of the engine lift away out of the frame and the front half of the engine "
+                   "slides away, revealing the cutaway: the pistons, connecting rods and crankshaft inside. Smooth, steady, mechanical "
+                   "motion; the camera stays still. Everything else stays exactly as it is."),
+}
+FIT_INSIDE = {   # swap films: the factory part lifts out of the frame, the new one lowers into place
+    'eng-cams': "The factory camshaft{s} lift{v} straight up out of the open cylinder head and away out of the frame, then the new camshaft{s} "
+                "lower{v} smoothly into the bearing caps in {its} place. Steady, mechanical motion; the camera stays still. Everything else stays exactly as it is.",
+    'eng-block': "Inside the cutaway engine, the factory {part} slide{v} out and away out of the frame, then the new {part} slide{v} smoothly "
+                 "into place. Steady, mechanical motion; the camera stays still. Everything else stays exactly as it is.",
+}
+
 REF = lambda pid: f'{C}/parts-ref/{pid}.jpg'
 REAR = ['a135', 'a180', 'a225', 'exhaust']
 FRONT_WHEELS = ['a045', 'a090', 'a270', 'a315', 'wheel', 'headlight']
@@ -242,13 +302,17 @@ for pid, axle, desc in [('endless-disc-racing-front', 'front', 'two-piece slotte
         f'Image 2 shows aftermarket brake discs. Replace the {axle} brake discs, seen behind the wheel spokes, with {desc}, at the '
         'factory size. Keep the factory calipers, the wheel spokes, rims and tyres exactly as they are.'))
 for pid, (what, where) in ENGINE_PARTS.items():
-    BRAND_PARTS[pid] = (ENGINE, edit(
+    BRAND_PARTS[pid] = (['eng-bay', 'eng-detail'], edit(
         f'Image 1 shows the engine bay with the bonnet raised. Image 2 shows an aftermarket part: {what}. Fit this part in the engine '
         f'bay {where}, at its real size, looking as it does in image 2. Everything else in the engine bay stays exactly as it is.'))
 BRAND_PARTS['hks-oil-cooler-black'] = (['a000'], edit(
     'Image 2 shows an aftermarket oil cooler with a silver-finned core. Fit it behind the opening at the front of the car\'s left side '
     '(on the right in this picture), low in the front bumper, so its silver-finned core shows through the bumper opening. Keep the '
     'bumper and everything else exactly as it is.'))
+for pid, (v, what, where) in INSIDE_PARTS.items():
+    BRAND_PARTS[pid] = ([v], edit(
+        f'Image 1 shows the inside of the engine. Image 2 shows an aftermarket part: {what}. Fit this part {where}, at its real '
+        f'size, looking as it does in image 2. Everything else stays exactly as it is.'))
 BRAND_REF = {'endless-disc-basic-slit-f': 'endless-disc-basic-slit', 'endless-disc-basic-slit-r': 'endless-disc-basic-slit'}
 
 
@@ -274,6 +338,8 @@ def jobs(stage):
                 continue
             for pid, d in PAINTS.items():
                 out.append({'name': f'{v}__paint-{pid}', 'images': [base(v)], 'prompt': paint_prompt(d)})
+            if v == 'eng-cams':   # the bonnet is out of the frame
+                continue
             out.append({'name': f'{v}__hood-carbon', 'images': [base(v)], 'prompt': edit(
                 'Only the raised bonnet itself, standing open at the top of the frame and seen from below, becomes an exposed '
                 'carbon fibre bonnet: its underside and edges are glossy 2x2 twill carbon weave. The front wings, bumper and '
@@ -294,6 +360,14 @@ def jobs(stage):
             for v in views:
                 if os.path.exists(base(v)):
                     out.append({'name': f'{v}__bp-{pid}', 'images': [base(v)] + ([ref] if os.path.exists(ref) else []), 'prompt': prompt})
+    elif stage == 'inside':
+        if not os.path.exists(base('eng-head')):
+            from PIL import Image
+            Image.open(base('eng-detail')).crop(HEAD_CROP).resize((2720, 1536), Image.LANCZOS).save(base('eng-head'), quality=95)
+        for v, (images, prompt) in INSIDE_BASES.items():
+            if all(os.path.exists(i) for i in images) and not os.path.exists(base(v)):
+                for take in 'abc':
+                    out.append({'name': f'{v}__base-{take}', 'images': images, 'prompt': prompt})
     else:
         sys.exit(f'unknown stage {stage}')
     return out

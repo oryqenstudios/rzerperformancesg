@@ -305,6 +305,9 @@ ENGINE_KIND = {'hks-gtiii-rs': 'turbo', 'tomei-arms-m7963': 'turbo', 'tomei-expr
                'hks-racing-suction': 'intake', 'hks-super-power-flow': 'intake', 'hks-premium-suction': 'intake',
                'tomei-turbo-suction-hose': 'suction', 'hks-ssqv4': 'bov', 'tomei-bov': 'bov', 'hks-coil-pro': 'ignition'}
 OIL_ROI = {'a000': (1170, 720, 1310, 820)}   # the bumper's corner intake on the car's left
+# inside the engine: the open head (eng-cams) and the cutaway (eng-block), where the parts in J.INSIDE_PARTS go
+INSIDE_ROI = {'eng-cams': (380, 280, 1720, 980), 'eng-block': (440, 380, 1200, 940)}
+ALIGN_TO = {'eng-cams': 'eng-head'}   # a base made by editing another view's photo, laid back onto it
 
 
 def project(v, pts):
@@ -394,6 +397,9 @@ def build_brand_parts(v, base, get, have, entry, ids=None, paint_px=None, paint3
         elif pid in ENGINE_KIND and v in ENGINE_ROI:
             r = cv2.dilate(significant(base, img), disk(4)) & box_mask(ENGINE_ROI[v][ENGINE_KIND[pid]])
             box = layer(base, img, r, path, thr=6, reach=0, close=5, fill=3000)
+        elif pid in J.INSIDE_PARTS and v == J.INSIDE_PARTS[pid][0]:
+            r = cv2.dilate(significant(base, img), disk(4)) & box_mask(INSIDE_ROI[v])
+            box = layer(base, img, r, path, thr=6, reach=0, close=5, fill=3000)
         elif pid == 'hks-oil-cooler-black' and v in OIL_ROI:
             r = cv2.dilate(significant(base, img, 24, 300), disk(4)) & box_mask(OIL_ROI[v])
             box = layer(base, img, r, path, thr=6, reach=0, close=4, fill=1500)
@@ -401,13 +407,77 @@ def build_brand_parts(v, base, get, have, entry, ids=None, paint_px=None, paint3
             entry['layers'][name] = box
 
 
+HEAD_SCALE = W / ((J.HEAD_CROP[2] - J.HEAD_CROP[0]) * W / 2720)
+HEAD_M = np.float32([[HEAD_SCALE, 0, -J.HEAD_CROP[0] * W / 2720 * HEAD_SCALE],
+                     [0, HEAD_SCALE, -J.HEAD_CROP[1] * H / 1536 * HEAD_SCALE]])
+
+
+def cut_layer(path_in, box, path_out, M):
+    """A layer (RGBA WebP placed at box) moved by the affine M into a new view; its new box, or None if it leaves the frame."""
+    lay = cv2.imread(path_in, cv2.IMREAD_UNCHANGED)
+    x, y, w, h = box
+    full = np.zeros((H, W, 4), np.uint8)
+    full[y:y + h, x:x + w] = cv2.resize(lay, (w, h)) if lay.shape[:2] != (h, w) else lay
+    out = cv2.warpAffine(full, M, (W, H), flags=cv2.INTER_LINEAR)
+    ys, xs = np.nonzero(out[..., 3] > 5)
+    if len(xs) < 150:
+        return None
+    x0, x1, y0, y1 = xs.min(), xs.max() + 1, ys.min(), ys.max() + 1
+    save_webp(path_out, out[y0:y1, x0:x1], 86)
+    return [int(x0), int(y0), int(x1 - x0), int(y1 - y0)]
+
+
+def build_head():
+    """eng-head: the cam cover close-up of eng-detail (HEAD_CROP), the page's zoom target before the cover comes off. Its
+    silver photo is the base (the same crop from the full-size photo); the other paints and every layer are eng-detail's,
+    cut to the crop, so the zoom is seamless whatever the build."""
+    src = manifest['views'].get('eng-detail')
+    if not src or not os.path.exists(J.base('eng-head')):
+        return []
+    v = 'eng-head'
+    os.makedirs(f'{OUT}/{v}', exist_ok=True)
+    entry = {'paints': list(src['paints']), 'layers': {}, 'kind': 'engine'}
+    save_webp(f'{OUT}/{v}/paint-silver.webp', load(J.base(v)))
+    for pid in src['paints'][1:]:
+        im = cv2.imread(f'{OUT}/eng-detail/paint-{pid}.webp')
+        save_webp(f'{OUT}/{v}/paint-{pid}.webp', cv2.warpAffine(im, HEAD_M, (W, H), flags=cv2.INTER_LANCZOS4))
+    for name, box in src['layers'].items():
+        b = cut_layer(f'{OUT}/eng-detail/{name}.webp', box, f'{OUT}/{v}/{name}.webp', HEAD_M)
+        if b:
+            entry['layers'][name] = b
+    manifest['views'][v] = entry
+    return [f'{len(entry["layers"])} layers cut from eng-detail']
+
+
+def head_layers_outside(v, base, entry):
+    """eng-cams shows the parts around the head that eng-head shows (the turbo, intakes, pipes): eng-head's layers that
+    stay clear of what taking the cover off changed."""
+    head = manifest['views'].get('eng-head')
+    if not head:
+        return
+    opened = cv2.dilate(significant(load(J.base('eng-head')), base), disk(12))
+    for name, (x, y, w, h) in head['layers'].items():
+        if not name.startswith('bp-'):
+            continue
+        lay = cv2.imread(f'{OUT}/eng-head/{name}.webp', cv2.IMREAD_UNCHANGED)
+        a = cv2.resize(lay, (w, h))[..., 3] > 128
+        if a.sum() and (opened[y:y + h, x:x + w][a] > 0).mean() < 0.03:
+            b = cut_layer(f'{OUT}/eng-head/{name}.webp', [x, y, w, h], f'{OUT}/{v}/{name}.webp', np.float32([[1, 0, 0], [0, 1, 0]]))
+            if b:
+                entry['layers'][name] = b
+
+
 def build_view(v):
+    if v == 'eng-head':
+        return build_head()
     os.makedirs(f'{OUT}/{v}', exist_ok=True)
     base = load(J.base(v))
+    if v in ALIGN_TO:
+        base, _, worst = align(load(J.base(ALIGN_TO[v])), base)
     kind = 'exterior' if v in J.EXTERIOR else 'interior' if v in J.INTERIOR else 'engine'
     entry = {'paints': ['silver'], 'layers': {}, 'kind': kind}
     save_webp(f'{OUT}/{v}/paint-silver.webp', base)
-    notes = []
+    notes = [f'laid onto {ALIGN_TO[v]}, misfit {worst:.1f}px'] if v in ALIGN_TO else []
     have = lambda name: os.path.exists(J.src(f'{v}__{name}'))
     aligned = {}
 
@@ -438,6 +508,8 @@ def build_view(v):
             if box:
                 entry['layers']['hood-carbon'] = box
         build_brand_parts(v, base, get, have, entry)
+        if v == 'eng-cams':
+            head_layers_outside(v, base, entry)
         manifest['views'][v] = entry
         return notes
     if not (have('plate') and have('paint-red') and os.path.exists(f'{IDDIR}/{v}-stock.png')):
@@ -562,7 +634,7 @@ def build_clips():
             jobs = [(f'spin-{a}-{b}', 'setpts=PTS/5'), (f'spin-{b}-{a}', 'reverse,setpts=PTS/5')]
         elif name.startswith('fly-'):
             jobs = [(name, 'setpts=PTS/2')]
-        elif name.startswith('fit-'):
+        elif name.startswith('fit-') or name.startswith('open-'):
             jobs = [(name, 'setpts=PTS/1.6')]
         for out_name, speed in jobs:
             dst = f'{out_dir}/{out_name}.mp4'
@@ -577,6 +649,12 @@ def build_clips():
 views = sys.argv[1:] or [v for v in J.EXTERIOR + J.INTERIOR + J.ENGINE if os.path.exists(J.base(v))]
 if views == ['clips']:
     views = []
+if 'eng-detail' in views and 'eng-head' not in views:   # the close-up is cut from eng-detail, and eng-cams uses it
+    views.insert(views.index('eng-detail') + 1, 'eng-head')
+for later in ('eng-cams', 'eng-block'):
+    if later in views:
+        views.remove(later)
+        views.append(later)
 build_clips()
 for v in views:
     notes = build_view(v)

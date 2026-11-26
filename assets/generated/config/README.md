@@ -92,6 +92,26 @@ python3 tools/config-build.py a135 a180 a225 exhaust a045 a090 a270 a315 wheel h
 
 Building only some views keeps the rest of the existing manifest.
 
+## Inside the engine
+
+The camshafts, valvetrain, bottom end, head gaskets, studs and the oil pan baffle are fitted inside the engine, in
+three more engine views (`python3 tools/config-jobs.py inside` makes the takes for the last two):
+
+| View | What it is | Made by |
+|---|---|---|
+| `eng-head` | the cam cover close-up of `eng-detail` (`HEAD_CROP`, enlarged 2.5x) | a crop of `eng-detail`'s photo: about as sharp as the page shows it, so the zoom into it is seamless; `config-build.py` cuts eng-detail's paints and layers to it |
+| `eng-cams` | the cylinder head with the cam cover off: both camshafts, bearing caps, rockers, valve springs, cam gears | a Kling edit of `eng-head` (take a of three), laid back onto it when built |
+| `eng-block` | the engine as a sectioned cutaway in `eng-detail`'s framing: the front half cut away with red cut faces, pistons, rods, crank, oil pan | a Kling edit of `eng-detail` (take a of three; the others lost or cut the turbo) |
+
+Both edited views have the five other paints (the `edits` stage), and `eng-block` the carbon bonnet. The parts
+(`INSIDE_PARTS` in `config-jobs.py`) are edits of those views with the product photo as image 2, cut to what clearly
+changed inside the head or the cutaway (`INSIDE_ROI`). `eng-cams` also takes `eng-head`'s layers of the parts around
+the head (turbos, intakes, pipes) that stay clear of what taking the cover off changed.
+
+Films (Kling O3 first-last-frame, sped up to about 3 s): `open-head` (`eng-head` to `eng-cams`, the cover lifts off),
+`open-block` (`eng-detail` to `eng-block`, the pipes lift away and the block opens), and a swap film `fit-<id>` for each
+camshaft, piston, rod, crank and stroker kit (the view to its edit: the factory part lifts out, the new one goes in).
+
 ## In the page
 
 `assets/config/manifest.js` sets `window.RZ_PHOTOS` (views, their paints and layer boxes, ride-height drops, films).

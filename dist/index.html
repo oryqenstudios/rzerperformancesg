@@ -1774,17 +1774,17 @@ const PARTS = [
   P('cams', 'TOMEI', 'tomei-poncam-evo9', 'PONCAM EVO9 (intake and exhaust)', 'Intake and exhaust camshaft set made for the Evo IX\'s MIVEC engine, a bolt-in upgrade on the factory valve springs.', { excl: ['camex', 'camin'] }),
   P('cams', 'TOMEI', 'tomei-procam-evo9', 'PROCAM EVO9', 'Single intake or exhaust camshafts in a range of durations for built engines, in hydraulic or solid-lifter versions.', { excl: ['camex', 'camin'] }),
   P('valvetrain', 'HKS', 'hks-valve-spring', 'Valve Spring', 'Strengthened valve springs to suit HKS camshafts.', { excl: ['springs'] }),
-  P('valvetrain', 'HKS', 'hks-cam-pulley', 'Cam Pulley (adjustable)', 'Adjustable aluminium cam pulley, anodised purple, for fine-tuning cam timing.', { excl: ['camgear'] }),
+  P('valvetrain', 'HKS', 'hks-cam-pulley', 'Cam Pulley (adjustable)', 'Adjustable aluminium cam pulley, anodised purple, for fine-tuning cam timing.', { excl: ['camgear'], layer: 'camgear' }),
   P('valvetrain', 'TOMEI', 'tomei-valve-spring', 'Valve Spring', 'Strengthened oval-wire valve springs for up to 11.5 mm of valve lift.', { excl: ['springs'] }),
   P('valvetrain', 'TOMEI', 'tomei-ti-retainer', 'Titanium Valve Spring Retainers', 'Titanium retainers, nearly 40% lighter than stock, made for the TOMEI valve springs.', ANY),
-  P('valvetrain', 'TOMEI', 'tomei-cam-gear', 'Adjustable Cam Gear', 'Red-anodised duralumin cam gear for fine-tuning cam timing.', { excl: ['camgear'] }),
-  P('bottom', 'HKS', 'hks-forged-pistons', 'Forged Piston Kit', 'Forged pistons with nickel plating and moly-coated skirts, slightly oversized, for a rebuilt 4G63.', { excl: ['pistons'] }),
-  P('bottom', 'HKS', 'hks-conrods', 'Connecting Rod Set (H-beam)', 'H-beam connecting rods made to go with the HKS forged pistons.', { excl: ['rods'] }),
-  P('bottom', 'TOMEI', 'tomei-stroker-kits', '2.2 L / 2.3 L stroker kit', 'Complete stroker kits with crank, rods, pistons and rings that take the 4G63 to 2.2 or 2.3 litres.', { excl: ['pistons', 'rods', 'crank'] }),
-  P('bottom', 'TOMEI', 'tomei-forged-pistons', 'Forged Piston Kit', 'Forged pistons made for the TOMEI stroker crankshaft.', { excl: ['pistons'] }),
-  P('bottom', 'TOMEI', 'tomei-conrods', 'Forged H-Beam Conrods', 'Forged H-beam connecting rods in chrome-moly steel, in 147 mm and 150 mm lengths.', { excl: ['rods'] }),
-  P('bottom', 'TOMEI', 'tomei-billet-crank', 'Billet Full Counter Crank', 'Billet, fully counterweighted stroker crankshaft for 2.2-litre or 2.3-litre builds.', { excl: ['crank'] }),
-  P('bottom', 'TOMEI', 'tomei-studs-bearings', 'Studs, bolts and bearings', 'Head and main studs, bolts and bearings for a built 4G63.', ANY),
+  P('valvetrain', 'TOMEI', 'tomei-cam-gear', 'Adjustable Cam Gear', 'Red-anodised duralumin cam gear for fine-tuning cam timing.', { excl: ['camgear'], layer: 'camgear' }),
+  P('bottom', 'HKS', 'hks-forged-pistons', 'Forged Piston Kit', 'Forged pistons with nickel plating and moly-coated skirts, slightly oversized, for a rebuilt 4G63.', { excl: ['pistons'], layer: 'pistons' }),
+  P('bottom', 'HKS', 'hks-conrods', 'Connecting Rod Set (H-beam)', 'H-beam connecting rods made to go with the HKS forged pistons.', { excl: ['rods'], layer: 'rods' }),
+  P('bottom', 'TOMEI', 'tomei-stroker-kits', '2.2 L / 2.3 L stroker kit', 'Complete stroker kits with crank, rods, pistons and rings that take the 4G63 to 2.2 or 2.3 litres.', { excl: ['pistons', 'rods', 'crank'], layer: 'crank' }),
+  P('bottom', 'TOMEI', 'tomei-forged-pistons', 'Forged Piston Kit', 'Forged pistons made for the TOMEI stroker crankshaft.', { excl: ['pistons'], layer: 'pistons' }),
+  P('bottom', 'TOMEI', 'tomei-conrods', 'Forged H-Beam Conrods', 'Forged H-beam connecting rods in chrome-moly steel, in 147 mm and 150 mm lengths.', { excl: ['rods'], layer: 'rods' }),
+  P('bottom', 'TOMEI', 'tomei-billet-crank', 'Billet Full Counter Crank', 'Billet, fully counterweighted stroker crankshaft for 2.2-litre or 2.3-litre builds.', { excl: ['crank'], layer: 'crank' }),
+  P('bottom', 'TOMEI', 'tomei-studs-bearings', 'Studs, bolts and bearings', 'Head and main studs, bolts and bearings for a built 4G63.', Object.assign({ layer: 'studs' }, ANY)),
   P('gasket', 'HKS', 'hks-head-gasket', 'Stopper Type Head Gasket', 'Multi-layer metal head gasket with an opposed-bead stopper, in several thicknesses.'),
   P('gasket', 'TOMEI', 'tomei-head-gasket', 'Metal Head Gasket', 'Metal head gasket with a stainless bead layer for an 86.5 mm bore, in several thicknesses.'),
   P('oil', 'HKS', 'hks-oil-cooler-black', 'Oil Cooler Kit Black', 'Extra oil cooler behind the front bumper that works alongside the factory cooler, with braided lines.', ANY),
@@ -1837,10 +1837,12 @@ const PART = Object.fromEntries(PARTS.map(p => [p.id, p]));
 const PART_GROUPS = PARTS.map(p => ({ key: 'p_' + p.id, label: p.name, card: PART_TYPES[p.type][1], part: p, items: [{ id: 'none', name: 'None', note: '' }, p] }));
 const partOn = id => config['p_' + id] === id;
 const chosenParts = (cfg = config) => PARTS.filter(p => cfg['p_' + p.id] === p.id);
-// which parts sit on a wheel (they stay put when the body drops) and the order their photo layers go down in: the
-// turbo last, as the blow-off valves and intakes were fitted next to the stock turbo and their layers hold a bit of it
+// which parts sit on a wheel (they stay put when the body drops) and the order their photo layers go down in (by the
+// part's layer, else its type): the turbo after the bay's other parts, as the blow-off valves and intakes were fitted
+// next to the stock turbo and their layers hold a bit of it; inside the engine, from the crank up to the cam gears
 const WHEEL_PART = new Set(PARTS.filter(p => ['brakef', 'braker', 'discs'].includes(p.type)).map(p => p.id));
-const LAYER_ORDER = ['discs', 'braker', 'brakef', 'exhaust', 'oil', 'manifold', 'suction', 'intake', 'bov', 'ignition', 'turbo'];
+const LAYER_ORDER = ['discs', 'braker', 'brakef', 'exhaust', 'oil', 'manifold', 'suction', 'intake', 'bov', 'ignition', 'turbo',
+  'crank', 'rods', 'pistons', 'studs', 'gasket', 'valvetrain', 'cams', 'camgear'];
 CATS.push({ id: 'parts', label: 'Parts', view: 'exhaust', hidden: true, groups: PART_GROUPS });
 const PT_ORBIT = { 'pt-exhaust': 'exhaust', 'pt-coilovers': 'stance', 'pt-brakes': 'brakes' };
 for (const t of PART_TABS) CATS.push({ id: t.id, label: t.label, view: PT_ORBIT[t.id] || 'paint', ptab: t, groups: [] });
@@ -2379,7 +2381,12 @@ const ORBIT = ['a000', 'a045', 'a090', 'a135', 'a180', 'a225', 'a270', 'a315'];
 const CAT_VIEW = { paint: 'a045', wheels: 'wheel', brakes: 'wheel', aero: 'a135', stance: 'a090', exhaust: 'exhaust', lights: 'headlight', carbon: 'top' };
 for (const t of PART_TABS) if (t.view) CAT_VIEW[t.id] = t.view;
 const NEAR_ORBIT = { wheel: 'a045', exhaust: 'a135', headlight: 'a045', top: 'a045' };
-const INSIDE = { interior: ['int-front', 'int-dash', 'int-gauges', 'int-rear'], engine: ['eng-bay', 'eng-detail'] };
+const INSIDE = { interior: ['int-front', 'int-dash', 'int-gauges', 'int-rear'], engine: ['eng-bay', 'eng-detail', 'eng-cams', 'eng-block'] };
+if (PH) for (const k in INSIDE) INSIDE[k] = INSIDE[k].filter(v => PH.views[v]);   // only the views the manifest has
+// inside the engine: eng-head is the cam cover close-up cut from eng-detail (this rectangle of it, as shares of the photo),
+// eng-cams the head with the cover off, eng-block the engine as a cutaway; the films open the cover and the block
+const HEAD_RECT = [737 / 2720, 363 / 1536, 1076 / 2720, 606 / 1536];
+const OPEN = { 'eng-cams': { from: 'eng-head', clip: 'open-head' }, 'eng-block': { from: 'eng-detail', clip: 'open-block' } };
 // short films of the stock car (assets/config/clips/): turning one step between neighbouring views (and back), and
 // flying in through the driver's door or under the raised bonnet. They only play while the car looks stock in silver.
 const FLY = { interior: { from: 'a090', to: 'int-front', clip: 'fly-interior' }, engine: { from: 'a000', to: 'eng-bay', clip: 'fly-engine' } };
@@ -2418,7 +2425,7 @@ function psLayers(v, cfg) {
   if (cfg.roof !== 'factory') add('roof-' + cfg.roof);
   if (cfg.mirror !== 'factory') add('mirror-' + cfg.mirror);
   const chosen = chosenParts(cfg);
-  for (const t of LAYER_ORDER) for (const q of chosen) if (q.type === t) add('bp-' + q.id);
+  for (const t of LAYER_ORDER) for (const q of chosen) if ((q.layer || q.type) === t) add('bp-' + q.id);
   return { paint, names };
 }
 
@@ -2591,6 +2598,7 @@ const psFx = $('#ps-fx');
 const FIT_VIEW = { exhaust: 'exhaust', brakef: 'wheel', braker: 'a135', oil: 'a000' };
 const FIT_FROM = {   // where the part comes from, as a share of its own size, and its starting scale
   exhaust: [0.35, 0, 1.04], brakef: [0, 0, 1.18], braker: [0, 0, 1.18], discs: [0, 0, 1.12], oil: [0, 0.25, 1.06],
+  cams: [0, -0.7, 1.02], valvetrain: [0, -0.5, 1.04], bottom: [0.45, 0, 1.02], gasket: [0.6, 0, 1],
 };
 const wait = ms => new Promise(r => setTimeout(r, ms));
 function psEnterEngine() {
@@ -2686,6 +2694,50 @@ async function psTurbo(q) {
   }
   await psFit(v, q);
 }
+// zoom from eng-detail into its cam cover close-up (eng-head): the photo scales up about the point that keeps the
+// rectangle's edges travelling to the frame's edges, then the sharper close-up takes over
+function psZoomHead() {
+  return new Promise(res => {
+    const c = psCanvases[ps.front], [x, y, w, h] = HEAD_RECT;
+    if (reduceMotion) { psShow('eng-head', true).then(res); return; }
+    c.style.transformOrigin = `${(100 * x / (1 - w)).toFixed(2)}% ${(100 * y / (1 - h)).toFixed(2)}%`;
+    c.style.transition = 'transform 0.75s cubic-bezier(0.45, 0, 0.2, 1)';
+    requestAnimationFrame(() => { c.style.transform = `scale(${(1 / w).toFixed(4)})`; });
+    setTimeout(() => psShow('eng-head', true).then(() => {
+      c.style.transition = 'none'; c.style.transform = '';
+      requestAnimationFrame(() => { c.style.transition = ''; res(); });
+    }), 780);
+  });
+}
+// go inside the engine to eng-cams (zoom in, the cover lifts off) or eng-block (the block opens into the cutaway); the
+// films play while what they start from looks stock, else the views crossfade
+async function psInside(to) {
+  if (ps.place !== 'engine') await psEnterEngine();
+  if (ps.view === to) return;
+  const o = OPEN[to];
+  if (to === 'eng-cams') {
+    if (ps.view !== 'eng-head') {
+      if (ps.view !== 'eng-detail') await psShow('eng-detail');
+      await psZoomHead();
+    }
+  } else if (ps.view !== 'eng-detail') await psShow('eng-detail');
+  if (!reduceMotion && psStockLook(o.from) && PH.clips && PH.clips.includes(o.clip)) {
+    await new Promise(res => { ps.afterFilm = res; if (!psFilm(o.clip, to)) { ps.afterFilm = null; psShow(to, true).then(res); } });
+  } else await psShow(to);
+}
+const INNER = new Set(['eng-cams', 'eng-block']);
+async function psInner(q, v) {
+  ps.hold = q.id;
+  await psInside(v);
+  const clip = 'fit-' + q.id;
+  const rest = psLayers(v, psCfg());
+  ps.hold = null;
+  if (!reduceMotion && !rest.names.length && rest.paint === 'silver' && PH.clips && PH.clips.includes(clip)) {
+    await new Promise(res => { ps.afterFilm = res; if (!psFilm(clip, v)) { ps.afterFilm = null; res(); } });
+    return;
+  }
+  await psFit(v, q);
+}
 async function psPart(q, on, changed, rideBefore) {
   if (ps.playing) { psShow(ps.view, true); return; }
   if (changed.includes('ride')) {   // coilovers on or off: the car settles first
@@ -2701,6 +2753,8 @@ async function psPart(q, on, changed, rideBefore) {
     return;
   }
   if (q.type === 'turbo' && views.length) return psTurbo(q);
+  const inner = views.find(v => INNER.has(v));
+  if (inner) return psInner(q, inner);
   if (!views.length) { pulseCard(); if (changed.length) psShow(ps.view, true); return; }
   const engine = PH.views[views[0]].kind === 'engine';
   const want = engine ? 'eng-detail' : (q.type === 'discs' ? (q.id.endsWith('-r') || q.id.includes('rear') ? 'a135' : 'wheel') : FIT_VIEW[q.type]);
