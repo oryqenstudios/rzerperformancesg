@@ -92,6 +92,22 @@ python3 tools/config-build.py a135 a180 a225 exhaust a045 a090 a270 a315 wheel h
 
 Building only some views keeps the rest of the existing manifest.
 
+## Parts from the second review
+
+The 71 parts in `tools/parts_more.py` (picked from `preview/parts-review-2/`) are edits listed by the `parts` stage too,
+each prompt giving the part's real size and asking for the perspective of the part it replaces:
+
+| Parts | Views | Cut to (`cut_more()` in `tools/config-build.py`) |
+|---|---|---|
+| 48 wheels | `a045`, `a090`, `a135`, `a225`, `a270`, `a315`, `wheel`, `exhaust`, `headlight`, `top` | what clearly changed near the 3D map's wheels and their floor reflections, each piece filled to its outline (the map sits tens of pixels off) |
+| 4 bonnets | `a000`, `a045`, `a090`, `a270`, `a315`, `wheel`, `headlight`, `top` | the factory bonnet's place, like the carbon bonnet option |
+| 2 GT wings | the wing views, edited from `wingdel-silver` | what changed from the wing-delete photo around the boot |
+| ETS intercooler | `a000`, `a045`, `a315`, `headlight` | what clearly changed below the headlights |
+| 4 Forced Performance turbos, ETS piping | `eng-bay`, `eng-detail` | as the other engine-bay parts; each turbo has a fitting film |
+| seat, 3 steering wheels, gauge, harness | the interior views | what clearly changed in the cabin view |
+
+Tyres don't change the photo (plain black sidewalls) and are job-card lines.
+
 ## Inside the engine
 
 The camshafts, valvetrain, bottom end, head gaskets, studs and the oil pan baffle are fitted inside the engine, in
