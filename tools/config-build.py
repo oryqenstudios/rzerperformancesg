@@ -293,7 +293,7 @@ DISC_FRONT = {'endless-disc-racing-front', 'endless-disc-basic-slit-f'}
 DISC_REAR = {'endless-disc-eslit-rear', 'endless-disc-basic-slit-r'}
 # box (x0, y0, x1, y1) per engine view and part kind, in photo pixels
 ENGINE_ROI = {
-    'eng-bay': {'turbo': (930, 380, 1330, 820), 'manifold': (760, 420, 1330, 840), 'intake': (520, 260, 1000, 760),
+    'eng-bay': {'turbo': (720, 380, 1340, 830), 'manifold': (760, 420, 1330, 840), 'intake': (520, 260, 1000, 760),
                 'suction': (620, 260, 1250, 760), 'bov': (560, 300, 1300, 860), 'ignition': (700, 260, 1150, 560)},
     'eng-detail': {'turbo': (850, 200, 1700, 900), 'manifold': (700, 250, 1700, 950), 'intake': (300, 120, 1200, 800),
                    'suction': (400, 120, 1650, 850), 'bov': (300, 150, 1700, 950), 'ignition': (550, 120, 1300, 600)},
