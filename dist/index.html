@@ -383,6 +383,22 @@ fieldset.field { border: 0; margin: 0; padding: 0; }
 .opt .tick { grid-row: 1 / span 2; grid-column: 3; width: 18px; height: 18px; opacity: 0; }
 .opt[aria-pressed="true"] .tick { opacity: 1; }
 .opt .stock-tag { font-size: 0.6875rem; color: var(--graphite); margin-left: 6px; font-weight: 500; }
+/* brand parts: a tab per brand under a label, the brand's parts as cards with the cut-out product photo */
+.b-tabs-label { grid-column: 1 / -1; padding: 8px 4px 2px; font-size: 0.6875rem; color: var(--graphite); letter-spacing: 0.06em; text-transform: uppercase; }
+.b-tab-brand { letter-spacing: 0.06em; }
+.p-intro { margin: 0; font-size: 0.8125rem; color: var(--steel); line-height: 1.45; }
+.popt { grid-template-columns: 1fr auto; gap: 2px 10px; padding: 0 0 12px; align-items: start; overflow: hidden; }
+.popt .p-img {
+  grid-column: 1 / -1; width: 100%; height: 138px; margin-bottom: 8px; display: grid; place-items: center;
+  background: radial-gradient(ellipse 58% 72% at 50% 56%, rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0.02) 74%), linear-gradient(#151517, #0b0b0c);
+}
+.popt .p-img img { max-width: 86%; max-height: 118px; object-fit: contain; filter: drop-shadow(0 8px 10px rgba(0, 0, 0, 0.6)); transition: transform 0.25s ease; }
+.popt:hover .p-img img { transform: scale(1.04); }
+.popt .p-noimg svg { width: 64px; height: 64px; fill: none; stroke: var(--steel); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.popt .p-brand { grid-column: 1; padding: 0 12px; font-size: 0.6875rem; font-weight: 700; letter-spacing: 0.08em; color: var(--steel); }
+.popt .opt-name { grid-column: 1; padding: 0 12px; line-height: 1.25; }
+.popt .opt-note { grid-column: 1 / -1; padding: 2px 12px 0; font-size: 0.8125rem; }
+.popt .tick { grid-column: 2; grid-row: 2 / span 2; align-self: center; margin-right: 12px; }
 
 .b-card {
   position: absolute; right: 20px; top: 80px; width: 318px; max-height: calc(100% - 176px);
@@ -461,6 +477,7 @@ body:not(.in-builder) .loading { display: none; }
   .b-panel { left: 0; right: 0; bottom: 0; top: auto; width: auto; height: 44vh; border-radius: 10px 10px 0 0; }
   .b-tabs { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; }
   .b-tab { flex: none; padding: 9px 14px; scroll-snap-align: start; }
+  .b-tabs-label { flex: none; align-self: center; padding: 0 2px 0 10px; border-left: 1px solid var(--hair); margin-left: 4px; }
   .b-options { padding: 12px; }
   .b-card { left: 12px; right: 12px; width: auto; top: 70px; max-height: calc(56vh - 90px); }
   .b-dock { bottom: calc(44vh + 10px); left: 12px; right: 12px; transform: none; justify-content: flex-start; overflow-x: auto; padding: 0; background: none; border: 0; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
@@ -1677,6 +1694,86 @@ const CATS = [
       { id: 'carbon', name: 'Carbon caps', note: 'Exposed twill weave', mark: 'C', u: { uMirror: 1 } },
     ] } ] },
 ];
+// ------------------------------------------------------------------ brand parts (HKS, TOMEI, ENDLESS)
+// Real parts that fit the Evo IX (CT9A), chosen by the client from the research in reports/. Each slot is an option
+// group whose first item is 'none' (stock), so the job card, build code and copy-build treat them like any other
+// option. The configurator shows them in a tab per brand, grouped by type; picking a part again removes it. Photos
+// are the makers' product shots cut out onto a transparent background (assets/parts/, see assets/parts/README.md).
+// `link` sets the matching visual options, so the photo shows what the part looks like where a layer exists.
+const PART_BRANDS = ['HKS', 'TOMEI', 'ENDLESS'];
+const P = (brand, id, name, note, link) => ({ id, brand, name, note, img: id === 'hks-hipower-us' ? null : `assets/parts/${id}.webp`, link });
+const EX_STEEL = { exhaust: 'factory', exfin: 'polished' }, EX_TI = { exhaust: 'factory', exfin: 'titanium' };
+const PART_SLOTS = [
+  { key: 'p_exhaust', label: 'Exhaust', card: 'Exhaust system', icon: 'exhaust', items: [
+    P('HKS', 'hks-super-turbo-muffler', 'Super Turbo Muffler', 'Polished stainless cat-back with a rounded-oval silencer, a ring of slots on its end cap and one 124 mm round tip with a blue heat tint.', EX_STEEL),
+    P('HKS', 'hks-silent-hipower', 'silent Hi-Power (TYPE-S)', 'The quieter HKS cat-back: polished stainless oval silencer and one plain 120 mm round tip at the factory exit.', EX_STEEL),
+    P('HKS', 'hks-hipower-spec-r', 'Hi-Power SPEC-R', 'Full titanium cat-back, much lighter than the factory system, with a cylindrical silencer and one 120 mm blue-tinted tip.', EX_TI),
+    P('HKS', 'hks-hipower-us', 'Hi-Power (US market)', 'Stainless cat-back from the Hi-Power range with one 120 mm round tip, made for the US-market Evo VIII and IX.', EX_STEEL),
+    P('HKS', 'hks-legal', 'LEGAL (US market)', 'Street cat-back with a matte black silencer and piping, finished with one polished 106 mm round tip.', EX_STEEL),
+    P('HKS', 'hks-carbon-ti', 'Carbon-Ti (US market)', 'Cat-back with a carbon-wrapped silencer, polished stainless piping and a double-wall burnt-titanium tip.', EX_TI),
+    P('TOMEI', 'tomei-expreme-ti', 'EXPREME Ti titanium muffler', 'Full titanium cat-back at under a third of the factory system\'s weight, with a round silencer and one 115 mm heat-blued tip.', EX_TI),
+  ] },
+  { key: 'p_manifold', label: 'Exhaust manifold', card: 'Manifold', icon: 'manifold', items: [
+    P('TOMEI', 'tomei-expreme-manifold', 'EXPREME Exhaust Manifold', 'Polished stainless tubular manifold for the 4G63, supplied with heat wrap and gaskets.'),
+  ] },
+  { key: 'p_heat', label: 'Heat protector', card: 'Heat shield', icon: 'manifold', items: [
+    P('TOMEI', 'tomei-heat-protector', 'EXPREME Heat Protector', 'Stainless heat shield over the exhaust manifold; fits the EXPREME manifold or the factory one.'),
+  ] },
+  { key: 'p_frontpipe', label: 'Turbo outlet and front pipe', card: 'Front pipe', icon: 'pipe', items: [
+    P('HKS', 'hks-gt-extension', 'GT Extension Kit', 'Stainless turbo outlet extension and front pipe in one piece, for freer flow from the turbo.'),
+    P('HKS', 'hks-front-pipe', 'Front Pipe', 'Polished stainless front pipe from the turbo outlet back to the catalyst.'),
+    P('TOMEI', 'tomei-outlet-component', 'EXPREME Outlet Component Ver.2', 'Turbine outlet and 3-inch stainless front pipe with a flexible section, supplied with gaskets.'),
+  ] },
+  { key: 'p_cat', label: 'Catalyst pipe', card: 'Catalyst', icon: 'pipe', items: [
+    P('HKS', 'hks-metal-catalyzer', 'Metal Catalyzer', 'High-flow 70 mm metal-core catalytic converter in stainless steel, supplied with gaskets and bolts.'),
+    P('TOMEI', 'tomei-ti-cat-straight', 'EXPREME Ti Cat Straight Pipe', 'Titanium straight pipe that takes the place of the catalytic converter section.'),
+  ] },
+  { key: 'p_turbo', label: 'Turbo', card: 'Turbo', icon: 'turbo', items: [
+    P('HKS', 'hks-gtiii-rs', 'GT III Sports Turbine Kit (GTIII-RS)', 'Bolt-on turbo upgrade for the 4G63 that replaces the factory turbo, supplied with oil and water lines and gaskets.'),
+    P('TOMEI', 'tomei-arms-m7963', 'ARMS M7963 Turbo Kit', 'Bolt-on ARMS turbo kit for the 4G63 with its own actuator, oil and water lines and gaskets.'),
+  ] },
+  { key: 'p_coilover', label: 'Coilovers', card: 'Coilovers', icon: 'coilover', items: [
+    P('ENDLESS', 'endless-function-ps', 'FUNCTION-PS', 'Street coilovers from the current FUNCTION range on X COILS PLUS springs (8 kg/mm front, 5 rear), with reinforced rubber top mounts.', { ride: 'coilovers' }),
+    P('ENDLESS', 'endless-function-sc', 'FUNCTION-SC', 'The softest FUNCTION setup, tuned for the street: X COILS springs (8 kg/mm front, 5 rear) on rubber top mounts.', { ride: 'coilovers' }),
+    P('ENDLESS', 'endless-function-tc', 'FUNCTION-TC', 'Track coilovers with firmer X COILS R springs (12 kg/mm front, 10 rear) plus helpers, on spherical top mounts.', { ride: 'coilovers' }),
+    P('ENDLESS', 'endless-zeal-function-x-plus', 'ZEAL Function X Plus', 'Blue-bodied, height-adjustable coilovers with yellow springs, in a soft or a hard spring set.', { ride: 'coilovers' }),
+    P('ENDLESS', 'endless-zeal-super-function', 'ZEAL Super Function Racing', 'Circuit coilovers with red springs and race spring rates, for track days and time attack.', { ride: 'coilovers' }),
+  ] },
+  { key: 'p_brakef', label: 'Brake kit (front)', card: 'Front brakes', icon: 'caliper', items: [
+    P('ENDLESS', 'endless-racing-mono6', 'Racing MONO6', 'Forged monoblock six-piston front calipers in hard-anodised gunmetal with a red logo, on 370 mm discs.'),
+    P('ENDLESS', 'endless-racing-mono4', 'Racing MONO4', 'Forged monoblock four-piston front calipers in hard-anodised gunmetal, on 355 mm discs.'),
+    P('ENDLESS', 'endless-mono6-sports-ta', 'MONO6 Sports TA', 'Monoblock six-piston front calipers in blue, with discs from the factory size up to 370 mm.', { caliper: 'blue' }),
+    P('ENDLESS', 'endless-racing6', 'Racing6', 'Two-piece six-piston front calipers in blue anodise, on 370 mm discs.', { caliper: 'blue' }),
+    P('ENDLESS', 'endless-6pot', '6POT', 'Two-piece six-piston front calipers in blue anodise, with discs from the factory size up to 370 mm.', { caliper: 'blue' }),
+    P('ENDLESS', 'endless-chibi6', '6POT Compact Mini (Chibi6)', 'Compact six-piston front calipers in blue anodise, for the factory-size or 320 mm discs.', { caliper: 'blue' }),
+    P('ENDLESS', 'endless-m4', 'M4', 'Two-piece four-piston front calipers in blue anodise, for the factory-size or 320 mm discs.', { caliper: 'blue' }),
+  ] },
+  { key: 'p_braker', label: 'Brake kit (rear)', card: 'Rear brakes', icon: 'caliper', items: [
+    P('ENDLESS', 'endless-racing-mono4r', 'Racing MONO4r', 'Forged monoblock four-piston rear calipers in hard-anodised gunmetal, on 332 mm discs.'),
+    P('ENDLESS', 'endless-racing4-rear', 'Racing4', 'Two-piece four-piston rear calipers in blue anodise, on 332 mm discs.', { caliper: 'blue' }),
+    P('ENDLESS', 'endless-s2-rear', 'S2', 'Two-piston rear calipers in blue anodise, for the factory-size or 300 mm discs.', { caliper: 'blue' }),
+  ] },
+  { key: 'p_pads', label: 'Brake pads', card: 'Pads', icon: 'pad', items: [
+    P('ENDLESS', 'endless-pads-street', 'Street and sport pads', 'Pads for the factory Brembo calipers, front and rear, in ENDLESS street and sport compounds such as SS-S, MX72 and MX72 Plus.'),
+  ] },
+  { key: 'p_discf', label: 'Brake discs (front)', card: 'Front discs', icon: 'disc', items: [
+    P('ENDLESS', 'endless-disc-racing-front', 'Racing 2-piece disc', 'Two-piece front discs at the factory size, with E-slit or curving-slit grooves and an anodised bell.'),
+    Object.assign(P('ENDLESS', 'endless-disc-basic-slit', 'Basic Slit disc', 'One-piece slotted front discs at the factory size.'), { id: 'endless-disc-basic-slit-f' }),
+  ] },
+  { key: 'p_discr', label: 'Brake discs (rear)', card: 'Rear discs', icon: 'disc', items: [
+    P('ENDLESS', 'endless-disc-eslit-rear', 'E-Slit disc', 'Rear discs at the factory size with ENDLESS\'s E-slit groove pattern.'),
+    Object.assign(P('ENDLESS', 'endless-disc-basic-slit', 'Basic Slit disc', 'One-piece slotted rear discs at the factory size.'), { id: 'endless-disc-basic-slit-r' }),
+  ] },
+  { key: 'p_lines', label: 'Brake lines', card: 'Brake lines', icon: 'line', items: [
+    P('ENDLESS', 'endless-swivel-steel', 'Swivel Steel', 'Stainless braided brake lines with swivel fittings, for a firmer, more consistent pedal.'),
+    P('ENDLESS', 'endless-swivel-racing', 'Swivel Racing', 'Race braided brake lines with stainless swivel fittings, built for repeated hard braking on track.'),
+  ] },
+];
+for (const g of PART_SLOTS) g.items.unshift({ id: 'none', name: 'None', note: 'Factory part' });
+CATS.push({ id: 'parts', label: 'Parts', view: 'exhaust', hidden: true, groups: PART_SLOTS });
+// one tab per brand: the slots that brand fills, with only its parts
+const BRAND_VIEW = { HKS: 'exhaust', TOMEI: 'exhaust', ENDLESS: 'brakes' };
+for (const b of PART_BRANDS) CATS.push({ id: b.toLowerCase(), label: b, view: BRAND_VIEW[b], brand: b, groups: [] });
 const GROUPS = CATS.flatMap(c => c.groups.map(g => Object.assign(g, { cat: c })));
 const STOCK = Object.fromEntries(GROUPS.map(g => [g.key, g.items[0].id]));
 // the Rzer showcase build, styled on the client's Evo IX: silver, carbon bonnet, black wheels, splitter
@@ -1685,6 +1782,8 @@ const SIGNATURE = Object.assign({}, STOCK, {
   diffuser: 'carbon', spoiler: 'gt', ride: 'coilovers', exhaust: 'dual', exfin: 'titanium', tint: 'medium', hood: 'carbon'
 });
 const item = (key, id) => { const g = GROUPS.find(x => x.key === key); return g.items.find(i => i.id === id) || g.items[0]; };
+const itemName = it => it.brand ? `${it.brand} ${it.name}` : it.name;
+const TABS = CATS.filter(c => !c.hidden);
 const uniformsFor = cfg => { const u = {}; for (const g of GROUPS) Object.assign(u, item(g.key, cfg[g.key]).u); return u; };
 
 let config = Object.assign({}, SIGNATURE);
@@ -1973,21 +2072,44 @@ addEventListener('hashchange', route);
 const tabsEl = $('#b-tabs'), optsEl = $('#b-options');
 let activeCat = null;
 const TICK = '<svg class="tick" viewBox="0 0 18 18" aria-hidden="true"><path d="M4 9.5l3.2 3L14 5.5" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>';
-tabsEl.innerHTML = CATS.map(c => `<button class="b-tab" role="tab" type="button" id="tab-${c.id}" data-cat="${c.id}" aria-selected="false" aria-controls="b-options">${c.label}</button>`).join('');
+const tabBtn = c => `<button class="b-tab${c.brand ? ' b-tab-brand' : ''}" role="tab" type="button" id="tab-${c.id}" data-cat="${c.id}" aria-selected="false" aria-controls="b-options">${c.label}</button>`;
+tabsEl.innerHTML = TABS.filter(c => !c.brand).map(tabBtn).join('')
+  + '<span class="b-tabs-label" aria-hidden="true">Performance parts</span>'
+  + TABS.filter(c => c.brand).map(tabBtn).join('');
 tabsEl.addEventListener('click', e => { const b = e.target.closest('.b-tab'); if (b) setCategory(b.dataset.cat); });
 tabsEl.addEventListener('keydown', e => {
   if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
-  const i = CATS.findIndex(c => c.id === activeCat);
-  const n = CATS[(i + (e.key === 'ArrowRight' ? 1 : CATS.length - 1)) % CATS.length];
+  const i = TABS.findIndex(c => c.id === activeCat);
+  const n = TABS[(i + (e.key === 'ArrowRight' ? 1 : TABS.length - 1)) % TABS.length];
   setCategory(n.id); $('#tab-' + n.id).focus(); e.preventDefault();
 });
 
+// a simple line drawing of the part type, for a part without a product photo
+const PART_ICON = {
+  exhaust: '<path d="M6 30h22m0-6h6a8 8 0 0 1 0 16h-6zM42 32h12" />',
+  manifold: '<path d="M8 18h8v24M24 18v24M32 18h8v24M8 42h44" />', pipe: '<path d="M8 22h20c8 0 8 16 16 16h12" />',
+  turbo: '<circle cx="30" cy="30" r="13"/><circle cx="30" cy="30" r="4"/>', coilover: '<path d="M26 10v40M34 10v40M22 16l16 6-16 6 16 6-16 6 16 6" />',
+  caliper: '<path d="M14 40a18 18 0 0 1 32 0" /><path d="M18 40h24" />', disc: '<circle cx="30" cy="30" r="18"/><circle cx="30" cy="30" r="6"/>',
+  pad: '<rect x="14" y="22" width="32" height="16" rx="4"/>', line: '<path d="M8 40c10-20 34 4 44-16" />',
+};
+function partCard(g, it) {
+  const pic = it.img
+    ? `<img src="${it.img}" alt="" loading="lazy" decoding="async">`
+    : `<svg viewBox="0 0 60 60" aria-hidden="true">${PART_ICON[g.icon] || PART_ICON.pipe}</svg>`;
+  return `<button class="opt popt" type="button" data-key="${g.key}" data-id="${it.id}" aria-pressed="${config[g.key] === it.id}">`
+    + `<span class="p-img${it.img ? '' : ' p-noimg'}">${pic}</span><span class="p-brand">${it.brand}</span>`
+    + `<span class="opt-name">${it.name}</span><span class="opt-note">${it.note}</span>${TICK}</button>`;
+}
 function setCategory(id, jump) {
   activeCat = id;
   const cat = CATS.find(c => c.id === id);
   $$('.b-tab', tabsEl).forEach(b => b.setAttribute('aria-selected', String(b.dataset.cat === id)));
   optsEl.setAttribute('aria-labelledby', 'tab-' + id);
-  optsEl.innerHTML = cat.groups.filter(shown).map(g => `<fieldset class="og"><legend>${g.label}</legend><div class="og-items">${g.items.map((it, idx) => {
+  if (cat.brand) {
+    optsEl.innerHTML = `<p class="p-intro">${cat.brand} parts that fit the Evo IX. Pick one per type; pick it again to take it off.</p>`
+      + PART_SLOTS.map(g => [g, g.items.filter(it => it.brand === cat.brand)]).filter(([, its]) => its.length)
+        .map(([g, its]) => `<fieldset class="og"><legend>${g.label}</legend><div class="og-items">${its.map(it => partCard(g, it)).join('')}</div></fieldset>`).join('');
+  } else optsEl.innerHTML = cat.groups.filter(shown).map(g => `<fieldset class="og"><legend>${g.label}</legend><div class="og-items">${g.items.map((it, idx) => {
     const lead = it.swatch ? `<span class="sw" style="--sw:${it.swatch}"></span>` : `<span class="mark">${it.mark || ''}</span>`;
     const tag = idx === 0 ? '<span class="stock-tag">stock</span>' : '';
     return `<button class="opt" type="button" data-key="${g.key}" data-id="${it.id}" aria-pressed="${config[g.key] === it.id}">${lead}<span class="opt-name">${it.name}${tag}</span><span class="opt-note">${it.note}</span>${TICK}</button>`;
@@ -1998,14 +2120,40 @@ function setCategory(id, jump) {
   if (jump && !userOrbit) cam.orbit = Object.assign({}, cam.orbit);
   if (photoMode && mode === 'build') psCategory(id);
 }
+// the visual options a brand part sets (its `link`), and the brand part a visual option takes off again: a generic
+// exhaust layout replaces the real exhaust, another ride height the coilovers
+const LINK_UNDO = { exhaust: 'p_exhaust', ride: 'p_coilover' };
+function pickPart(key, id) {
+  const before = config[key];
+  config[key] = before === id ? 'none' : id;   // picking the chosen part again takes it off
+  const now = item(key, config[key]), was = item(key, before);
+  const changed = [];
+  if (now.link) for (const [k, v] of Object.entries(now.link)) { if (config[k] !== v) { config[k] = v; changed.push(k); } }
+  // taking a part off returns what it set to stock, unless another chosen part still sets it
+  if (was.link && !now.link) for (const [k, v] of Object.entries(was.link)) {
+    const still = PART_SLOTS.some(g => g.key !== key && (item(g.key, config[g.key]).link || {})[k] === v);
+    if (k !== 'exhaust' && k !== 'exfin' && config[k] === v && !still) { config[k] = STOCK[k]; changed.push(k); }
+  }
+  return changed;
+}
 optsEl.addEventListener('click', e => {
   const b = e.target.closest('.opt'); if (!b) return;
-  config[b.dataset.key] = b.dataset.id;
-  $$(`.opt[data-key="${b.dataset.key}"]`, optsEl).forEach(o => o.setAttribute('aria-pressed', String(o.dataset.id === b.dataset.id)));
+  const key = b.dataset.key, part = key.startsWith('p_');
+  let changed = [key];
+  if (part) changed = pickPart(key, b.dataset.id);
+  else {
+    config[key] = b.dataset.id;
+    const undo = LINK_UNDO[key];
+    if (undo && config[undo] !== 'none' && (item(undo, config[undo]).link || {})[key] !== config[key]) config[undo] = 'none';
+  }
+  $$(`.opt[data-key="${key}"]`, optsEl).forEach(o => o.setAttribute('aria-pressed', String(o.dataset.id === config[key])));
   renderCard();
   const v = BUILD_VIEWS[CATS.find(c => c.id === activeCat).view];
   orbitGoal = Object.assign({}, v.orbit, { target: v.orbit.target.slice() });
-  if (photoMode) psOption(b.dataset.key);
+  if (!photoMode || !changed.length) return;
+  // show the change where it can be seen: lowering on a view with ride-height masks, others as usual
+  if (changed.includes('ride') && !(PH.views[ps.view] || {}).masks) { psShow('a090'); return; }
+  psOption(changed.includes('caliper') ? 'caliper' : changed[0]);
 });
 
 function buildCode(cfg) {
@@ -2013,20 +2161,23 @@ function buildCode(cfg) {
   for (const g of GROUPS) { v = v * BigInt(g.items.length) + BigInt(Math.max(0, g.items.findIndex(i => i.id === cfg[g.key]))); }
   return 'RZ-' + v.toString(36).toUpperCase().padStart(6, '0');
 }
+// a visual option set by a chosen brand part (e.g. the ride height its coilovers give): the part's own line covers it
+const implied = g => PART_SLOTS.some(s => (item(s.key, config[s.key]).link || {})[g.key] === config[g.key]);
 function renderCard() {
-  const changed = GROUPS.filter(shown).filter(g => config[g.key] !== STOCK[g.key]);
+  const changed = GROUPS.filter(shown).filter(g => config[g.key] !== STOCK[g.key] && !implied(g));
   $('#card-count').textContent = String(changed.length);
   $('#jc-code').textContent = buildCode(config);
   $('#jc-sub').textContent = changed.length ? `${changed.length} ${changed.length === 1 ? 'change' : 'changes'} from stock` : 'Stock car';
   $('#jc-list').innerHTML = changed.length
-    ? changed.map(g => `<li><span>${g.card || g.label}</span><span>${item(g.key, config[g.key]).name}</span></li>`).join('')
+    ? changed.map(g => `<li><span>${g.card || g.label}</span><span>${itemName(item(g.key, config[g.key]))}</span></li>`).join('')
     : '<li class="jc-empty">Nothing changed yet. Pick parts on the left to start a job card.</li>';
 }
 function buildText() {
   const lines = ['RZER build request', 'Build code: ' + buildCode(config), 'My car: (make, model, year)', ''];
   for (const c of CATS) for (const g of c.groups.filter(shown)) {
     const stock = config[g.key] === STOCK[g.key];
-    lines.push(`${g.card || g.label}: ${item(g.key, config[g.key]).name}${stock ? ' (stock)' : ''}`);
+    if ((c.hidden && stock) || implied(g)) continue;   // brand parts: only the ones chosen, and what they cover once
+    lines.push(`${g.card || g.label}: ${itemName(item(g.key, config[g.key]))}${stock ? ' (stock)' : ''}`);
   }
   return lines.join('\n');
 }
@@ -2141,7 +2292,8 @@ optsEl.addEventListener('click', () => { userOrbit = null; });
 // empty workshop behind. Views: eight around the car (a000 front ... a315, 45 degrees apart towards its right side),
 // close-ups for the wheels, exhaust, headlights and the top, and the interior and engine bay.
 const ORBIT = ['a000', 'a045', 'a090', 'a135', 'a180', 'a225', 'a270', 'a315'];
-const CAT_VIEW = { paint: 'a045', wheels: 'wheel', brakes: 'wheel', aero: 'a135', stance: 'a090', exhaust: 'exhaust', lights: 'headlight', carbon: 'top' };
+const CAT_VIEW = { paint: 'a045', wheels: 'wheel', brakes: 'wheel', aero: 'a135', stance: 'a090', exhaust: 'exhaust', lights: 'headlight', carbon: 'top',
+  hks: 'exhaust', tomei: 'exhaust', endless: 'wheel' };
 const NEAR_ORBIT = { wheel: 'a045', exhaust: 'a135', headlight: 'a045', top: 'a045' };
 const INSIDE = { interior: ['int-front', 'int-dash', 'int-gauges', 'int-rear'], engine: ['eng-bay', 'eng-detail'] };
 // short films of the stock car (assets/config/clips/): turning one step between neighbouring views (and back), and
