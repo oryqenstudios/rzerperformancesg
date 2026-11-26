@@ -291,17 +291,20 @@ def mask_layer(img, mask, path):
 FRONT_AXLE, REAR_AXLE = 1.31, -1.315          # the 3D car's axles (x, metres), wheel centres 0.33 m up, 0.755 m out
 DISC_FRONT = {'endless-disc-racing-front', 'endless-disc-basic-slit-f'}
 DISC_REAR = {'endless-disc-eslit-rear', 'endless-disc-basic-slit-r'}
-# box (x0, y0, x1, y1) per engine view and part kind, in photo pixels
+# box (x0, y0, x1, y1) per engine view and part kind, in photo pixels, drawn round where the edits put each kind; the
+# layer is what clearly changed inside it (significant()), as Kling re-renders the whole engine bay a little
 ENGINE_ROI = {
-    'eng-bay': {'turbo': (720, 380, 1340, 830), 'manifold': (760, 420, 1330, 840), 'intake': (520, 260, 1000, 760),
-                'suction': (620, 260, 1250, 760), 'bov': (560, 300, 1300, 860), 'ignition': (700, 260, 1150, 560)},
-    'eng-detail': {'turbo': (850, 200, 1700, 900), 'manifold': (700, 250, 1700, 950), 'intake': (300, 120, 1200, 800),
-                   'suction': (400, 120, 1650, 850), 'bov': (300, 150, 1700, 950), 'ignition': (550, 120, 1300, 600)},
+    'eng-bay': {'turbo': (680, 380, 1340, 830), 'manifold': (600, 400, 1340, 860), 'heat': (620, 640, 1180, 940),
+                'intake': (980, 300, 1500, 830), 'suction': (620, 260, 1320, 820), 'bov': (940, 420, 1250, 770),
+                'ignition': (500, 280, 1060, 560)},
+    'eng-detail': {'turbo': (800, 200, 1700, 900), 'manifold': (380, 330, 1460, 900), 'heat': (360, 460, 980, 900),
+                   'intake': (380, 380, 1500, 850), 'suction': (380, 480, 1200, 820), 'bov': (380, 450, 1420, 780),
+                   'ignition': (560, 300, 1250, 720)},
 }
-ENGINE_KIND = {'hks-gtiii-rs': 'turbo', 'tomei-arms-m7963': 'turbo', 'tomei-expreme-manifold': 'manifold', 'tomei-heat-protector': 'manifold',
+ENGINE_KIND = {'hks-gtiii-rs': 'turbo', 'tomei-arms-m7963': 'turbo', 'tomei-expreme-manifold': 'manifold', 'tomei-heat-protector': 'heat',
                'hks-racing-suction': 'intake', 'hks-super-power-flow': 'intake', 'hks-premium-suction': 'intake',
                'tomei-turbo-suction-hose': 'suction', 'hks-ssqv4': 'bov', 'tomei-bov': 'bov', 'hks-coil-pro': 'ignition'}
-OIL_ROI = {'a000': (1180, 690, 1560, 960)}
+OIL_ROI = {'a000': (1170, 720, 1310, 820)}   # the bumper's corner intake on the car's left
 
 
 def project(v, pts):
@@ -350,6 +353,17 @@ def brake_region(ids, wheels, grow):
     return cv2.dilate(cal, disk(grow)) & inside & (1 - cv2.erode(rim, disk(1)))
 
 
+def significant(base, img, thr=30, min_area=1500):
+    """Where the edit clearly differs from the base: colour difference (Lab) of both blurred, big regions only. Keeps a
+    new part whole and drops the slight re-rendering Kling does everywhere else."""
+    lb = cv2.cvtColor(cv2.GaussianBlur(base, (0, 0), 3), cv2.COLOR_BGR2LAB).astype(np.float32)
+    li = cv2.cvtColor(cv2.GaussianBlur(img, (0, 0), 3), cv2.COLOR_BGR2LAB).astype(np.float32)
+    m = cv2.morphologyEx((np.sqrt(((lb - li) ** 2).sum(2)) > thr).astype(np.uint8), cv2.MORPH_OPEN, disk(3))
+    n, lab, st, _ = cv2.connectedComponentsWithStats(m, 8)
+    m = np.isin(lab, [i for i in range(1, n) if st[i, cv2.CC_STAT_AREA] >= min_area]).astype(np.uint8)
+    return fill_holes(cv2.morphologyEx(m, cv2.MORPH_CLOSE, disk(9)), 20000)
+
+
 def box_mask(b):
     m = np.zeros((H, W), np.uint8)
     m[b[1]:b[3], b[0]:b[2]] = 1
@@ -378,10 +392,11 @@ def build_brand_parts(v, base, get, have, entry, ids=None, paint_px=None, paint3
             if r.any():
                 box = layer(base, img, r, path, thr=14, reach=3, close=2)
         elif pid in ENGINE_KIND and v in ENGINE_ROI:
-            r = box_mask(ENGINE_ROI[v][ENGINE_KIND[pid]])
-            box = layer(base, img, r, path, thr=18, reach=0, close=5, fill=3000)
+            r = cv2.dilate(significant(base, img), disk(4)) & box_mask(ENGINE_ROI[v][ENGINE_KIND[pid]])
+            box = layer(base, img, r, path, thr=6, reach=0, close=5, fill=3000)
         elif pid == 'hks-oil-cooler-black' and v in OIL_ROI:
-            box = layer(base, img, box_mask(OIL_ROI[v]), path, thr=16, reach=0, close=4, fill=1500)
+            r = cv2.dilate(significant(base, img, 24, 300), disk(4)) & box_mask(OIL_ROI[v])
+            box = layer(base, img, r, path, thr=6, reach=0, close=4, fill=1500)
         if box:
             entry['layers'][name] = box
 

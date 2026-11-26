@@ -272,9 +272,10 @@ const PART = Object.fromEntries(PARTS.map(p => [p.id, p]));
 const PART_GROUPS = PARTS.map(p => ({ key: 'p_' + p.id, label: p.name, card: PART_TYPES[p.type][1], part: p, items: [{ id: 'none', name: 'None', note: '' }, p] }));
 const partOn = id => config['p_' + id] === id;
 const chosenParts = (cfg = config) => PARTS.filter(p => cfg['p_' + p.id] === p.id);
-// which parts sit on a wheel (they stay put when the body drops) and the order their photo layers go down in
+// which parts sit on a wheel (they stay put when the body drops) and the order their photo layers go down in: the
+// turbo last, as the blow-off valves and intakes were fitted next to the stock turbo and their layers hold a bit of it
 const WHEEL_PART = new Set(PARTS.filter(p => ['brakef', 'braker', 'discs'].includes(p.type)).map(p => p.id));
-const LAYER_ORDER = ['discs', 'braker', 'brakef', 'exhaust', 'oil', 'manifold', 'turbo', 'suction', 'intake', 'bov', 'ignition'];
+const LAYER_ORDER = ['discs', 'braker', 'brakef', 'exhaust', 'oil', 'manifold', 'suction', 'intake', 'bov', 'ignition', 'turbo'];
 CATS.push({ id: 'parts', label: 'Parts', view: 'exhaust', hidden: true, groups: PART_GROUPS });
 const PT_ORBIT = { 'pt-exhaust': 'exhaust', 'pt-coilovers': 'stance', 'pt-brakes': 'brakes' };
 for (const t of PART_TABS) CATS.push({ id: t.id, label: t.label, view: PT_ORBIT[t.id] || 'paint', ptab: t, groups: [] });
@@ -1022,7 +1023,7 @@ function psCategory(id) {
 // part's own layer moves into place on an overlay with a sweep of light across it, and the full build is drawn under
 // it. A turbo plays its own fitting film when the engine bay is otherwise stock. Coilovers lower the car smoothly.
 const psFx = $('#ps-fx');
-const FIT_VIEW = { exhaust: 'exhaust', brakef: 'wheel', braker: 'exhaust', oil: 'a000' };
+const FIT_VIEW = { exhaust: 'exhaust', brakef: 'wheel', braker: 'a135', oil: 'a000' };
 const FIT_FROM = {   // where the part comes from, as a share of its own size, and its starting scale
   exhaust: [0.35, 0, 1.04], brakef: [0, 0, 1.18], braker: [0, 0, 1.18], discs: [0, 0, 1.12], oil: [0, 0.25, 1.06],
 };
@@ -1137,7 +1138,7 @@ async function psPart(q, on, changed, rideBefore) {
   if (q.type === 'turbo' && views.length) return psTurbo(q);
   if (!views.length) { pulseCard(); if (changed.length) psShow(ps.view, true); return; }
   const engine = PH.views[views[0]].kind === 'engine';
-  const want = engine ? 'eng-detail' : (q.type === 'discs' ? (q.id.endsWith('-r') || q.id.includes('rear') ? 'exhaust' : 'wheel') : FIT_VIEW[q.type]);
+  const want = engine ? 'eng-detail' : (q.type === 'discs' ? (q.id.endsWith('-r') || q.id.includes('rear') ? 'a135' : 'wheel') : FIT_VIEW[q.type]);
   const v = views.includes(ps.view) ? ps.view : views.includes(want) ? want : views[0];
   if (engine) { if (ps.place !== 'engine') { ps.hold = q.id; await psEnterEngine(); } }
   else psExterior();
