@@ -314,6 +314,73 @@ for pid, (v, what, where) in INSIDE_PARTS.items():
     BRAND_PARTS[pid] = ([v], edit(
         f'Image 1 shows the inside of the engine. Image 2 shows an aftermarket part: {what}. Fit this part {where}, at its real '
         f'size, looking as it does in image 2. Everything else stays exactly as it is.'))
+# ---------------------------------------------------------------- parts from the second review (tools/parts_more.py)
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from parts_more import MORE  # noqa: E402
+WHEEL_VIEWS = ['a045', 'a090', 'a135', 'a225', 'a270', 'a315', 'wheel', 'exhaust', 'headlight', 'top']
+BONNET_VIEWS = ['a000', 'a045', 'a090', 'a270', 'a315', 'wheel', 'headlight', 'top']
+IC_VIEWS = ['a000', 'a045', 'a315', 'headlight']
+BRAND_SRC = {}   # id -> view -> the image an edit starts from, where that is not the view's silver photo
+WING_SPAN = {'voltex-type-5': 'about 1600 mm wide', 'apr-gtc-300': 'about 1550 mm (61 inches) wide'}
+for m in MORE:
+    pid, t, what = m['id'], m['type'], f"{m['brand']} {m['name']}: {m['look']}"
+    if t == 'wheel':
+        BRAND_PARTS[pid] = (WHEEL_VIEWS, edit(
+            f'Image 2 shows an aftermarket wheel, the {what} Replace the rims of all four wheels with this wheel design in the finish '
+            'shown in image 2, at its real size: an 18-inch, 9.5-inch-wide wheel on low-profile 255/35R18 tyres, so the tyre\'s outer '
+            'diameter and the way it fills the wheel arch stay the same as now. Draw each wheel in exactly the perspective, angle, '
+            'position and size of the wheel it replaces, with the same plain black tyre sidewalls, and the brake disc and caliper '
+            'visible behind the spokes. No lettering or logos on the wheels or tyres. The body, the ride height, the arches and the '
+            'floor reflections stay exactly as they are apart from the wheels themselves.'))
+    elif t == 'bonnet':
+        BRAND_PARTS[pid] = (BONNET_VIEWS, edit(
+            f'Image 2 shows an aftermarket carbon fibre bonnet, the {what} Replace the car\'s factory bonnet with it: exactly the '
+            'factory bonnet\'s outline, size and fit against the wings, headlights and windscreen, in glossy exposed 2x2 twill carbon '
+            'weave under clear lacquer, with this bonnet\'s own vents, ridges and shape from image 2 drawn at their real size in the '
+            'perspective of this view. The wings, bumper and the rest of the car keep their paint exactly as they are.'))
+    elif t == 'wing':
+        BRAND_PARTS[pid] = (WING_VIEWS, edit(
+            f'Image 1 shows the car with no rear wing on its boot lid. Image 2 shows an aftermarket GT wing, the {what} Fit this wing '
+            f'to the boot lid at its real size: the blade {WING_SPAN[pid]}, spanning almost the full width of the boot, on two '
+            'stands bolted to the boot lid, the blade standing well above the boot at roughly roof height, with its end plates, in '
+            'carbon fibre and black as in image 2, drawn in exactly the perspective of this view. The rest of the car stays exactly as it is.'))
+        BRAND_SRC[pid] = {v: src(f'{v}__wingdel-silver') for v in WING_VIEWS}
+    elif t == 'intercooler':
+        BRAND_PARTS[pid] = (IC_VIEWS, edit(
+            f'Image 2 shows a large aftermarket front-mount intercooler, the {what} Fit it behind the large lower opening in the '
+            'middle of the front bumper: the opening now shows this intercooler\'s silver aluminium core with its fine horizontal fins '
+            'filling the whole opening, at its real size (about 600 mm wide), drawn in the perspective of this view. Keep the bumper, '
+            'its mesh edges and everything else exactly as it is.'))
+    elif t == 'turbo':
+        BRAND_PARTS[pid] = (['eng-bay', 'eng-detail'], edit(
+            f'Image 1 shows the engine bay with the bonnet raised. Image 2 shows an aftermarket turbocharger, the {what} Fit it in place '
+            'of the factory turbocharger and its heat shield at the front of the engine, bolted to the exhaust manifold, at its real '
+            'size, with its compressor housing and wastegate actuator clearly visible. Everything else in the engine bay stays exactly as it is.'))
+    elif t == 'icpipe':
+        BRAND_PARTS[pid] = (['eng-bay', 'eng-detail'], edit(
+            f'Image 1 shows the engine bay with the bonnet raised. Image 2 shows aftermarket intercooler piping, the {what} Replace '
+            'the factory intercooler pipes that run from the front of the bay up to the throttle body with these polished aluminium '
+            'pipes and their black silicone couplers and clamps, at their real size and along the same route. Everything else stays exactly as it is.'))
+    elif t == 'seat':
+        BRAND_PARTS[pid] = (['int-front', 'int-dash', 'int-rear'], edit(
+            f'Image 1 shows the inside of the car. Image 2 shows a fixed-back full bucket racing seat, the {what} Replace both front '
+            'seats with this seat in black, at its real size, mounted low on seat rails where the factory seats were, facing forward, '
+            'drawn in exactly the perspective of this view. No lettering or logos. Everything else in the cabin stays exactly as it is.'))
+    elif t == 'steering':
+        BRAND_PARTS[pid] = (['int-dash', 'int-gauges', 'int-front'], edit(
+            f'Image 1 shows the inside of the car. Image 2 shows an aftermarket steering wheel, the {what} Replace the factory steering '
+            'wheel with this wheel, at its real size (about 350 mm across), on the steering column in exactly the position and angle '
+            'of the factory wheel, in the perspective of this view. No lettering or logos. Everything else stays exactly as it is.'))
+    elif t == 'gauge':
+        BRAND_PARTS[pid] = (['int-dash', 'int-gauges'], edit(
+            f'Image 1 shows the inside of the car. Image 2 shows an aftermarket boost gauge, the {what} Fit one of these gauges, at '
+            'its real size (74 mm across), in a small black pod on top of the dashboard just to the left of the instrument cluster, '
+            'facing the driver, drawn in the perspective of this view. No readable text. Everything else stays exactly as it is.'))
+    elif t == 'harness':
+        BRAND_PARTS[pid] = (['int-front', 'int-dash', 'int-rear'], edit(
+            f'Image 1 shows the inside of the car. Image 2 shows a four-point racing harness, the {what} Fit it to the driver\'s seat: '
+            'two shoulder straps over the top of the seat back and two lap straps meeting at the buckle, at their real width, in the '
+            'colour shown in image 2, in the perspective of this view. No lettering. Everything else stays exactly as it is.'))
 BRAND_REF = {'endless-disc-basic-slit-f': 'endless-disc-basic-slit', 'endless-disc-basic-slit-r': 'endless-disc-basic-slit'}
 
 
@@ -359,8 +426,9 @@ def jobs(stage):
         for pid, (views, prompt) in BRAND_PARTS.items():
             ref = REF(BRAND_REF.get(pid, pid))
             for v in views:
-                if os.path.exists(base(v)):
-                    out.append({'name': f'{v}__bp-{pid}', 'images': [base(v)] + ([ref] if os.path.exists(ref) else []), 'prompt': prompt})
+                start = BRAND_SRC.get(pid, {}).get(v, base(v))
+                if os.path.exists(start):
+                    out.append({'name': f'{v}__bp-{pid}', 'images': [start] + ([ref] if os.path.exists(ref) else []), 'prompt': prompt})
     elif stage == 'inside':
         if not os.path.exists(base('eng-head')):
             from PIL import Image

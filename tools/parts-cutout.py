@@ -25,6 +25,10 @@ from PIL import Image
 
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
 REV = os.path.join(ROOT, 'preview', 'parts-review')
+REV2 = os.path.join(ROOT, 'preview', 'parts-review-2')   # the second review: the parts in tools/parts_more.py
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from parts_more import MORE  # noqa: E402
+MORE_BY_ID = {m['id']: m for m in MORE}
 OUT = os.path.join(ROOT, 'assets', 'site', 'parts')
 IDS = [
     'hks-super-turbo-muffler',
@@ -194,17 +198,46 @@ def strip_floor_reflection(path):
     Image.fromarray(im).save(path, 'WEBP', quality=86, method=6)
 
 
+def largest_parts(cut):
+    """Keep the matte's big pieces only: drops captions printed under a wheel and stray specks."""
+    import cv2
+    a = np.array(cut)[..., 3]
+    n, lab, st, _ = cv2.connectedComponentsWithStats((a > 40).astype(np.uint8), 8)
+    if n <= 2:
+        return cut
+    big = st[1:, cv2.CC_STAT_AREA].max()
+    keep = np.isin(lab, [i for i in range(1, n) if st[i, cv2.CC_STAT_AREA] >= 0.15 * big])
+    keep = cv2.dilate(keep.astype(np.uint8), np.ones((5, 5), np.uint8)) > 0
+    arr = np.array(cut)
+    arr[..., 3] = np.where(keep, arr[..., 3], 0)
+    return Image.fromarray(arr)
+
+
 def main():
     from rembg import new_session, remove
     parts = {p['id']: p for p in json.load(open(os.path.join(REV, 'parts.json')))['parts']}
+    rev2 = {p['id']: p for p in json.load(open(os.path.join(REV2, 'parts.json')))['parts']} if os.path.exists(os.path.join(REV2, 'parts.json')) else {}
     os.makedirs(OUT, exist_ok=True)
     session = new_session('isnet-general-use')
-    for pid in sys.argv[1:] or IDS:
-        src = (parts[pid].get('photo') or {}).get('thumbnail')   # the review's copies: badges masked, CMYK converted
-        if not src:
-            print('no photo:', pid)
-            continue
-        im = Image.open(os.path.join(REV, src)).convert('RGB')
+    for pid in sys.argv[1:] or IDS + list(MORE_BY_ID):
+        if pid in MORE_BY_ID:   # second review: its full-size download
+            src = (rev2[MORE_BY_ID[pid]['review']].get('photo') or {}).get('local_file')
+            if not src:
+                print('no photo:', pid)
+                continue
+            im = Image.open(os.path.join(REV2, src))
+            if im.mode in ('RGBA', 'LA', 'P'):   # transparent PNGs: flatten on white for the matte
+                im = im.convert('RGBA')
+                bg = Image.new('RGBA', im.size, (255, 255, 255, 255))
+                bg.alpha_composite(im)
+                im = bg
+            im = im.convert('RGB')
+        else:
+            src = (parts[pid].get('photo') or {}).get('thumbnail')   # the review's copies: badges masked, CMYK converted
+            if not src:
+                print('no photo:', pid)
+                continue
+            im = Image.open(os.path.join(REV, src)).convert('RGB')
         if pid in ALT_SOURCE:
             url, local, box = ALT_SOURCE[pid]
             path = os.path.join(REV, local)
@@ -227,6 +260,8 @@ def main():
         if im.width < 900:   # small sources: upscale before the matte so the edges stay smooth
             im = im.resize((im.width * 2, im.height * 2), Image.LANCZOS)
         cut = remove(im, session=session, post_process_mask=True)
+        if pid in MORE_BY_ID:
+            cut = largest_parts(cut)
         a = np.array(cut)[..., 3]
         ys, xs = np.where(a > 12)
         pad = int(0.03 * max(a.shape))
