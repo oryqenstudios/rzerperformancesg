@@ -250,13 +250,13 @@ const PARTS = [
   P('clutch', 'HKS', 'hks-la-clutch', 'LA Clutch', 'Single-plate clutch with a light 5.1 kg flywheel, rated for 450 PS.'),
   P('clutch', 'HKS', 'hks-la-clutch-twin', 'LA Clutch Twin', 'Twin-plate clutch with a light flywheel, for more power than a single plate holds.'),
   // coilovers
-  P('coilover', 'HKS', 'hks-hipermax-s', 'HIPERMAX S', 'Street coilovers with 30-step damping, black bodies and white springs; about 34 mm lower at the front and 16 mm at the rear.', { link: COIL }),
-  P('coilover', 'HKS', 'hks-hipermax-r', 'HIPERMAX R', 'Track coilovers with pillow-ball top mounts and 30-step damping; about 43 mm lower at the front and 25 mm at the rear.', { link: COIL }),
-  P('coilover', 'ENDLESS', 'endless-function-ps', 'FUNCTION-PS', 'Street coilovers from the current FUNCTION range on X COILS PLUS springs (8 kg/mm front, 5 rear), with reinforced rubber top mounts.', { link: COIL }),
-  P('coilover', 'ENDLESS', 'endless-function-sc', 'FUNCTION-SC', 'The softest FUNCTION setup, tuned for the street: X COILS springs (8 kg/mm front, 5 rear) on rubber top mounts.', { link: COIL }),
-  P('coilover', 'ENDLESS', 'endless-function-tc', 'FUNCTION-TC', 'Track coilovers with firmer X COILS R springs (12 kg/mm front, 10 rear) plus helpers, on spherical top mounts.', { link: COIL }),
-  P('coilover', 'ENDLESS', 'endless-zeal-function-x-plus', 'ZEAL Function X Plus', 'Blue-bodied, height-adjustable coilovers with yellow springs, in a soft or a hard spring set.', { link: COIL }),
-  P('coilover', 'ENDLESS', 'endless-zeal-super-function', 'ZEAL Super Function Racing', 'Circuit coilovers with red springs and race spring rates, for track days and time attack.', { link: COIL }),
+  P('coilover', 'HKS', 'hks-hipermax-s', 'HIPERMAX S', 'Street coilovers with 30-step damping, black bodies and white springs; about 34 mm lower at the front and 16 mm at the rear.', { link: COIL, drop: [34, 16] }),
+  P('coilover', 'HKS', 'hks-hipermax-r', 'HIPERMAX R', 'Track coilovers with pillow-ball top mounts and 30-step damping; about 43 mm lower at the front and 25 mm at the rear.', { link: COIL, drop: [43, 25] }),
+  P('coilover', 'ENDLESS', 'endless-function-ps', 'FUNCTION-PS', 'Street coilovers from the current FUNCTION range on X COILS PLUS springs (8 kg/mm front, 5 rear), with reinforced rubber top mounts.', { link: COIL, drop: [32, 32] }),
+  P('coilover', 'ENDLESS', 'endless-function-sc', 'FUNCTION-SC', 'The softest FUNCTION setup, tuned for the street: X COILS springs (8 kg/mm front, 5 rear) on rubber top mounts.', { link: COIL, drop: [32, 32] }),
+  P('coilover', 'ENDLESS', 'endless-function-tc', 'FUNCTION-TC', 'Track coilovers with firmer X COILS R springs (12 kg/mm front, 10 rear) plus helpers, on spherical top mounts.', { link: COIL, drop: [32, 32] }),
+  P('coilover', 'ENDLESS', 'endless-zeal-function-x-plus', 'ZEAL Function X Plus', 'Blue-bodied, height-adjustable coilovers with yellow springs, in a soft or a hard spring set.', { link: COIL, drop: [32, 32] }),
+  P('coilover', 'ENDLESS', 'endless-zeal-super-function', 'ZEAL Super Function Racing', 'Circuit coilovers with red springs and race spring rates, for track days and time attack.', { link: COIL, drop: [32, 32] }),
   // brakes
   P('brakef', 'ENDLESS', 'endless-racing-mono6', 'Racing MONO6', 'Forged monoblock six-piston front calipers in hard-anodised gunmetal with a red logo, on 370 mm discs.'),
   P('brakef', 'ENDLESS', 'endless-racing-mono4', 'Racing MONO4', 'Forged monoblock four-piston front calipers in hard-anodised gunmetal, on 355 mm discs.'),
@@ -739,11 +739,11 @@ optsEl.addEventListener('click', e => {
   const b = e.target.closest('.opt'); if (!b) return;
   const key = b.dataset.key;
   if (key.startsWith('p_')) {
-    const rideBefore = config.ride;
+    const rideBefore = config.ride, cfgBefore = Object.assign({}, config);
     const { on, changed } = pickPart(b.dataset.id);
     $$('.popt', optsEl).forEach(o => o.setAttribute('aria-pressed', String(config[o.dataset.key] === o.dataset.id)));
     renderCard();
-    if (photoMode && mode === 'build') psPart(PART[b.dataset.id], on, changed, rideBefore);
+    if (photoMode && mode === 'build') psPart(PART[b.dataset.id], on, changed, rideBefore, cfgBefore);
     else pulseCard();
     return;
   }
@@ -966,13 +966,39 @@ function psLayers(v, cfg) {
 }
 
 // draw view v with build cfg into canvas; false if its photo is missing
-const rideDrop = (v, ride) => (PH.views[v].masks && ride !== 'factory' && PH.drops[v] ? PH.drops[v][ride] || 0 : 0);
+// how far the body drops in view v, front and rear in pixels: a chosen coilover's real figures (its drop, in mm below the
+// factory height), else the generic option's even drop. The views' drops are 50 mm 'coilovers' in pixels; a000 sees
+// mostly the front axle, a180 the rear, and the other drop views tilt between the axles (AXLE_X, their x in the photo)
+const AXLE_X = { a045: [1050, 571], a090: [1401, 529], a315: [872, 1450] };
+const GENERIC_MM = { springs: [30, 30], coilovers: [50, 50] };
+function rideDrop(v, ride, cfg = config) {
+  if (!PH.views[v].masks || ride === 'factory' || !PH.drops[v]) return { f: 0, r: 0 };
+  const coil = ride === 'coilovers' && chosenParts(cfg).find(q => q.type === 'coilover' && q.drop);
+  const [fm, rm] = coil ? coil.drop : GENERIC_MM[ride] || [0, 0];
+  const k = (PH.drops[v].coilovers || 0) / 50;
+  if (v === 'a000') return { f: fm * k, r: fm * k };
+  if (v === 'a180') return { f: rm * k, r: rm * k };
+  return { f: fm * k, r: rm * k };
+}
+const dropMid = d => (typeof d === 'number' ? d : (d.f + d.r) / 2);
+// draw im shifted down by the drop (up with sign -1), tilting between the axles in thin vertical strips
+function drawDropped(ctx, im, v, d, sign) {
+  const ax = AXLE_X[v];
+  if (!ax || Math.abs(d.f - d.r) < 0.5) { ctx.drawImage(im, 0, sign * dropMid(d)); return; }
+  const [xf, xr] = ax, step = 6;
+  for (let x = 0; x < PSW; x += step) {
+    const t = Math.max(0, Math.min(1, (x + step / 2 - xr) / (xf - xr)));
+    ctx.drawImage(im, x, 0, step, PSH, x, sign * (d.r + (d.f - d.r) * t), step, PSH);
+  }
+}
 async function psCompose(canvas, v, cfg, dropPx) {
   const e = PH.views[v];
   const { paint, names } = psLayers(v, cfg);
-  const drop = dropPx !== undefined ? dropPx : rideDrop(v, cfg.ride);
+  let drop = dropPx !== undefined ? dropPx : rideDrop(v, cfg.ride, cfg);
+  if (typeof drop === 'number') drop = { f: drop, r: drop };
+  const dropped = drop.f || drop.r;
   const [base, ...rest] = await Promise.all([psPhoto(v, `paint-${paint}.webp`), ...names.map(n => psPhoto(v, n + '.webp')),
-    ...(drop || (e.masks && dropPx !== undefined) ? ['plate.webp', 'm-body.png', 'm-tyres.png', 'm-refl.png', 'm-floor.png'].map(f => psPhoto(v, f)) : [])]);
+    ...(dropped || (e.masks && dropPx !== undefined) ? ['plate.webp', 'm-body.png', 'm-tyres.png', 'm-refl.png', 'm-floor.png'].map(f => psPhoto(v, f)) : [])]);
   if (!base) return false;
   const lay = rest.slice(0, names.length), masks = rest.slice(names.length);
   const [car, mb, mr, tmp, wheels] = psScratch;
@@ -983,7 +1009,7 @@ async function psCompose(canvas, v, cfg, dropPx) {
   put(c, 'source-over', base);
   layers(c, 'source-over');
   const out = canvas.getContext('2d');
-  if (!drop || masks.some(m => !m)) { put(out, 'source-over', car); return true; }
+  if (!dropped || masks.some(m => !m)) { put(out, 'source-over', car); return true; }
   out.clearRect(0, 0, PSW, PSH);
   const [plate, mBody, mTyres, mRefl, mFloor] = masks;
   // the body: its mask minus the tyres, plus every part laid on it (a splitter or skirt in front of a wheel drops with
@@ -1003,9 +1029,9 @@ async function psCompose(canvas, v, cfg, dropPx) {
   const t = tmp.getContext('2d');
   const cut = (mask, from = car) => { t.globalCompositeOperation = 'source-over'; t.clearRect(0, 0, PSW, PSH); put(t, 'source-over', from); put(t, 'destination-in', mask); return tmp; };
   put(out, 'source-over', plate);
-  out.drawImage(cut(mr), 0, -drop);      // the reflection rises as the body drops
+  drawDropped(out, cut(mr), v, drop, -1);      // the reflection rises as the body drops
   out.drawImage(cut(mTyres, wheels), 0, 0);   // the wheels stay on the floor
-  out.drawImage(cut(mb), 0, drop);       // the body comes down over them
+  drawDropped(out, cut(mb), v, drop, 1);       // the body comes down over them, front and rear by their own amounts
   return true;
 }
 
@@ -1196,26 +1222,26 @@ async function psFit(v, q) {
   ps.hold = null;
   const im = await psPhoto(v, layer + '.webp');
   if (!im || reduceMotion || !e.layers[layer]) { await psShow(v, true); return; }
-  const drop = WHEEL_PART.has(q.id) ? 0 : rideDrop(v, config.ride);
+  const drop = WHEEL_PART.has(q.id) ? 0 : dropMid(rideDrop(v, config.ride));
   await psFitAnim(im, e.layers[layer], drop, q.type);
   await psShow(v, true);
   psFx.getContext('2d').clearRect(0, 0, PSW, PSH);
   psFx.classList.remove('on');
 }
 // the car settles from one ride height to another on a view that can show it
-async function psRide(from, to) {
+async function psRide(from, to, cfgFrom) {
   let v = ps.view;
   if (ps.place !== 'exterior' || !PH.views[v].masks) { psExterior(); v = 'a090'; }
   if (reduceMotion) { await psShow(v, true); return; }
   ps.ride = from;
   await psShow(v, ps.view === v);   // at the old height first
   ps.ride = null;
-  const d0 = rideDrop(v, from), d1 = rideDrop(v, to), canvas = psCanvases[ps.front];
+  const d0 = rideDrop(v, from, cfgFrom || config), d1 = rideDrop(v, to), canvas = psCanvases[ps.front];
   const t0 = performance.now(), D = 700;
   for (;;) {
     const t = Math.min(1, (performance.now() - t0) / D);
     const k = t < 1 ? 1 - Math.pow(1 - t, 3) * Math.cos(t * 7) : 1;   // settles with a small bounce
-    await psCompose(canvas, v, psCfg(), d0 + (d1 - d0) * k);
+    await psCompose(canvas, v, psCfg(), { f: d0.f + (d1.f - d0.f) * k, r: d0.r + (d1.r - d0.r) * k });
     if (t >= 1) break;
     await new Promise(r => requestAnimationFrame(r));
   }
@@ -1279,11 +1305,11 @@ async function psInner(q, v) {
   }
   await psFit(v, q);
 }
-async function psPart(q, on, changed, rideBefore) {
+async function psPart(q, on, changed, rideBefore, cfgBefore) {
   if (ps.playing) { psShow(ps.view, true); return; }
-  if (changed.includes('ride')) {   // coilovers on or off: the car settles first
+  if (changed.includes('ride') || q.type === 'coilover') {   // coilovers on, off or swapped: the car settles to the kit's height
     ps.hold = on ? q.id : null;
-    await psRide(rideBefore, config.ride);
+    await psRide(rideBefore, config.ride, cfgBefore);
     ps.hold = null;
     if (!on) { await psShow(ps.view, true); return; }
   }
