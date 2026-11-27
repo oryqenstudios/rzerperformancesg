@@ -2466,7 +2466,10 @@ optsEl.addEventListener('click', () => { userOrbit = null; });
 // empty workshop behind. Views: eight around the car (a000 front ... a315, 45 degrees apart towards its right side),
 // close-ups for the wheels, exhaust, headlights and the top, and the interior and engine bay.
 const ORBIT = ['a000', 'a045', 'a090', 'a135', 'a180', 'a225', 'a270', 'a315'];
-const CAT_VIEW = { paint: 'a045', wheels: 'wheel', brakes: 'wheel', aero: 'a135', stance: 'a090', exhaust: 'exhaust', lights: 'headlight', carbon: 'top' };
+const CAT_VIEW = { paint: 'a045', wheels: 'a045', brakes: 'a045', aero: 'a135', stance: 'a090', exhaust: 'a180', lights: 'headlight', carbon: 'top' };
+// the camera turns to the area being customised: each option, and each part type, has the view that shows it best
+const OPTION_VIEW = { paint: 'a045', rimfin: 'a045', caliper: 'a045', exhaust: 'a180', exfin: 'a180', spoiler: 'a180', diffuser: 'a180',
+  lip: 'a000', skirts: 'a090', ride: 'a090', drl: 'headlight', tint: 'a045', hood: 'a045', roof: 'top', mirror: 'top' };
 for (const t of PART_TABS) if (t.view && !t.into) CAT_VIEW[t.id] = t.view;
 const NEAR_ORBIT = { wheel: 'a045', exhaust: 'a135', headlight: 'a045', top: 'a045' };
 const INSIDE = { interior: ['int-front', 'int-dash', 'int-gauges', 'int-rear'], engine: ['eng-bay', 'eng-detail', 'eng-cams', 'eng-block'] };
@@ -2521,7 +2524,10 @@ function psLayers(v, cfg) {
   if (cfg.roof !== 'factory') add('roof-' + cfg.roof);
   if (cfg.mirror !== 'factory') add('mirror-' + cfg.mirror);
   const chosen = chosenParts(cfg);
-  for (const t of LAYER_ORDER) for (const q of chosen) if ((q.layer || q.type) === t) add('bp-' + q.id);
+  for (const t of LAYER_ORDER) for (const q of chosen) if ((q.layer || q.type) === t) {
+    if (!L['bp-' + q.id] && q.type === 'wing') { add('wingdel-' + paint); continue; }   // close-ups that hardly show the boot: no wing
+    add('bp-' + q.id);
+  }
   return { paint, names };
 }
 
@@ -2691,7 +2697,7 @@ function psCategory(id) {
 // part's own layer moves into place on an overlay with a sweep of light across it, and the full build is drawn under
 // it. A turbo plays its own fitting film when the engine bay is otherwise stock. Coilovers lower the car smoothly.
 const psFx = $('#ps-fx');
-const FIT_VIEW = { exhaust: 'exhaust', brakef: 'wheel', braker: 'a135', oil: 'a000', wheel: 'a045', bonnet: 'a045', wing: 'a135', intercooler: 'a000',
+const FIT_VIEW = { exhaust: 'a180', brakef: 'a045', braker: 'a135', oil: 'a000', wheel: 'a045', bonnet: 'a045', wing: 'a180', intercooler: 'a000',
   seat: 'int-front', steering: 'int-gauges', gauge: 'int-dash', harness: 'int-front' };
 const FIT_FROM = {   // where the part comes from, as a share of its own size, and its starting scale
   exhaust: [0.35, 0, 1.04], brakef: [0, 0, 1.18], braker: [0, 0, 1.18], discs: [0, 0, 1.12], oil: [0, 0.25, 1.06],
@@ -2858,8 +2864,8 @@ async function psPart(q, on, changed, rideBefore) {
   if (inner) return psInner(q, inner);
   if (!views.length) { pulseCard(); if (changed.length) psShow(ps.view, true); return; }
   const kind = PH.views[views[0]].kind, engine = kind === 'engine';
-  const want = engine ? 'eng-detail' : (q.type === 'discs' ? (q.id.endsWith('-r') || q.id.includes('rear') ? 'a135' : 'wheel') : FIT_VIEW[q.type]);
-  const v = views.includes(ps.view) ? ps.view : views.includes(want) ? want : views[0];
+  const want = engine ? 'eng-detail' : (q.type === 'discs' ? (q.id.endsWith('-r') || q.id.includes('rear') ? 'a135' : 'a045') : FIT_VIEW[q.type]);
+  const v = views.includes(want) ? want : views.includes(ps.view) ? ps.view : views[0];
   if (kind !== 'exterior') { if (ps.place !== kind) { ps.hold = q.id; await psEnter(kind); } }
   else psExterior();
   await psFit(v, q);
@@ -2869,6 +2875,8 @@ function psOption(key) {
   const e = PH.views[ps.view];
   const visible = ps.place === 'exterior' && (key === 'paint' || (key === 'ride' ? !!e.masks
     : (GROUP_LAYERS[key] || []).some(pre => Object.keys(e.layers || {}).some(n => n.startsWith(pre)))));
+  const want = OPTION_VIEW[key];
+  if (want && PH.views[want] && want !== ps.view) { psExterior(); psShow(want); return; }
   if (visible) psShow(ps.view, true); else psCategory(activeCat);
 }
 // the photo sits in the free space between the parts list and the job card (above the parts list on phones),
