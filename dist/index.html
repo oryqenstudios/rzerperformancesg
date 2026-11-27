@@ -1921,6 +1921,7 @@ const chosenParts = (cfg = config) => PARTS.filter(p => cfg['p_' + p.id] === p.i
 // which parts sit on a wheel (they stay put when the body drops) and the order their photo layers go down in (by the
 // part's layer, else its type): the turbo after the bay's other parts, as the blow-off valves and intakes were fitted
 // next to the stock turbo and their layers hold a bit of it; inside the engine, from the crank up to the cam gears
+const COMBOS = { 'bp-schroth-rallye-4-asm--bride-zeta-iv': ['bp-bride-zeta-iv', 'bp-schroth-rallye-4-asm'] };
 const WHEEL_PART = new Set(PARTS.filter(p => ['brakef', 'braker', 'discs', 'wheel'].includes(p.type)).map(p => p.id));
 const LAYER_ORDER = ['discs', 'braker', 'brakef', 'wheel', 'exhaust', 'oil', 'intercooler', 'bonnet', 'wing', 'manifold', 'suction', 'icpipe', 'intake', 'bov', 'ignition', 'turbo',
   'seat', 'harness', 'steering', 'gauge',
@@ -2494,6 +2495,11 @@ function psLayers(v, cfg) {
   const paint = e.paints.includes(cfg.paint) ? cfg.paint : 'silver';
   if (e.kind === 'interior') {   // only the parts fitted inside
     for (const t of LAYER_ORDER) for (const q of chosenParts(cfg)) if ((q.layer || q.type) === t && L['bp-' + q.id]) names.push('bp-' + q.id);
+    // parts drawn together as one layer where one was fitted over the other's place (the harness on the bucket seat)
+    for (const [combo, parts] of Object.entries(COMBOS)) if (L[combo] && parts.every(n => names.includes(n))) {
+      names.splice(names.indexOf(parts[0]), 1, combo);
+      for (const n of parts.slice(1)) names.splice(names.indexOf(n), 1);
+    }
     return { paint: 'silver', names };
   }
   const add = n => { if (L[n]) names.push(n); };
