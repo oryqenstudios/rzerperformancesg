@@ -370,6 +370,7 @@ fieldset.field { border: 0; margin: 0; padding: 0; }
 .opt[aria-pressed="true"] .tick { opacity: 1; }
 .opt .stock-tag { font-size: 0.6875rem; color: var(--graphite); margin-left: 6px; font-weight: 500; }
 /* brand parts: a tab per brand under a label, the brand's parts as cards with the cut-out product photo */
+.p-head { margin: 18px 0 4px; font-size: 0.75rem; font-weight: 600; color: var(--steel); letter-spacing: 0.06em; text-transform: uppercase; }
 .b-tabs-label { grid-column: 1 / -1; padding: 8px 4px 2px; font-size: 0.6875rem; color: var(--graphite); letter-spacing: 0.06em; text-transform: uppercase; }
 .b-tabs-parts { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
 .p-intro { margin: 0; font-size: 0.8125rem; color: var(--steel); line-height: 1.45; }

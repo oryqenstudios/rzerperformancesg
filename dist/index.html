@@ -384,6 +384,7 @@ fieldset.field { border: 0; margin: 0; padding: 0; }
 .opt[aria-pressed="true"] .tick { opacity: 1; }
 .opt .stock-tag { font-size: 0.6875rem; color: var(--graphite); margin-left: 6px; font-weight: 500; }
 /* brand parts: a tab per brand under a label, the brand's parts as cards with the cut-out product photo */
+.p-head { margin: 18px 0 4px; font-size: 0.75rem; font-weight: 600; color: var(--steel); letter-spacing: 0.06em; text-transform: uppercase; }
 .b-tabs-label { grid-column: 1 / -1; padding: 8px 4px 2px; font-size: 0.6875rem; color: var(--graphite); letter-spacing: 0.06em; text-transform: uppercase; }
 .b-tabs-parts { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
 .p-intro { margin: 0; font-size: 0.8125rem; color: var(--steel); line-height: 1.45; }
@@ -1729,18 +1730,18 @@ const PART_TYPES = {
 // the tabs: label, types in order, and where the photo goes when the tab opens (engine: the engine bay)
 const PART_TABS = [
   { id: 'pt-turbo', label: 'Turbo', types: ['turbo', 'bov'], place: 'engine' },
-  { id: 'pt-exhaust', label: 'Exhaust', types: ['exhaust', 'manifold', 'frontpipe', 'cat'], view: 'exhaust' },
+  { id: 'pt-exhaust', label: 'Exhaust', types: ['exhaust', 'manifold', 'frontpipe', 'cat'], view: 'exhaust', into: 'exhaust' },
   { id: 'pt-intake', label: 'Intake', types: ['intake', 'suction'], place: 'engine' },
   { id: 'pt-engine', label: 'Engine', types: ['cams', 'valvetrain', 'bottom', 'gasket', 'oil'], place: 'engine' },
   { id: 'pt-fuel', label: 'Fuel', types: ['fuel'], place: 'engine' },
   { id: 'pt-electronics', label: 'Electronics', types: ['ecu', 'boost', 'timer', 'ignition'] },
   { id: 'pt-clutch', label: 'Clutch', types: ['clutch'] },
-  { id: 'pt-coilovers', label: 'Coilovers', types: ['coilover'], view: 'a090' },
-  { id: 'pt-brakes', label: 'Brakes', types: ['brakef', 'braker', 'pads', 'discs', 'lines'], view: 'wheel' },
-  { id: 'pt-wheels', label: 'Wheels', types: ['wheel', 'tyre'], view: 'a045' },
+  { id: 'pt-coilovers', label: 'Coilovers', types: ['coilover'], view: 'a090', into: 'stance' },
+  { id: 'pt-brakes', label: 'Brakes', types: ['brakef', 'braker', 'pads', 'discs', 'lines'], view: 'wheel', into: 'brakes' },
+  { id: 'pt-wheels', label: 'Wheels', types: ['wheel', 'tyre'], view: 'a045', into: 'wheels' },
   { id: 'pt-intercooler', label: 'Intercooler', types: ['intercooler', 'icpipe'], view: 'a000' },
-  { id: 'pt-bonnets', label: 'Bonnets', types: ['bonnet'], view: 'a045' },
-  { id: 'pt-wings', label: 'Wings', types: ['wing'], view: 'a135' },
+  { id: 'pt-bonnets', label: 'Bonnets', types: ['bonnet'], view: 'a045', into: 'carbon' },
+  { id: 'pt-wings', label: 'Wings', types: ['wing'], view: 'a135', into: 'aero' },
   { id: 'pt-interior', label: 'Interior', types: ['seat', 'steering', 'gauge', 'harness'], place: 'interior' },
 ];
 const NO_PHOTO = new Set(['hks-hipower-us', 'hks-turbo-timer']);
@@ -1928,7 +1929,12 @@ const LAYER_ORDER = ['discs', 'braker', 'brakef', 'wheel', 'exhaust', 'oil', 'in
   'crank', 'rods', 'pistons', 'gasket', 'studs', 'valvetrain', 'cams', 'camgear'];
 CATS.push({ id: 'parts', label: 'Parts', view: 'exhaust', hidden: true, groups: PART_GROUPS });
 const PT_ORBIT = { 'pt-exhaust': 'exhaust', 'pt-coilovers': 'stance', 'pt-brakes': 'brakes' };
-for (const t of PART_TABS) CATS.push({ id: t.id, label: t.label, view: PT_ORBIT[t.id] || 'paint', ptab: t, groups: [] });
+// part types join the category they belong to (wheels, brakes, exhaust, stance, aero, carbon); the rest are categories of their own
+for (const t of PART_TABS) {
+  const home = t.into && CATS.find(c => c.id === t.into);
+  if (home) home.ptypes = (home.ptypes || []).concat(t.types);
+  else CATS.push({ id: t.id, label: t.label, view: PT_ORBIT[t.id] || 'paint', ptab: t, groups: [] });
+}
 const GROUPS = CATS.flatMap(c => c.groups.map(g => Object.assign(g, { cat: c })));
 const STOCK = Object.fromEntries(GROUPS.map(g => [g.key, g.items[0].id]));
 // the Rzer showcase build, styled on the client's Evo IX: silver, carbon bonnet, black wheels, splitter
@@ -2228,9 +2234,7 @@ const tabsEl = $('#b-tabs'), optsEl = $('#b-options');
 let activeCat = null;
 const TICK = '<svg class="tick" viewBox="0 0 18 18" aria-hidden="true"><path d="M4 9.5l3.2 3L14 5.5" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>';
 const tabBtn = c => `<button class="b-tab${c.ptab ? ' b-tab-part' : ''}" role="tab" type="button" id="tab-${c.id}" data-cat="${c.id}" aria-selected="false" aria-controls="b-options">${c.label}</button>`;
-tabsEl.innerHTML = TABS.filter(c => !c.ptab).map(tabBtn).join('')
-  + '<span class="b-tabs-label" aria-hidden="true">Performance parts</span>'
-  + `<div class="b-tabs-parts" role="presentation">${TABS.filter(c => c.ptab).map(tabBtn).join('')}</div>`;
+tabsEl.innerHTML = TABS.map(tabBtn).join('');
 tabsEl.addEventListener('click', e => { const b = e.target.closest('.b-tab'); if (b) setCategory(b.dataset.cat); });
 tabsEl.addEventListener('keydown', e => {
   if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
@@ -2264,15 +2268,16 @@ function setCategory(id, jump) {
   const cat = CATS.find(c => c.id === id);
   $$('.b-tab', tabsEl).forEach(b => b.setAttribute('aria-selected', String(b.dataset.cat === id)));
   optsEl.setAttribute('aria-labelledby', 'tab-' + id);
-  if (cat.ptab) {
-    optsEl.innerHTML = '<p class="p-intro">Real aftermarket parts that fit the Evo IX. Pick a part to fit it; pick it again to take it off.</p>'
-      + cat.ptab.types.map(t => [t, PARTS.filter(q => q.type === t)]).filter(([, list]) => list.length)
-        .map(([t, list]) => `<fieldset class="og"><legend>${PART_TYPES[t][0]}</legend><div class="og-items">${list.map(partCard).join('')}</div></fieldset>`).join('');
-  } else optsEl.innerHTML = cat.groups.filter(shown).map(g => `<fieldset class="og"><legend>${g.label}</legend><div class="og-items">${g.items.map((it, idx) => {
+  const partSets = types => types.map(t => [t, PARTS.filter(q => q.type === t)]).filter(([, list]) => list.length)
+    .map(([t, list]) => `<fieldset class="og"><legend>${PART_TYPES[t][0]}</legend><div class="og-items">${list.map(partCard).join('')}</div></fieldset>`).join('');
+  const intro = '<p class="p-intro">Real aftermarket parts that fit the Evo IX. Pick a part to fit it; pick it again to take it off.</p>';
+  if (cat.ptab) optsEl.innerHTML = intro + partSets(cat.ptab.types);
+  else optsEl.innerHTML = cat.groups.filter(shown).map(g => `<fieldset class="og"><legend>${g.label}</legend><div class="og-items">${g.items.map((it, idx) => {
     const lead = it.swatch ? `<span class="sw" style="--sw:${it.swatch}"></span>` : `<span class="mark">${it.mark || ''}</span>`;
     const tag = idx === 0 ? '<span class="stock-tag">stock</span>' : '';
     return `<button class="opt" type="button" data-key="${g.key}" data-id="${it.id}" aria-pressed="${config[g.key] === it.id}">${lead}<span class="opt-name">${it.name}${tag}</span><span class="opt-note">${it.note}</span>${TICK}</button>`;
   }).join('')}</div></fieldset>`).join('');
+  if (!cat.ptab && cat.ptypes) optsEl.innerHTML += '<h3 class="p-head">Real parts</h3>' + partSets(cat.ptypes);
   optsEl.scrollTop = 0;
   const v = BUILD_VIEWS[cat.view];
   orbitGoal = Object.assign({}, v.orbit, { target: v.orbit.target.slice() });
@@ -2462,7 +2467,7 @@ optsEl.addEventListener('click', () => { userOrbit = null; });
 // close-ups for the wheels, exhaust, headlights and the top, and the interior and engine bay.
 const ORBIT = ['a000', 'a045', 'a090', 'a135', 'a180', 'a225', 'a270', 'a315'];
 const CAT_VIEW = { paint: 'a045', wheels: 'wheel', brakes: 'wheel', aero: 'a135', stance: 'a090', exhaust: 'exhaust', lights: 'headlight', carbon: 'top' };
-for (const t of PART_TABS) if (t.view) CAT_VIEW[t.id] = t.view;
+for (const t of PART_TABS) if (t.view && !t.into) CAT_VIEW[t.id] = t.view;
 const NEAR_ORBIT = { wheel: 'a045', exhaust: 'a135', headlight: 'a045', top: 'a045' };
 const INSIDE = { interior: ['int-front', 'int-dash', 'int-gauges', 'int-rear'], engine: ['eng-bay', 'eng-detail', 'eng-cams', 'eng-block'] };
 if (PH) for (const k in INSIDE) INSIDE[k] = INSIDE[k].filter(v => PH.views[v]);   // only the views the manifest has
