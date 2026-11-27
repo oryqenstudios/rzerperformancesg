@@ -309,6 +309,7 @@ ENGINE_KIND.update({m['id']: 'icpipe' for m in J.MORE if m['type'] == 'icpipe'})
 ENGINE_ROI['eng-bay']['icpipe'] = (600, 250, 1450, 860)
 ENGINE_ROI['eng-detail']['icpipe'] = (250, 250, 1500, 920)
 MORE_BY = {m['id']: m for m in J.MORE}
+GOOD_WING_VIEWS = {'a135', 'a180', 'a225', 'exhaust', 'a045', 'a090', 'a270', 'a315', 'top'}   # where a GT wing edit sits on the boot (some retaken: config-jobs.py WING_RETAKE)
 WHEEL_ELLIPSES = json.load(open(f'{J.C}/wheel-ellipses.json'))
 OIL_ROI = {'a000': (1170, 720, 1310, 820)}   # the bumper's corner intake on the car's left
 # inside the engine: the open head (eng-cams) and the cutaway (eng-block), where the parts in J.INSIDE_PARTS go
@@ -425,10 +426,23 @@ def cut_more(v, t, base, img, path, get, have, ids, paint_px, paint3d):
         for cx, cy, w, h in ells:
             cv2.ellipse(m, ((cx, cy), (w * 1.01, h * 1.01), 0), 1, -1)
         return mask_layer(img, m, path)
-    if t == 'bonnet' and ids is not None:
-        part = ids.part('stock', ['bonnet'], mirror=False)
-        r = ids.roi('stock', ['bonnet'], 12) & (1 - (paint3d & (1 - cv2.dilate(part, disk(5)))))
-        return layer(base, img, r, path, paint=paint_px, cover=True) if r.any() else None
+    if t == 'bonnet':
+        # exactly the bonnet: the outline of this view's carbon bonnet option layer (checked to sit on the bonnet)
+        hc = manifest['views'].get(v, {}).get('layers', {}).get('hood-carbon')
+        if not hc or not os.path.exists(f'{OUT}/{v}/hood-carbon.webp'):
+            return None
+        x, y, w, h = hc
+        a = cv2.imread(f'{OUT}/{v}/hood-carbon.webp', cv2.IMREAD_UNCHANGED)[..., 3]
+        m = np.zeros((H, W), np.uint8)
+        m[y:y + h, x:x + w] = (cv2.resize(a, (w, h)) > 100).astype(np.uint8)
+        # only what the edit turned to carbon (darker than the silver paint), never the silver it left: that would show
+        # silver on every other paint
+        gb, gi = cv2.cvtColor(base, cv2.COLOR_BGR2GRAY).astype(int), cv2.cvtColor(img, cv2.COLOR_BGR2GRAY).astype(int)
+        carbon = cv2.morphologyEx(((gi < gb - 18) | (gi < 90)).astype(np.uint8), cv2.MORPH_CLOSE, disk(4))
+        m &= fill_holes(carbon, 3000)
+        return mask_layer(img, cv2.dilate(m, disk(1)), path)
+    if t == 'wing' and v not in GOOD_WING_VIEWS:   # elsewhere Kling's wing floats off the boot: the page shows the GT wing option
+        return None
     if t == 'wing' and ids is not None and have('wingdel-silver'):
         wd = get('wingdel-silver')
         r = ids.roi('stock', ['wing'], 30) | ids.roi('addA', ['gt'], 26)

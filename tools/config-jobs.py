@@ -388,6 +388,9 @@ for cid, (pid, onto) in COMBO.items():
     views = [v for v in BRAND_PARTS[pid][0] if v in BRAND_PARTS[onto][0]]
     BRAND_PARTS[cid] = (views, BRAND_PARTS[pid][1].replace("Fit it to the driver\'s seat", "Fit it to the driver\'s full bucket seat, through the seat\'s harness slots"))
     BRAND_SRC[cid] = {v: src(f'{v}__bp-{onto}') for v in views}
+# the GT wings again, in the views where the first edits floated off the boot: given the wing as fitted from behind
+# (a180, where it sat right) as image 3, two takes; the better one is copied to <view>__bp-<id>.png by hand
+WING_RETAKE = ['a045', 'a090', 'a270', 'a315', 'top', 'wheel', 'headlight']
 BRAND_REF = {'endless-disc-basic-slit-f': 'endless-disc-basic-slit', 'endless-disc-basic-slit-r': 'endless-disc-basic-slit'}
 
 
