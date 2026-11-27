@@ -444,9 +444,13 @@ def cut_more(v, t, base, img, path, get, have, ids, paint_px, paint3d):
     if t == 'wing' and v not in GOOD_WING_VIEWS:   # elsewhere Kling's wing floats off the boot: the page shows the GT wing option
         return None
     if t == 'wing' and ids is not None and have('wingdel-silver'):
+        # what the edit added to the no-wing photo, near the boot (the wing's stands sit on it; the blade stands above)
         wd = get('wingdel-silver')
-        r = ids.roi('stock', ['wing'], 30) | ids.roi('addA', ['gt'], 26)
-        return layer(wd, img, r, path, paint=paint_px, reach=90, thr=9, close=7, fill=4000, cover=True) if r.any() else None
+        near = cv2.dilate(ids.part('stock', ['wing'], mirror=False) | ids.part('addA', ['gt'], mirror=False), disk(140))
+        sig = significant(wd, img, 24, 300) & near
+        n, lab, st, _ = cv2.connectedComponentsWithStats(sig, 8)
+        keep = np.isin(lab, [i for i in range(1, n) if st[i, cv2.CC_STAT_AREA] >= 300]).astype(np.uint8)
+        return mask_layer(img, cv2.dilate(keep, disk(2)), path) if keep.any() else None
     if t == 'intercooler':
         sig = significant(base, img, 22, 300)
         if ids is not None:
