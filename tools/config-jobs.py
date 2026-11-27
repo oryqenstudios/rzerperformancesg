@@ -49,6 +49,13 @@ PAINTS = {   # id -> description (silver is the base photo)
     'blue': 'midnight blue: a very deep dark blue metallic that reads almost black in shade and deep blue where the light hits',
     'red': 'redline red: a solid bright red with no metallic flake, glossy under a deep clear coat',
 }
+# engine views: only the visible painted panels change (a 'repaint the car' prompt made Kling invent a whole new car)
+engine_paint_prompt = lambda d: ('Image 1 is a close photo of the engine bay with the bonnet raised. Change only the colour of the '
+                                 f'painted body panels that are already visible in it (the front wings, the inner wings round the bay, '
+                                 f'the strut towers and the raised bonnet\'s painted edges) to {d}. Keep the camera, the framing, the zoom, '
+                                 'the car\'s shape and every part of the engine, all pipes, hoses and the workshop exactly as they are, '
+                                 'pixel for pixel. Do not show more of the car and do not change it into another car. Photorealistic. '
+                                 'No text, no logos.')
 paint_prompt = lambda d: (f'Image 1 is the photo to edit. Repaint the whole car body in {d}, including the body-colour bumpers, '
                           'mirrors, sills, door handles and rear wing. Keep the black trim, glass, lights, grille, wheels and tyres '
                           'exactly as they are. ' + KEEP.replace('the paint, ', ''))
@@ -415,7 +422,7 @@ def jobs(stage):
             if not os.path.exists(base(v)):
                 continue
             for pid, d in PAINTS.items():
-                out.append({'name': f'{v}__paint-{pid}', 'images': [base(v)], 'prompt': paint_prompt(d)})
+                out.append({'name': f'{v}__paint-{pid}', 'images': [base(v)], 'prompt': engine_paint_prompt(d)})
             if v == 'eng-cams':   # the bonnet is out of the frame
                 continue
             out.append({'name': f'{v}__hood-carbon', 'images': [base(v)], 'prompt': edit(

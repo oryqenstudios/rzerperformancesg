@@ -261,15 +261,18 @@ def layer(base, img, region, path, thr=16, paint=None, reach=40, close=4, fill=0
 
 
 def wing_mask(base, wd_silver, region):
-    """Where the factory wing was: what the wing delete changed in the silver photo (a silver wing against the dark
-    workshop is a clean outline), near the wing's rough place, holes filled."""
-    ch = change_mask(base, wd_silver, thr=16, min_area=60, grow=0, feather=0).astype(np.uint8)
-    ch = cv2.morphologyEx(ch, cv2.MORPH_CLOSE, disk(5))
-    n, lab, stats, _ = cv2.connectedComponentsWithStats(ch, 8)
-    touch = np.unique(lab[(region > 0) & (ch > 0)])
-    m = np.isin(lab, [i for i in touch if i and stats[i, cv2.CC_STAT_AREA] >= 60]).astype(np.uint8)
-    m &= cv2.dilate(region, disk(60))
-    return cv2.dilate(fill_holes(m, 25000), disk(3))
+    """Where the factory wing was: what the wing delete clearly changed in the silver photo (a silver wing against the
+    dark workshop is a clean outline), near the wing's rough place, small holes filled. Only clear changes count: Kling
+    redraws the wall round the wing a little lighter, which would show as grey haze on the other paints."""
+    a = cv2.GaussianBlur(base, (0, 0), 1.0).astype(np.int16)
+    b = cv2.GaussianBlur(wd_silver, (0, 0), 1.0).astype(np.int16)
+    ch = (np.abs(a - b).max(2) > 30).astype(np.uint8) & cv2.dilate(region, disk(40))
+    ch = cv2.morphologyEx(ch, cv2.MORPH_OPEN, disk(1))
+    ch = cv2.morphologyEx(ch, cv2.MORPH_CLOSE, disk(4))
+    n, lab, st, _ = cv2.connectedComponentsWithStats(ch, 8)
+    big = max([st[i, cv2.CC_STAT_AREA] for i in range(1, n)] or [0])
+    m = np.isin(lab, [i for i in range(1, n) if st[i, cv2.CC_STAT_AREA] >= max(150, 0.03 * big)]).astype(np.uint8)
+    return cv2.dilate(fill_holes(m, 6000), disk(3))
 
 
 def mask_layer(img, mask, path):
@@ -309,6 +312,7 @@ ENGINE_KIND.update({m['id']: 'icpipe' for m in J.MORE if m['type'] == 'icpipe'})
 ENGINE_ROI['eng-bay']['icpipe'] = (600, 250, 1450, 860)
 ENGINE_ROI['eng-detail']['icpipe'] = (250, 250, 1500, 920)
 MORE_BY = {m['id']: m for m in J.MORE}
+IC_BOX = {'a000': (760, 725, 1140, 815), 'a045': (1310, 685, 1560, 792), 'a315': (330, 715, 482, 792), 'headlight': (1260, 730, 1570, 812)}
 GOOD_WING_VIEWS = {'a135', 'a180', 'a225', 'exhaust', 'a045', 'a090', 'a270', 'a315', 'top'}   # where a GT wing edit sits on the boot (some retaken: config-jobs.py WING_RETAKE)
 WHEEL_ELLIPSES = json.load(open(f'{J.C}/wheel-ellipses.json'))
 OIL_ROI = {'a000': (1170, 720, 1310, 820)}   # the bumper's corner intake on the car's left
@@ -410,6 +414,36 @@ def box_mask(b):
     return m
 
 
+def wing_matte(wd, img, region, path):
+    """A wing laid on the no-wing photo wd: a soft matte from how much each pixel changed (so the dark carbon blade
+    against the dark wall comes through whole), never the silver paint the edit redrew around it (a wing is dark, so
+    bright pixels that changed only a little are paint and would show as grey haze on other colours), near the boot."""
+    a = cv2.GaussianBlur(img, (0, 0), 1.0).astype(np.float32)
+    b = cv2.GaussianBlur(wd, (0, 0), 1.0).astype(np.float32)
+    d = np.abs(a - b).max(2)
+    # a carbon wing is darker than the wall or boot it covers; Kling's redrawn wall is lighter haze: keep what got
+    # darker, plus strong changes (highlights on the blade)
+    darker = cv2.cvtColor(b.astype(np.uint8), cv2.COLOR_BGR2GRAY).astype(np.float32) - cv2.cvtColor(a.astype(np.uint8), cv2.COLOR_BGR2GRAY).astype(np.float32)
+    alpha = np.maximum(np.clip((darker - 6) / 20, 0, 1), (d > 50).astype(np.float32))
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    alpha[(gray > 105) & (d < 60)] = 0
+    alpha *= region.astype(np.float32)
+    core = (alpha > 0.35).astype(np.uint8)
+    n, lab, st, _ = cv2.connectedComponentsWithStats(cv2.morphologyEx(core, cv2.MORPH_CLOSE, disk(4)), 8)
+    big = max([st[i, cv2.CC_STAT_AREA] for i in range(1, n)] or [0])
+    keep = np.isin(lab, [i for i in range(1, n) if st[i, cv2.CC_STAT_AREA] >= max(400, 0.04 * big)]).astype(np.uint8)
+    keep = fill_holes(cv2.morphologyEx(keep, cv2.MORPH_CLOSE, disk(3)), 1500)
+    alpha = np.maximum(alpha, keep * 0.0) * cv2.dilate(keep, disk(3)).astype(np.float32)
+    alpha = np.where(keep > 0, np.maximum(alpha, 0.92), alpha)
+    alpha = cv2.GaussianBlur(alpha, (0, 0), 0.8)
+    ys, xs = np.nonzero(alpha > 0.03)
+    if len(xs) < 150:
+        return None
+    x0, x1, y0, y1 = xs.min(), xs.max() + 1, ys.min(), ys.max() + 1
+    save_webp(path, np.dstack([img[y0:y1, x0:x1], (alpha[y0:y1, x0:x1] * 255).astype(np.uint8)]), 86)
+    return [int(x0), int(y0), int(x1 - x0), int(y1 - y0)]
+
+
 def cut_more(v, t, base, img, path, get, have, ids, paint_px, paint3d):
     """A layer for a part from the second review (tools/parts_more.py), by type:
       wheel        inside all the wheels the 3D map shows (rim, tyre, brake), never the paint around them
@@ -446,18 +480,13 @@ def cut_more(v, t, base, img, path, get, have, ids, paint_px, paint3d):
     if t == 'wing' and ids is not None and have('wingdel-silver'):
         # what the edit added to the no-wing photo, near the boot (the wing's stands sit on it; the blade stands above)
         wd = get('wingdel-silver')
-        near = cv2.dilate(ids.part('stock', ['wing'], mirror=False) | ids.part('addA', ['gt'], mirror=False), disk(140))
-        sig = significant(wd, img, 24, 300) & near
-        n, lab, st, _ = cv2.connectedComponentsWithStats(sig, 8)
-        keep = np.isin(lab, [i for i in range(1, n) if st[i, cv2.CC_STAT_AREA] >= 300]).astype(np.uint8)
-        return mask_layer(img, cv2.dilate(keep, disk(2)), path) if keep.any() else None
-    if t == 'intercooler':
-        sig = significant(base, img, 22, 300)
-        if ids is not None:
-            hl = ids.part('stock', ['headlight'], mirror=False)
-            if hl.any():
-                sig[:np.nonzero(hl)[0].max()] = 0
-        return layer(base, img, cv2.dilate(sig, disk(3)), path, thr=6, reach=0, close=4, fill=1500)
+        near = cv2.dilate(ids.part('stock', ['wing'], mirror=False) | ids.part('addA', ['gt'], mirror=False), disk(160))
+        return wing_matte(wd, img, near, path)
+    if t == 'intercooler':   # only the bumper's central opening (Kling also filled the corner intakes and fog lamps)
+        if v not in IC_BOX:
+            return None
+        sig = significant(base, img, 18, 200) & box_mask(IC_BOX[v])
+        return layer(base, img, cv2.dilate(sig, disk(3)) & box_mask(IC_BOX[v]), path, thr=6, reach=0, close=4, fill=1500)
     if t in ('seat', 'steering', 'gauge', 'harness'):
         r = cv2.dilate(significant(base, img, 26, 800), disk(4))
         return layer(base, img, r, path, thr=6, reach=0, close=5, fill=4000)
@@ -565,6 +594,37 @@ def head_layers_outside(v, base, entry):
                 entry['layers'][name] = b
 
 
+def structure_score(a, b):
+    """How well two photos line up, 0..1: the correlation of their (blurred) edge maps, colour-blind."""
+    def grad(im):
+        g = cv2.GaussianBlur(cv2.cvtColor(im, cv2.COLOR_BGR2GRAY).astype(np.float32), (0, 0), 2)
+        return np.hypot(cv2.Sobel(g, cv2.CV_32F, 1, 0), cv2.Sobel(g, cv2.CV_32F, 0, 1)).ravel()
+    A, B = grad(a), grad(b)
+    A -= A.mean(); B -= B.mean()
+    return float((A * B).sum() / np.sqrt((A * A).sum() * (B * B).sum()))
+
+
+def only_changed(v, base, entry):
+    """Every part layer keeps only what its edit changed: a pixel the edit left alone is the silver photo, and on any other
+    paint the right pixel there is that paint's own photo (else silver shows as grey haze round the part). Wings are cut
+    against the no-wing photo already, so they are left as they are."""
+    for name, (x, y, w, h) in list(entry['layers'].items()):
+        if not name.startswith('bp-') or MORE_BY.get(name[3:], {}).get('type') == 'wing':
+            continue
+        path = f'{OUT}/{v}/{name}.webp'
+        lay = cv2.imread(path, cv2.IMREAD_UNCHANGED)
+        if lay is None or lay.ndim < 3 or lay.shape[2] < 4:
+            continue
+        if lay.shape[:2] != (h, w):
+            lay = cv2.resize(lay, (w, h))
+        b = base[y:y + h, x:x + w]
+        d = np.abs(cv2.GaussianBlur(lay[..., :3], (0, 0), 1.0).astype(np.int16) - cv2.GaussianBlur(b, (0, 0), 1.0).astype(np.int16)).max(2)
+        c = np.clip((d.astype(np.float32) - 8) / 16, 0, 1)
+        c = cv2.GaussianBlur(cv2.dilate(c, disk(1)), (0, 0), 0.8)
+        lay[..., 3] = (lay[..., 3].astype(np.float32) * c).astype(np.uint8)
+        save_webp(path, lay, 86)
+
+
 def build_view(v):
     if v == 'eng-head':
         return build_head()
@@ -576,7 +636,18 @@ def build_view(v):
     entry = {'paints': ['silver'], 'layers': {}, 'kind': kind}
     save_webp(f'{OUT}/{v}/paint-silver.webp', base)
     notes = [f'laid onto {ALIGN_TO[v]}, misfit {worst:.1f}px'] if v in ALIGN_TO else []
-    have = lambda name: os.path.exists(J.src(f'{v}__{name}'))
+    sane_cache = {}
+
+    def sane(name):
+        """An edit is only used if it keeps the photo's structure (its edges line up with the base): Kling sometimes
+        answers a repaint with a different car, whose layers would float off the photo."""
+        if name not in sane_cache:
+            sc = structure_score(base, load(J.src(f'{v}__{name}')))
+            sane_cache[name] = sc >= 0.3
+            if sc < 0.3:
+                notes.append(f'{name} REJECTED (structure {sc:.2f})')
+        return sane_cache[name]
+    have = lambda name: os.path.exists(J.src(f'{v}__{name}')) and sane(name)
     aligned = {}
 
     def get(name, onto=None):
@@ -607,6 +678,7 @@ def build_view(v):
             if box:
                 entry['layers']['hood-carbon'] = box
         build_brand_parts(v, base, get, have, entry)
+        only_changed(v, base, entry)
         if v == 'eng-cams':
             head_layers_outside(v, base, entry)
         manifest['views'][v] = entry
@@ -697,7 +769,7 @@ def build_view(v):
             if src_paint is not None and wm is not None and have(f'wingdel-{pid}'):
                 wd_p = get(f'wingdel-{pid}', src_paint)
                 own = change_mask(src_paint, wd_p, thr=16, min_area=60, grow=0, feather=0).astype(np.uint8)
-                m = fill_holes(wm | (own & cv2.dilate(wm, disk(10))), 25000)
+                m = fill_holes(wm | (own & cv2.dilate(wm, disk(3))), 3000)
                 box = mask_layer(wd_p, m, f'{OUT}/{v}/wingdel-{pid}.webp')
                 if box:
                     entry['layers'][f'wingdel-{pid}'] = box
@@ -708,10 +780,11 @@ def build_view(v):
                 if rr is not None:   # Kling mounts its wings where the factory wing stood
                     rr = rr | ids.roi('stock', ['wing'], 30)
                 if have(o) and rr is not None and rr.any():
-                    box = layer(wd, get(o, wd), rr, f'{OUT}/{v}/{o}.webp', paint=paint_px, reach=90, thr=9, close=7, fill=4000, cover=True)
+                    box = wing_matte(wd, get(o, wd), cv2.dilate(rr, disk(60)), f'{OUT}/{v}/{o}.webp')
                     if box:
                         entry['layers'][o] = box
     build_brand_parts(v, base, get, have, entry, ids, paint_px, paint3d)
+    only_changed(v, base, entry)
     manifest['views'][v] = entry
     return notes
 
