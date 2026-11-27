@@ -97,6 +97,48 @@ def car_region(base, plate):
     return keep | (1 - ff)
 
 
+def tps_fit(src, dst):
+    """Thin-plate spline taking the points src to dst (n x 2 each), as a function on m x 2 arrays."""
+    src, dst = np.asarray(src, float), np.asarray(dst, float)
+    n = len(src)
+
+    def U(r2):
+        with np.errstate(divide='ignore', invalid='ignore'):
+            u = r2 * np.log(r2)
+        u[r2 == 0] = 0
+        return u
+    P = np.hstack([np.ones((n, 1)), src])
+    L = np.zeros((n + 3, n + 3))
+    L[:n, :n], L[:n, n:], L[n:, :n] = U(((src[:, None] - src[None]) ** 2).sum(2)), P, P.T
+    Y = np.zeros((n + 3, 2))
+    Y[:n] = dst
+    Wt = np.linalg.solve(L, Y)
+    return lambda q: U(((q[:, None] - src[None]) ** 2).sum(2)) @ Wt[:n] + np.hstack([np.ones((len(q), 1)), q]) @ Wt[n:]
+
+
+def tps_warp(m, pts):
+    """Lay the map m (guide coordinates) onto the photo by the points [guide x, guide y, photo x, photo y]: a spline
+    from photo to guide at every pixel, then nearest-neighbour lookups."""
+    pts = np.float32(pts)
+    f = tps_fit(pts[:, 2:], pts[:, :2])
+    mx, my = np.zeros((H, W), np.float32), np.zeros((H, W), np.float32)
+    xs = np.arange(W, dtype=float)
+    for y0 in range(0, H, 60):
+        ys = np.arange(y0, min(H, y0 + 60), dtype=float)
+        gx, gy = np.meshgrid(xs, ys)
+        g = f(np.stack([gx.ravel(), gy.ravel()], 1))
+        mx[y0:y0 + len(ys)], my[y0:y0 + len(ys)] = g[:, 0].reshape(gx.shape), g[:, 1].reshape(gx.shape)
+    return cv2.remap(m, mx, my, cv2.INTER_NEAREST, borderMode=cv2.BORDER_CONSTANT, borderValue=0)
+
+
+def tps_map(m, lm):
+    """A part-ID map laid onto a photo seen from a different angle than its guide: the car by its points, the floor
+    and the car's reflection by theirs (the reflection moves differently from the car when the angle changes)."""
+    car, refl = tps_warp(m, lm['car']), tps_warp(m, lm['refl'])
+    out = np.where(refl >= 100, refl, 0).astype(m.dtype)
+    return np.where((car > 0) & (car < 100), car, out).astype(m.dtype)
+
+
 class Ids:
     """The view's part-ID maps, aligned onto its photo."""
     PAINT_IDS = (10, 11, 12, 13, 14, 15)
@@ -130,10 +172,15 @@ class Ids:
         raw = {st: cv2.imread(f'{IDDIR}/{v}-{st}.png', cv2.IMREAD_UNCHANGED) for st in ('stock', 'addA', 'addB', 'addC')}
         st = raw['stock']
         lm = json.load(open(f'{J.C}/landmarks.json')).get(v) if os.path.exists(f'{J.C}/landmarks.json') else None
-        if lm:   # hand-placed matching points: a homography (these photos' perspective differs from their guides)
-            pts = np.float32(lm)
-            Hm, _ = cv2.findHomography(pts[:, :2], pts[:, 2:], 0)
-            self.maps = {k: cv2.warpPerspective(m, Hm, (W, H), flags=cv2.INTER_NEAREST) for k, m in raw.items()}
+        if lm:   # hand-placed matching points (these photos' framing or perspective differs from their guides)
+            if isinstance(lm, dict):   # many points: thin-plate splines, the car and its floor reflection each by its own
+                self.warp = lambda m: tps_map(m, lm)
+            else:                      # a few points: a homography
+                pts = np.float32(lm)
+                Hm, _ = cv2.findHomography(pts[:, :2], pts[:, 2:], 0)
+                self.warp = lambda m: cv2.warpPerspective(m, Hm, (W, H), flags=cv2.INTER_NEAREST)
+            self.raw = raw
+            self.maps = {k: self.warp(m) for k, m in raw.items()}
             pids = list(self.PAINT_IDS) + [i + 100 for i in self.PAINT_IDS]
             p3 = np.isin(self.maps['stock'], pids)
             self.how, self.A = 'landmarks', None
@@ -155,7 +202,22 @@ class Ids:
             if best is None or score > best[3]:
                 best = (name, A, iou, score)
         self.how, self.A, self.iou, self.score = best
-        self.maps = {k: cv2.warpAffine(m, self.A, (W, H), flags=cv2.INTER_NEAREST | cv2.WARP_INVERSE_MAP) for k, m in raw.items()}
+        self.warp = lambda m: cv2.warpAffine(m, self.A, (W, H), flags=cv2.INTER_NEAREST | cv2.WARP_INVERSE_MAP)
+        self.raw = raw
+        self.maps = {k: self.warp(m) for k, m in raw.items()}
+
+    def factory_tip(self, v):
+        """Where the factory exhaust tip is: the 3D car's own tip doesn't show in its renders, so of the twin tips fitted
+        in the add-on render, the one on the car's right (and its reflection), as (tip, tip and reflection)."""
+        out = []
+        for idv, y in ((ID['tip'], 0.3), (ID['tip'] + 100, -0.3)):
+            raw = (self.raw['addA'] == idv).astype(np.uint8)
+            n, lab, st, cen = cv2.connectedComponentsWithStats(cv2.dilate(raw, disk(4)), 8)
+            right, left = project(v, [(-2.2, y, 0.55), (-2.2, y, -0.55)])
+            comps = [i for i in range(1, n) if st[i, cv2.CC_STAT_AREA] >= 60]
+            keep = [i for i in comps if np.hypot(*(cen[i] - right)) < np.hypot(*(cen[i] - left))]
+            out.append(self.warp(((np.isin(lab, keep)) & (raw > 0)).astype(np.uint8)) if keep else np.zeros((H, W), np.uint8))
+        return out[0], out[0] | out[1]
 
     def part(self, state, names, mirror=True):
         m = self.maps[state]
@@ -288,8 +350,7 @@ def mask_layer(img, mask, path):
 # ---------------------------------------------------------------- brand parts fitted to the car (config-jobs.py 'parts')
 # Each Kling edit of a view with one part fitted becomes that part's layer, 'bp-<id>', cut to where the part goes:
 #   exhausts    around the factory tip (and where the added tips of the 3D car sit), like the exhaust options
-#   brakes      inside the wheels on the part's axle (front or rear, from where the view's camera sees each axle),
-#               around the factory caliper and disc, leaving out the spokes in front (from the 3D part map)
+#   brakes      inside the wheels on the part's axle, through the stock wheel's gaps (brake_layer)
 #   engine bay  and the oil cooler: inside a box drawn per view around where the part sits (ENGINE_ROI)
 FRONT_AXLE, REAR_AXLE = 1.31, -1.315          # the 3D car's axles (x, metres), wheel centres 0.33 m up, 0.755 m out
 DISC_FRONT = {'endless-disc-racing-front', 'endless-disc-basic-slit-f'}
@@ -369,7 +430,8 @@ def project(v, pts):
 
 def wheel_masks(v, ids):
     """Each wheel the photo shows (rim, tyre and brake in the 3D map), as 'front' or 'rear' by the nearest projected axle."""
-    wheel = ids.part('stock', ['rim', 'tyre', 'caliper'], mirror=False)
+    # in the guide's own pixels (where the camera projection holds), then laid onto the photo like the rest of the map
+    wheel = np.isin(ids.raw['stock'], [ID['rim'], ID['tyre'], ID['caliper']]).astype(np.uint8)
     n, lab, st, cen = cv2.connectedComponentsWithStats(cv2.morphologyEx(wheel, cv2.MORPH_CLOSE, disk(7)), 8)
     axles = {'front': [(FRONT_AXLE, 0.33, z) for z in (0.755, -0.755)], 'rear': [(REAR_AXLE, 0.33, z) for z in (0.755, -0.755)]}
     pix = {k: [q for q in project(v, pts) if not np.isnan(q[0])] for k, pts in axles.items()}
@@ -381,7 +443,7 @@ def wheel_masks(v, ids):
         best = min(((np.hypot(cx - x, cy - y), k) for k, qs in pix.items() for x, y in qs), default=(0, None))[1]
         if best:
             out[best] |= (lab == i).astype(np.uint8)
-    return out
+    return {k: ids.warp(m) for k, m in out.items()}
 
 
 def brake_region(ids, wheels, grow):
@@ -395,6 +457,52 @@ def brake_region(ids, wheels, grow):
             cv2.fillConvexPoly(inside, cv2.convexHull(cv2.findNonZero((lab == i).astype(np.uint8))), 1)
     inside = cv2.erode(inside, disk(5))
     return cv2.dilate(cal, disk(grow)) & inside & (1 - cv2.erode(rim, disk(1)))
+
+
+def brake_layer(v, base, img, ids, axle, disc, path):
+    """A brake kit or disc seen through the stock wheel. Kling often redraws the wheel round a new brake (spokes thinned
+    or gone, a bare disc), so the edit is only used inside each wheel on the part's axle (its hand-measured tyre
+    ellipse, cut to the rim) and only where the stock photo is dark between the spokes: the wheel stays exactly as it
+    is in front, and the new brake shows through its gaps. A kit's caliper is kept to where the factory caliper is in
+    the 3D map (one caliper per wheel; Kling sometimes draws a second one on the far side of the disc)."""
+    wm = wheel_masks(v, ids)
+    cal3 = ids.part('stock', ['caliper'], mirror=False)
+    lum = cv2.GaussianBlur(cv2.cvtColor(base, cv2.COLOR_BGR2GRAY).astype(np.float32), (0, 0), 0.8)
+    gaps = np.clip((58 - lum) / 30, 0, 1)
+    a = np.zeros((H, W), np.float32)
+    for cx, cy, w, h in WHEEL_ELLIPSES[v][:2]:
+        tyre = np.zeros((H, W), np.uint8)
+        cv2.ellipse(tyre, (cx, cy), (w // 2, h // 2), 0, 0, 360, 1, -1)
+        f, r = int((wm['front'] & tyre).sum()), int((wm['rear'] & tyre).sum())
+        if f + r == 0 or (axle != 'both' and ('front' if f > r else 'rear') != axle):
+            continue
+        inner = np.zeros((H, W), np.float32)
+        cv2.ellipse(inner, (cx, cy), (int(w * 0.36), int(h * 0.36)), 0, 0, 360, 1, -1)
+        m = cv2.GaussianBlur(inner, (0, 0), 1.5)
+        c = cal3 & tyre
+        if not disc and c.sum() >= 30:   # (from some angles the factory caliper is hidden behind the spokes in the 3D map)
+            m *= cv2.GaussianBlur(cv2.dilate(c, disk(int(0.3 * w))).astype(np.float32), (0, 0), 6)
+        a = np.maximum(a, m)
+    a *= gaps
+    ys, xs = np.nonzero(a > 0.02)
+    if len(xs) < 150:
+        return None
+    x0, x1, y0, y1 = max(0, xs.min() - 2), min(W, xs.max() + 3), max(0, ys.min() - 2), min(H, ys.max() + 3)
+    save_webp(path, np.dstack([img[y0:y1, x0:x1], (a[y0:y1, x0:x1] * 255).astype(np.uint8)]), 86)
+    return [int(x0), int(y0), int(x1 - x0), int(y1 - y0)]
+
+
+def rim_layer(v, base, img, path):
+    """A rim colour: inside each wheel and its floor reflection (the hand-measured tyre ellipses, inside the tyre's
+    rubber), what the edit changed. The 3D map's rims reach into the arches where its fit is rough, and the paint test
+    misses the silver reflections there, so the layers carried silver patches of the body onto other colours."""
+    m = np.zeros((H, W), np.float32)
+    for cx, cy, w, h in WHEEL_ELLIPSES[v]:
+        cv2.ellipse(m, ((cx, cy), (w * 0.86, h * 0.86), 0), 1, -1)
+    m = cv2.GaussianBlur(m, (0, 0), 1.5)
+    d = np.abs(cv2.GaussianBlur(img, (0, 0), 1.0).astype(np.int16) - cv2.GaussianBlur(base, (0, 0), 1.0).astype(np.int16)).max(2)
+    c = cv2.GaussianBlur(cv2.dilate(np.clip((d.astype(np.float32) - 10) / 18, 0, 1), disk(1)), (0, 0), 0.8)
+    return mask_layer(img, m * c, path)
 
 
 def significant(base, img, thr=30, min_area=1500):
@@ -462,18 +570,24 @@ def cut_more(v, t, base, img, path, get, have, ids, paint_px, paint3d):
         return mask_layer(img, m, path)
     if t == 'bonnet':
         # exactly the bonnet: the outline of this view's carbon bonnet option layer (checked to sit on the bonnet)
-        hc = manifest['views'].get(v, {}).get('layers', {}).get('hood-carbon')
+        hc = (CURRENT.get('layers') or {}).get('hood-carbon')   # this build's own carbon bonnet layer
         if not hc or not os.path.exists(f'{OUT}/{v}/hood-carbon.webp'):
             return None
         x, y, w, h = hc
         a = cv2.imread(f'{OUT}/{v}/hood-carbon.webp', cv2.IMREAD_UNCHANGED)[..., 3]
         m = np.zeros((H, W), np.uint8)
         m[y:y + h, x:x + w] = (cv2.resize(a, (w, h)) > 100).astype(np.uint8)
-        # only what the edit turned to carbon (darker than the silver paint), never the silver it left: that would show
-        # silver on every other paint
-        gb, gi = cv2.cvtColor(base, cv2.COLOR_BGR2GRAY).astype(int), cv2.cvtColor(img, cv2.COLOR_BGR2GRAY).astype(int)
-        carbon = cv2.morphologyEx(((gi < gb - 18) | (gi < 90)).astype(np.uint8), cv2.MORPH_CLOSE, disk(4))
-        m &= fill_holes(carbon, 3000)
+        if ids is not None:   # never the front wings (Kling made some carbon too); gaps in the outline filled from the 3D bonnet
+            b3 = ids.part('stock', ['bonnet'], mirror=False)
+            m = fill_holes(cv2.morphologyEx(m | b3, cv2.MORPH_CLOSE, disk(6)), 40000) & cv2.dilate(b3, disk(12))
+        # only what the edit turned to carbon, never the silver it left (that would show silver on every other paint):
+        # darker than the silver paint, or with the weave's fine texture where the carbon catches a bright reflection
+        gb, gi = cv2.cvtColor(base, cv2.COLOR_BGR2GRAY).astype(np.float32), cv2.cvtColor(img, cv2.COLOR_BGR2GRAY).astype(np.float32)
+        hp_i = cv2.blur(np.abs(gi - cv2.GaussianBlur(gi, (0, 0), 1.5)), (9, 9))
+        hp_b = cv2.blur(np.abs(gb - cv2.GaussianBlur(gb, (0, 0), 1.5)), (9, 9))
+        weave = (hp_i > hp_b + 2.5) & (hp_i > 4)
+        carbon = cv2.morphologyEx(((gi < gb - 18) | (gi < 90) | weave).astype(np.uint8), cv2.MORPH_CLOSE, disk(4))
+        m &= fill_holes(carbon, 6000)
         return mask_layer(img, cv2.dilate(m, disk(1)), path)
     if t == 'wing' and v not in GOOD_WING_VIEWS:   # elsewhere Kling's wing floats off the boot: the page shows the GT wing option
         return None
@@ -493,27 +607,32 @@ def cut_more(v, t, base, img, path, get, have, ids, paint_px, paint3d):
     return None
 
 
+CURRENT = {}   # the view entry being built (the bonnet parts use its carbon bonnet layer)
+
+
 def build_brand_parts(v, base, get, have, entry, ids=None, paint_px=None, paint3d=None):
+    CURRENT.clear()
+    CURRENT.update(entry)
     for pid in J.BRAND_PARTS:
         name = f'bp-{pid}'
         if not have(name):
             continue
         img = get(name)
+        if get.misfit.get(name, 0) > 12:   # Kling moved the camera: the part would sit in the wrong place
+            print(f'  {v} {name} skipped: misaligned by {get.misfit[name]:.0f}px')
+            continue
         path = f'{OUT}/{v}/{name}.webp'
         box = None
         if pid in J.EXHAUSTS and ids is not None:
-            part = ids.part('stock', ['tip'], mirror=False)
-            r = ids.roi('stock', ['tip'], 40) | ids.roi('addA', ['tip'], 30)
+            # every one of these exhausts has a single tip where the factory one is: never the twin-tip positions
+            # (a second tip Kling sometimes adds on the left of the bumper would not be the real part)
+            part, both = ids.factory_tip(v)
+            r = cv2.dilate(part, disk(40)) | cv2.dilate(both, disk(5))
             r &= 1 - (paint3d & (1 - cv2.dilate(part, disk(5))))
             box = layer(base, img, r, path, paint=paint_px, cover=True)
         elif ids is not None and (pid in J.FRONT_KITS or pid in J.REAR_KITS or pid == 'hks-brake-system' or pid in DISC_FRONT | DISC_REAR):
-            wm = wheel_masks(v, ids)
             axle = ('front' if pid in J.FRONT_KITS or pid in DISC_FRONT else 'rear' if pid in J.REAR_KITS or pid in DISC_REAR else 'both')
-            wheels = wm['front'] | wm['rear'] if axle == 'both' else wm[axle]
-            disc = pid in DISC_FRONT | DISC_REAR
-            r = brake_region(ids, wheels, 12 if disc else 30)
-            if r.any():
-                box = layer(base, img, r, path, thr=14, reach=3, close=2)
+            box = brake_layer(v, base, img, ids, axle, pid in DISC_FRONT | DISC_REAR, path)
         elif pid in ENGINE_KIND and v in ENGINE_ROI:
             r = cv2.dilate(significant(base, img), disk(4)) & box_mask(ENGINE_ROI[v][ENGINE_KIND[pid]])
             box = layer(base, img, r, path, thr=6, reach=0, close=5, fill=3000)
@@ -647,16 +766,20 @@ def build_view(v):
             if sc < 0.3:
                 notes.append(f'{name} REJECTED (structure {sc:.2f})')
         return sane_cache[name]
-    have = lambda name: os.path.exists(J.src(f'{v}__{name}')) and sane(name)
+    # only repaints are checked: the empty-garage plate, the wing delete and the parts change the picture by design
+    have = lambda name: os.path.exists(J.src(f'{v}__{name}')) and (not name.startswith('paint-') or sane(name))
     aligned = {}
+    get_misfit = {}
 
     def get(name, onto=None):
         if name not in aligned:
             im, _, worst = align(onto if onto is not None else base, load(J.src(f'{v}__{name}')))
             aligned[name] = im
+            get.misfit[name] = worst
             if worst > 2.5:
                 notes.append(f'{name} misfit {worst:.1f}px')
         return aligned[name]
+    get.misfit = get_misfit
 
     for pid in J.PAINTS:
         if have(f'paint-{pid}'):
@@ -757,8 +880,17 @@ def build_view(v):
             carbon = o.split('-')[0] in ('hood', 'roof', 'mirror', 'lip', 'skirts', 'diffuser', 'ex')
             wheel = o.startswith('rim-') or o.startswith('caliper-')
             rims = o.startswith('rim-')
+            if rims and v in WHEEL_ELLIPSES:   # the rim colours: what changed inside the wheels, never the paint round them
+                box = rim_layer(v, base, get(o), f'{OUT}/{v}/{o}.webp')
+                if box:
+                    entry['layers'][o] = box
+                continue
+            # a carbon panel stops at its shut lines: Kling often turned the panels next to it carbon too (the front
+            # wings beside the bonnet), joined to it, so only a little reach past the panel's place in the 3D map
+            panel = o in ('hood-carbon', 'roof-carbon', 'mirror-carbon')
             box = layer(base, get(o), r, f'{OUT}/{v}/{o}.webp', paint=paint_px, darken_only=o.startswith('tint-'),
-                        cover=carbon, fill=2500 if rims else 0, fill_paint=rims, colour_only=o.startswith('caliper-'))
+                        cover=carbon, fill=2500 if rims else 0, fill_paint=rims, colour_only=o.startswith('caliper-'),
+                        reach=12 if panel else 40)
             if box:
                 entry['layers'][o] = box
     if v in J.WING_VIEWS:

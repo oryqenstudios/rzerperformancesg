@@ -44,7 +44,10 @@ shows in one picture. The shipped files are in `assets/site/config/` (`build.mjs
      on the dark wall gives a clean outline; on dark paints the wing barely differs from the wall and left holes)
 5. **Ride height** is not photographed (the split between body and reflection is the line where the tyres meet the floor,
    so a splitter or skirt hanging over the floor drops with the body; the front and rear views are fitted to the 3D maps
-   by hand-placed landmarks in `landmarks.json`, as the car's long floor reflection pulls the automatic fit down): the page moves the body down by 30 mm (lowering springs) or 50 mm
+   by hand-placed landmarks in `landmarks.json`, as the car's long floor reflection pulls the automatic fit down; `a045`,
+   `a225`, `headlight` and `top`, whose photos see the car from a somewhat different angle than their guides, by thin-plate
+   splines through 20 to 30 points each, the car and its reflection by separate points: an affine fit there put the
+   front wheel's brake layers on the floor and the rim, caliper, splitter and lights layers beside their parts): the page moves the body down by 30 mm (lowering springs) or 50 mm
    (coilovers), converted to pixels per view from the camera distance, over wheels that stay put, and moves its floor
    reflection up, with the empty workshop behind. The masks (`m-body`, `m-tyres`, `m-refl`, `m-floor`) come from the
    3D ID maps trimmed to the photo's own car outline. (A lowered edit from Kling moved the whole car about 120 px, so
@@ -73,8 +76,8 @@ each given the part's product photo (on light grey, `parts-ref/`, from `assets/s
 
 | Parts | Views | Cut to (`build_brand_parts()` in `tools/config-build.py`) |
 |---|---|---|
-| 7 exhausts | `a135`, `a180`, `a225`, `exhaust` | around the factory tip and where the 3D car's added tips sit, with its floor reflection |
-| 7 front brake kits, 2 front discs | `a045`, `a090`, `a270`, `a315`, `wheel`, `headlight` (discs: `wheel`, `a045`, `a315`) | inside the front wheels: each wheel the 3D map shows is front or rear by the nearest axle projected through the view's camera; around the factory caliper and disc, out to the rim, minus the spokes |
+| 7 exhausts | `a135`, `a180`, `a225`, `exhaust` | around the factory tip only (every one of them has a single tip there; the 3D car's own tip doesn't render, so its place is the right-hand twin tip of the add-on render), with its floor reflection. Edits that drew a second tip or a silencer hanging under the bumper were retaken with a stricter prompt |
+| 7 front brake kits, 2 front discs | `a045`, `a090`, `a270`, `a315`, `wheel`, `headlight` (discs: `wheel`, `a045`, `a315`) | `brake_layer()`: inside each front wheel (front or rear by the nearest axle projected through the view's camera), within its hand-measured tyre ellipse cut to the rim, and only where the stock photo is dark between the spokes. Kling often redrew the wheel round a new brake (spokes thinned or gone), so the stock wheel always stays in front and the new caliper and disc show through its gaps; a kit's caliper is kept to where the factory caliper sits |
 | 3 rear brake kits, 2 rear discs | `a090`, `a135`, `a225`, `a270`, `exhaust` (discs: `exhaust`, `a135`, `a225`) | the same, inside the rear wheels |
 | HKS Brake System | all of the above | inside all four wheels |
 | turbos, manifold, heat shield, 3 intakes, intake hose, 2 blow-off valves, Coil Pro | `eng-bay`, `eng-detail` | what clearly changed (`significant()`: the colour difference of both photos blurred, big regions only, as Kling re-renders the whole bay a little) inside a box per view round where the edits put that kind of part (`ENGINE_ROI`) |

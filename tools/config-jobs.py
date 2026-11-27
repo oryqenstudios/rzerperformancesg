@@ -398,6 +398,20 @@ for cid, (pid, onto) in COMBO.items():
 # the GT wings again, in the views where the first edits floated off the boot: given the wing as fitted from behind
 # (a180, where it sat right) as image 3, two takes; the better one is copied to <view>__bp-<id>.png by hand
 WING_RETAKE = ['a045', 'a090', 'a270', 'a315', 'top', 'wheel', 'headlight']
+# exhaust edits that drew a second tip, a tip on the left or a silencer hanging under the bumper (every exhaust here has
+# one tip, in the factory place), again with a stricter prompt: 'exhaust-retake' makes two takes of each, <name>-a/-b;
+# the one with a single tip on the right was copied to <view>__bp-<id>.png by hand
+EXHAUST_RETAKE = [('a135', 'hks-hipower-us'), ('a135', 'hks-silent-hipower'), ('a180', 'hks-hipower-us'), ('a225', 'hks-silent-hipower'),
+                  ('a225', 'hks-hipower-us'), ('a225', 'hks-super-turbo-muffler'), ('exhaust', 'hks-silent-hipower'), ('exhaust', 'hks-hipower-us')]
+
+
+def exhaust_retake_prompt(what):
+    return edit(f'The new exhaust is {what}. Replace only the car\'s single factory exhaust tip, under the right of the rear bumper, '
+                'with this exhaust\'s single round tip, at its real size and in exactly the same place, pointing straight back. There '
+                'is exactly one tip. The silencer and the pipes stay hidden under the car behind the bumper, as on the factory car: '
+                'nothing new hangs below the bumper. Keep the rear bumper, the floor and everything else exactly as it is.')
+
+
 BRAND_REF = {'endless-disc-basic-slit-f': 'endless-disc-basic-slit', 'endless-disc-basic-slit-r': 'endless-disc-basic-slit'}
 
 
@@ -454,6 +468,12 @@ def jobs(stage):
             if all(os.path.exists(i) for i in images) and not os.path.exists(base(v)):
                 for take in 'abc':
                     out.append({'name': f'{v}__base-{take}', 'images': images, 'prompt': prompt})
+    elif stage == 'exhaust-retake':
+        for v, pid in EXHAUST_RETAKE:
+            ref = REF(pid)
+            for take in 'ab':
+                out.append({'name': f'{v}__bp-{pid}-{take}', 'images': [base(v)] + ([ref] if os.path.exists(ref) else []),
+                            'prompt': exhaust_retake_prompt(EXHAUSTS[pid])})
     else:
         sys.exit(f'unknown stage {stage}')
     return out
