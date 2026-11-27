@@ -99,7 +99,7 @@ each prompt giving the part's real size and asking for the perspective of the pa
 
 | Parts | Views | Cut to (`cut_more()` in `tools/config-build.py`) |
 |---|---|---|
-| 48 wheels | `a045`, `a090`, `a135`, `a225`, `a270`, `a315`, `wheel`, `exhaust`, `headlight`, `top` | what clearly changed near the 3D map's wheels and their floor reflections, each piece filled to its outline (the map sits tens of pixels off) |
+| 48 wheels | `a045`, `a090`, `a135`, `a225`, `a270`, `a315`, `wheel`, `exhaust`, `headlight`, `top` | the stock wheels' outlines, measured by hand per view (`wheel-ellipses.json`: each tyre and its floor reflection), so a wheel never takes body paint with it. The edits are guided by the real wheel (`tools/wheel-guided.py`): image 1 is the stock photo with the product photo laid into each tyre (`tools/wheel_photo.py`), so the spoke count and shape match the real wheel |
 | 4 bonnets | `a000`, `a045`, `a090`, `a270`, `a315`, `wheel`, `headlight`, `top` | the factory bonnet's place, like the carbon bonnet option |
 | 2 GT wings | the wing views, edited from `wingdel-silver` | what changed from the wing-delete photo around the boot |
 | ETS intercooler | `a000`, `a045`, `a315`, `headlight` | what clearly changed below the headlights |

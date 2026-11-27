@@ -56,6 +56,7 @@ npm run dev          # rebuild on every change in src/; refresh dist/index.html 
 | `tools/config-jobs.py`, `tools/config-gen.py` | The configurator's views, options and prompts; run the Higgsfield edits ten at a time (resumable) |
 | `tools/config-build.py`, `tools/config_layers.py` | Align the edits, cut the option layers and masks, encode the films, write `assets/site/config/` |
 | `assets/site/parts/` | The brand parts' product photos, cut out onto transparent WebP (manufacturers' copyright: see its README) |
+| `tools/wheel-guided.py`, `tools/wheel_photo.py` | The wheel edits guided by the real wheel: the product photo laid into each stock tyre, then redrawn photoreal with the same spokes |
 | `tools/parts-cutout.py` | Cut those photos out of their backgrounds (rembg IS-Net) from the review copies in `preview/parts-review/` |
 | `reports/`, `research_notes/` | The research behind the brand parts: every Tomei, HKS and ENDLESS model for the Evo IX, with part numbers, prices, photo sources and Singapore sourcing (the LTA notes there predate the client's wish to leave road rules out) |
 | `assets/source/` | The model as downloaded, input to `tools/split-model.py` (not shipped) |
