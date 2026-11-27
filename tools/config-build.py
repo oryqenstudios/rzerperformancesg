@@ -313,14 +313,14 @@ GOOD_WING_VIEWS = {'a135', 'a180', 'a225', 'exhaust', 'a045', 'a090', 'a270', 'a
 WHEEL_ELLIPSES = json.load(open(f'{J.C}/wheel-ellipses.json'))
 OIL_ROI = {'a000': (1170, 720, 1310, 820)}   # the bumper's corner intake on the car's left
 # inside the engine: the open head (eng-cams) and the cutaway (eng-block), where the parts in J.INSIDE_PARTS go
-INSIDE_ROI = {'eng-cams': (380, 280, 1720, 980), 'eng-block': (440, 380, 1200, 940)}
+INSIDE_ROI = {'eng-cams': (600, 380, 1450, 760), 'eng-block': (440, 380, 1200, 940)}
 ALIGN_TO = {'eng-cams': 'eng-head'}   # a base made by editing another view's photo, laid back onto it
 # parts that look much like the factory ones (camshafts, springs, pistons, rods, the crank, gaskets) change too little for
 # significant(): their layer is the edit inside the shape of where they sit. Shapes in photo pixels: ('band', end, end,
 # half width, end radius) along a camshaft with its gears, or ('poly', points).
 INSIDE_SHAPES = {
-    'eng-cams': {'ex': ('band', (540, 505), (1255, 740), 60, 78), 'in': ('band', (770, 390), (1550, 615), 52, 72),
-                 'head': ('poly', [(460, 670), (450, 600), (500, 430), (730, 350), (1600, 530), (1560, 700), (1250, 860), (900, 820)])},
+    'eng-cams': {'ex': ('band', (710, 530), (1150, 660), 36, 58), 'in': ('band', (840, 455), (1340, 580), 32, 52),
+                 'head': ('poly', [(650, 580), (660, 500), (830, 430), (1370, 530), (1400, 610), (1260, 700), (1060, 720), (800, 680)])},
     'eng-block': {'pistons': ('poly', [(705, 500), (775, 500), (780, 568), (985, 585), (985, 690), (745, 690), (705, 600)]),
                   'rods': ('poly', [(735, 600), (990, 640), (990, 770), (900, 800), (735, 720)]),
                   'crank': ('poly', [(500, 620), (640, 600), (760, 700), (940, 715), (955, 800), (880, 865), (700, 875), (560, 805), (500, 720)]),

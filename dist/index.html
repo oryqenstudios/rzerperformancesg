@@ -2476,7 +2476,7 @@ const INSIDE = { interior: ['int-front', 'int-dash', 'int-gauges', 'int-rear'], 
 if (PH) for (const k in INSIDE) INSIDE[k] = INSIDE[k].filter(v => PH.views[v]);   // only the views the manifest has
 // inside the engine: eng-head is the cam cover close-up cut from eng-detail (this rectangle of it, as shares of the photo),
 // eng-cams the head with the cover off, eng-block the engine as a cutaway; the films open the cover and the block
-const HEAD_RECT = [737 / 2720, 363 / 1536, 1076 / 2720, 606 / 1536];
+const HEAD_RECT = [425 / 2720, 188 / 1536, 1700 / 2720, 956 / 1536];
 const OPEN = { 'eng-cams': { from: 'eng-head', clip: 'open-head' }, 'eng-block': { from: 'eng-detail', clip: 'open-block' } };
 // short films of the stock car (assets/config/clips/): turning one step between neighbouring views (and back), and
 // flying in through the driver's door or under the raised bonnet. They only play while the car looks stock in silver.

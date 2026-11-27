@@ -10,7 +10,7 @@ Stages:
   wing      the wing-delete edit of every paint photo, then the lip spoiler and GT wing on the silver wing-delete
   parts     the brand parts (HKS, TOMEI, ENDLESS; PARTS in src/app.js) fitted to the car in every view they show
             in, each edit given the part's product photo as image 2 (assets/generated/config/parts-ref/)
-  inside    the views inside the engine: eng-head (the cam cover close-up cut from eng-detail, HEAD_CROP, enlarged; it
+  inside    the views inside the engine: eng-head (the cam cover and the bay round it cut from eng-detail, HEAD_CROP, 1.6x; it
             is about as sharp as the page shows it, and the zoom into it is seamless), eng-cams (eng-head with the cam
             cover off) and eng-block (eng-detail as a sectioned cutaway engine); takes a, b, c each, pick one into base/
             as for the bases.
@@ -32,7 +32,7 @@ CLOSE = ['wheel', 'exhaust', 'headlight', 'top']
 EXTERIOR = ORBIT + CLOSE
 INTERIOR = ['int-dash', 'int-front', 'int-rear', 'int-gauges']
 ENGINE = ['eng-bay', 'eng-detail', 'eng-cams', 'eng-block']
-HEAD_CROP = (737, 363, 1813, 969)   # the cam cover close-up in eng-detail's photo (2720 x 1536): eng-head is its re-render
+HEAD_CROP = (425, 188, 2125, 1144)   # the cam cover close-up in eng-detail's photo (2720 x 1536): eng-head is its re-render
 
 base = lambda v: f'{C}/base/silver-factory-{v}.jpg'
 src = lambda name: f'{SRC}/{name}.png'
