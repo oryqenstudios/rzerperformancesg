@@ -427,7 +427,12 @@ def cut_more(v, t, base, img, path, get, have, ids, paint_px, paint3d):
         for i in range(1, n):
             if st[i, cv2.CC_STAT_AREA] >= 1200:
                 cv2.fillConvexPoly(m, cv2.convexHull(cv2.findNonZero((lab == i).astype(np.uint8))), 1)
-        return mask_layer(img, cv2.dilate(m, disk(2)), path)
+        m = cv2.dilate(m, disk(2)) & cv2.dilate(ids.part('stock', ['rim', 'tyre', 'caliper']), disk(45))
+        if paint_px is not None:   # never the body paint round the arch (Kling redraws it a little): the layer goes over every paint
+            body = paint_px & (1 - cv2.dilate(ids.part('stock', ['rim', 'tyre', 'caliper'], mirror=False), disk(4)))
+            body = cv2.morphologyEx(body, cv2.MORPH_OPEN, disk(3))
+            m &= 1 - cv2.dilate(body, disk(3))
+        return mask_layer(img, m, path)
     if t == 'bonnet' and ids is not None:
         part = ids.part('stock', ['bonnet'], mirror=False)
         r = ids.roi('stock', ['bonnet'], 12) & (1 - (paint3d & (1 - cv2.dilate(part, disk(5)))))
@@ -479,6 +484,8 @@ def build_brand_parts(v, base, get, have, entry, ids=None, paint_px=None, paint3
             else:
                 r = cv2.dilate(significant(base, img), disk(4)) & box_mask(INSIDE_ROI[v])
                 box = layer(base, img, r, path, thr=6, reach=0, close=5, fill=3000)
+        elif '--' in pid:   # a part fitted together with another (the harness on the BRIDE seat): what changed in the cabin
+            box = cut_more(v, 'seat', base, img, path, get, have, ids, paint_px, paint3d)
         elif pid in MORE_BY and MORE_BY[pid]['type'] in ('wheel', 'bonnet', 'wing', 'intercooler', 'seat', 'steering', 'gauge', 'harness'):
             box = cut_more(v, MORE_BY[pid]['type'], base, img, path, get, have, ids, paint_px, paint3d)
         elif pid == 'hks-oil-cooler-black' and v in OIL_ROI:

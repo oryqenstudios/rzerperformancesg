@@ -381,6 +381,13 @@ for m in MORE:
             f'Image 1 shows the inside of the car. Image 2 shows a four-point racing harness, the {what} Fit it to the driver\'s seat: '
             'two shoulder straps over the top of the seat back and two lap straps meeting at the buckle, at their real width, in the '
             'colour shown in image 2, in the perspective of this view. No lettering. Everything else stays exactly as it is.'))
+# parts fitted together where one was drawn over the other's place: the harness on the BRIDE seat (the page shows this
+# layer instead of the two when both are chosen)
+COMBO = {'schroth-rallye-4-asm--bride-zeta-iv': ('schroth-rallye-4-asm', 'bride-zeta-iv')}
+for cid, (pid, onto) in COMBO.items():
+    views = [v for v in BRAND_PARTS[pid][0] if v in BRAND_PARTS[onto][0]]
+    BRAND_PARTS[cid] = (views, BRAND_PARTS[pid][1].replace("Fit it to the driver\'s seat", "Fit it to the driver\'s full bucket seat, through the seat\'s harness slots"))
+    BRAND_SRC[cid] = {v: src(f'{v}__bp-{onto}') for v in views}
 BRAND_REF = {'endless-disc-basic-slit-f': 'endless-disc-basic-slit', 'endless-disc-basic-slit-r': 'endless-disc-basic-slit'}
 
 
@@ -424,7 +431,7 @@ def jobs(stage):
                     out.append({'name': f'{v}__{opt}', 'images': [src(f'{v}__wingdel-silver')], 'prompt': prompt})
     elif stage == 'parts':
         for pid, (views, prompt) in BRAND_PARTS.items():
-            ref = REF(BRAND_REF.get(pid, pid))
+            ref = REF(BRAND_REF.get(pid, COMBO[pid][0] if pid in COMBO else pid))
             for v in views:
                 start = BRAND_SRC.get(pid, {}).get(v, base(v))
                 if os.path.exists(start):
