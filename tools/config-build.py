@@ -309,6 +309,7 @@ ENGINE_KIND.update({m['id']: 'icpipe' for m in J.MORE if m['type'] == 'icpipe'})
 ENGINE_ROI['eng-bay']['icpipe'] = (600, 250, 1450, 860)
 ENGINE_ROI['eng-detail']['icpipe'] = (250, 250, 1500, 920)
 MORE_BY = {m['id']: m for m in J.MORE}
+WHEEL_ELLIPSES = json.load(open(f'{J.C}/wheel-ellipses.json'))
 OIL_ROI = {'a000': (1170, 720, 1310, 820)}   # the bumper's corner intake on the car's left
 # inside the engine: the open head (eng-cams) and the cutaway (eng-block), where the parts in J.INSIDE_PARTS go
 INSIDE_ROI = {'eng-cams': (380, 280, 1720, 980), 'eng-block': (440, 380, 1200, 940)}
@@ -415,23 +416,14 @@ def cut_more(v, t, base, img, path, get, have, ids, paint_px, paint3d):
       wing         what changed from the wing-delete photo the edit started from, around the boot (like the GT wing option)
       intercooler  what clearly changed below the headlights (the bumper's opening)
       interior     what clearly changed anywhere in the cabin view"""
-    if t == 'wheel' and ids is not None:
-        # the whole wheel is replaced: what clearly changed near the 3D map's wheels (and their floor reflections; the
-        # map can sit tens of pixels off the photo), each piece filled out to its outline (a wheel is an ellipse)
-        near = cv2.dilate(ids.part('stock', ['rim', 'tyre', 'caliper']), disk(80))
-        if not near.any():
+    if t == 'wheel':
+        # exactly the stock wheels and their floor reflections (assets/generated/config/wheel-ellipses.json)
+        ells = WHEEL_ELLIPSES.get(v)
+        if not ells:
             return None
-        sig = significant(base, img, 16, 150) & near
-        n, lab, st, _ = cv2.connectedComponentsWithStats(sig, 8)
         m = np.zeros((H, W), np.uint8)
-        for i in range(1, n):
-            if st[i, cv2.CC_STAT_AREA] >= 1200:
-                cv2.fillConvexPoly(m, cv2.convexHull(cv2.findNonZero((lab == i).astype(np.uint8))), 1)
-        m = cv2.dilate(m, disk(2)) & cv2.dilate(ids.part('stock', ['rim', 'tyre', 'caliper']), disk(45))
-        if paint_px is not None:   # never the body paint round the arch (Kling redraws it a little): the layer goes over every paint
-            body = paint_px & (1 - cv2.dilate(ids.part('stock', ['rim', 'tyre', 'caliper'], mirror=False), disk(4)))
-            body = cv2.morphologyEx(body, cv2.MORPH_OPEN, disk(3))
-            m &= 1 - cv2.dilate(body, disk(3))
+        for cx, cy, w, h in ells:
+            cv2.ellipse(m, ((cx, cy), (w * 1.01, h * 1.01), 0), 1, -1)
         return mask_layer(img, m, path)
     if t == 'bonnet' and ids is not None:
         part = ids.part('stock', ['bonnet'], mirror=False)
